@@ -1,6 +1,6 @@
 //! Mesh validation and boundary operations.
 
-use brepkit_math::vec::Point3;
+use brepkit_math::vec::{Point3, Vec3};
 use brepkit_topology::Topology;
 use brepkit_topology::face::FaceSurface;
 use brepkit_topology::solid::SolidId;
@@ -8,35 +8,18 @@ use brepkit_topology::solid::SolidId;
 use super::TriangleMesh;
 use super::edge_sampling::sample_edge;
 
-/// Check if a mesh is watertight (every edge shared by exactly 2 triangles).
+/// Check if a mesh is a closed 2-manifold.
 ///
-/// Returns `true` if the mesh is a closed 2-manifold: every half-edge
-/// `(a, b)` in the mesh has a corresponding reverse half-edge `(b, a)`.
-///
-/// This is useful for validating that `tessellate_solid` produces
-/// gap-free meshes.
+/// Returns `true` iff every edge is shared by exactly 2 triangles: no gaps
+/// (boundary edges), no branching (non-manifold edges). Useful for
+/// validating that `tessellate_solid` produces watertight meshes suitable
+/// for slicers and downstream geometric operations.
 #[must_use]
 pub fn is_watertight(mesh: &TriangleMesh) -> bool {
-    use std::collections::HashSet;
-
-    let mut half_edges: HashSet<(u32, u32)> = HashSet::new();
-    let tri_count = mesh.indices.len() / 3;
-
-    for t in 0..tri_count {
-        let i0 = mesh.indices[t * 3];
-        let i1 = mesh.indices[t * 3 + 1];
-        let i2 = mesh.indices[t * 3 + 2];
-        half_edges.insert((i0, i1));
-        half_edges.insert((i1, i2));
-        half_edges.insert((i2, i0));
-    }
-
-    half_edges
-        .iter()
-        .all(|&(a, b)| half_edges.contains(&(b, a)))
+    boundary_edge_count(mesh) == 0 && non_manifold_edge_count(mesh) == 0
 }
 
-/// Count boundary (non-manifold) edges in a mesh.
+/// Count boundary (one-sided) edges in a mesh.
 ///
 /// A boundary edge is one where the half-edge `(a, b)` exists but `(b, a)`
 /// does not. Returns the number of such edges. A watertight mesh has 0.
@@ -60,6 +43,165 @@ pub fn boundary_edge_count(mesh: &TriangleMesh) -> usize {
         .iter()
         .filter(|&&(a, b)| !half_edges.contains(&(b, a)))
         .count()
+}
+
+/// Count non-manifold (branching) edges in a mesh.
+///
+/// An undirected edge `{a, b}` is non-manifold when 3 or more triangles
+/// reference it. A 2-manifold mesh has 0 such edges. Distinct from
+/// [`boundary_edge_count`], which counts 1-sided edges. Use both together
+/// to validate that a tessellated solid is a closed 2-manifold.
+#[must_use]
+pub fn non_manifold_edge_count(mesh: &TriangleMesh) -> usize {
+    use std::collections::HashMap;
+
+    let mut edge_count: HashMap<(u32, u32), u32> = HashMap::new();
+    for tri in mesh.indices.chunks_exact(3) {
+        let (a, b, c) = (tri[0], tri[1], tri[2]);
+        for (p, q) in [(a, b), (b, c), (c, a)] {
+            let key = if p < q { (p, q) } else { (q, p) };
+            *edge_count.entry(key).or_default() += 1;
+        }
+    }
+
+    edge_count.values().filter(|&&c| c > 2).count()
+}
+
+/// Remove duplicate triangles, cancelling opposing pairs and dedup same-winding pairs.
+///
+/// Workaround for issue #696: when a boolean leaves overlapping coplanar faces
+/// in its output (the GFA path can do this without breaking Euler), tessellating
+/// each face independently produces multiple triangles on the same 3D positions.
+/// Slicers see this as branching (an edge shared by 3+ triangles), then "repair"
+/// it by dropping pieces — turning hollow baseplates into solid blocks.
+///
+/// Triangles are keyed by their **quantized vertex positions** (sorted), not
+/// global vertex IDs — boundary-vertex welding only runs on edges that already
+/// look like boundaries, so two coplanar interior overlaps can survive with
+/// distinct IDs at coincident positions. Pairs with matching winding
+/// (sort-permutation parity equal) deduplicate to one triangle; pairs with
+/// opposite winding cancel (both removed) — that's the signature of two faces
+/// tessellated from opposite sides of the same plane.
+pub(super) fn dedupe_coincident_triangles(mesh: &mut TriangleMesh) {
+    use std::collections::HashMap;
+
+    /// 1µm grid: tight enough that legitimately distinct CAD features (down to
+    /// ~10µm geometry like thin plates) keep separate keys, while still
+    /// merging post-merge floating-point noise in coincident vertices that
+    /// boundary-vertex welding didn't catch.
+    const POS_GRID: f64 = 1e-6;
+
+    type TriKey = [(i64, i64, i64); 3];
+    type TriRefs = Vec<(usize, bool)>;
+
+    let tri_count = mesh.indices.len() / 3;
+    if tri_count < 2 {
+        return;
+    }
+
+    #[allow(clippy::cast_possible_truncation)]
+    let quant = |p: Point3| -> (i64, i64, i64) {
+        let s = 1.0 / POS_GRID;
+        (
+            (p.x() * s).round() as i64,
+            (p.y() * s).round() as i64,
+            (p.z() * s).round() as i64,
+        )
+    };
+
+    let mut by_key: HashMap<TriKey, TriRefs> = HashMap::new();
+    for t in 0..tri_count {
+        let (a, b, c) = (
+            mesh.indices[t * 3] as usize,
+            mesh.indices[t * 3 + 1] as usize,
+            mesh.indices[t * 3 + 2] as usize,
+        );
+        let mut tri_pts = [
+            quant(mesh.positions[a]),
+            quant(mesh.positions[b]),
+            quant(mesh.positions[c]),
+        ];
+        // Sort tri_pts ascending; track parity of the sort permutation.
+        let mut parity_even = true;
+        if tri_pts[0] > tri_pts[1] {
+            tri_pts.swap(0, 1);
+            parity_even = !parity_even;
+        }
+        if tri_pts[1] > tri_pts[2] {
+            tri_pts.swap(1, 2);
+            parity_even = !parity_even;
+        }
+        if tri_pts[0] > tri_pts[1] {
+            tri_pts.swap(0, 1);
+            parity_even = !parity_even;
+        }
+        // Skip degenerate triangles (collapsed to <3 distinct positions).
+        if tri_pts[0] == tri_pts[1] || tri_pts[1] == tri_pts[2] {
+            continue;
+        }
+        by_key.entry(tri_pts).or_default().push((t, parity_even));
+    }
+
+    let mut keep = vec![true; tri_count];
+    for tris in by_key.values() {
+        if tris.len() < 2 {
+            continue;
+        }
+        let (even, odd): (Vec<_>, Vec<_>) = tris.iter().partition(|&&(_, p)| p);
+        let cancel_pairs = even.len().min(odd.len());
+        for &(t, _) in even.iter().take(cancel_pairs) {
+            keep[t] = false;
+        }
+        for &(t, _) in odd.iter().take(cancel_pairs) {
+            keep[t] = false;
+        }
+        // Of the surviving same-winding triangles, keep only one.
+        let leftover_even: Vec<_> = even.iter().skip(cancel_pairs).copied().collect();
+        let leftover_odd: Vec<_> = odd.iter().skip(cancel_pairs).copied().collect();
+        for &(t, _) in leftover_even.iter().skip(1) {
+            keep[t] = false;
+        }
+        for &(t, _) in leftover_odd.iter().skip(1) {
+            keep[t] = false;
+        }
+    }
+
+    if keep.iter().all(|&k| k) {
+        return;
+    }
+
+    let mut new_indices = Vec::with_capacity(mesh.indices.len());
+    for (t, &k) in keep.iter().enumerate().take(tri_count) {
+        if k {
+            new_indices.extend_from_slice(&mesh.indices[t * 3..t * 3 + 3]);
+        }
+    }
+
+    // Compact the position/normal buffers: drop any vertex no longer
+    // referenced by a surviving triangle. Downstream consumers that iterate
+    // `mesh.positions` directly (e.g. bbox passes, exporters that walk
+    // vertices rather than triangle indices) would otherwise see phantom
+    // vertices from removed triangles.
+    let n_verts = mesh.positions.len();
+    let mut remap: Vec<u32> = vec![u32::MAX; n_verts];
+    let mut new_positions: Vec<Point3> = Vec::new();
+    let mut new_normals: Vec<Vec3> = Vec::new();
+    for idx in &mut new_indices {
+        let old = *idx as usize;
+        if remap[old] == u32::MAX {
+            #[allow(clippy::cast_possible_truncation)]
+            let new_id = new_positions.len() as u32;
+            remap[old] = new_id;
+            new_positions.push(mesh.positions[old]);
+            if old < mesh.normals.len() {
+                new_normals.push(mesh.normals[old]);
+            }
+        }
+        *idx = remap[old];
+    }
+    mesh.indices = new_indices;
+    mesh.positions = new_positions;
+    mesh.normals = new_normals;
 }
 
 /// Edge polyline data for wireframe visualization.
