@@ -29,6 +29,11 @@ use crate::error::AlgoError;
 /// different input solids have separate vertex entities at the same position.
 type VPair = (QPos, QPos);
 
+/// Bounding boxes of two growth shells are shrunk by this amount before testing
+/// interior overlap, so shells that merely touch at a shared face, edge, or
+/// vertex are still recognized as separate lumps.
+const INTERIOR_OVERLAP_MARGIN: f64 = 1e-6;
+
 /// Build a solid from BOP-selected faces using the 4-phase algorithm.
 ///
 /// # Errors
@@ -398,6 +403,44 @@ fn perform_areas(topo: &Topology, shells: &[Vec<FaceId>]) -> (Vec<Vec<FaceId>>, 
     (growth, holes)
 }
 
+/// Axis-aligned bounding box of a shell's boundary vertices.
+fn shell_aabb(topo: &Topology, faces: &[FaceId]) -> Option<brepkit_math::aabb::Aabb3> {
+    let mut points = Vec::new();
+    for &fid in faces {
+        let Ok(face) = topo.face(fid) else { continue };
+        for wid in std::iter::once(face.outer_wire()).chain(face.inner_wires().iter().copied()) {
+            let Ok(wire) = topo.wire(wid) else { continue };
+            for oe in wire.edges() {
+                let Ok(edge) = topo.edge(oe.edge()) else {
+                    continue;
+                };
+                if let Ok(v) = topo.vertex(edge.start()) {
+                    points.push(v.point());
+                }
+                if let Ok(v) = topo.vertex(edge.end()) {
+                    points.push(v.point());
+                }
+            }
+        }
+    }
+    brepkit_math::aabb::Aabb3::try_from_points(points)
+}
+
+/// Whether a shell is closed: every quantized boundary edge is shared by an
+/// even number of the shell's own faces (a watertight, manifold lump).
+fn shell_is_closed(topo: &Topology, faces: &[FaceId]) -> bool {
+    let mut edge_counts: HashMap<VPair, u32> = HashMap::new();
+    for &fid in faces {
+        let Ok(keys) = face_edge_keys(topo, fid) else {
+            return false;
+        };
+        for key in keys {
+            *edge_counts.entry(key).or_default() += 1;
+        }
+    }
+    !edge_counts.is_empty() && edge_counts.values().all(|&c| c % 2 == 0)
+}
+
 /// Compute a signed volume estimate for a shell using the divergence theorem.
 ///
 /// Positive = outward-oriented normals (growth shell).
@@ -687,22 +730,45 @@ fn assemble(
         normalize_face_wires(topo, fid);
     }
 
-    // Use the largest growth shell as outer
+    // The outer shell bounds the largest enclosed region. Selecting by face
+    // count instead lets a heavily fragmented but small growth shell (e.g. an
+    // overlap region split into many tiny faces) win over the shell that
+    // actually carries the bulk of the volume, demoting that bulk shell to an
+    // inner shell and collapsing the measured volume.
     let outer_idx = growth_shells
         .iter()
         .enumerate()
-        .max_by_key(|(_, s)| s.len())
+        .map(|(i, s)| (i, signed_volume_of_shell(topo, s)))
+        .max_by(|a, b| a.1.total_cmp(&b.1))
         .map(|(i, _)| i)
         .unwrap_or(0);
 
     // Additional growth shells (disjoint outward-oriented regions, e.g. a cut
-    // that severs the solid into pieces) go into the same outer shell. Inner
-    // shells are reserved for cavities (hole shells); putting a disjoint piece
-    // there would mark it as a cavity and downstream multi-region handling
-    // walks only the outer shell.
+    // that severs the solid into pieces, or a disjoint fuse) join the same
+    // outer shell so their positive volume adds correctly — inner shells are
+    // reserved for cavities (hole shells), and downstream multi-region handling
+    // walks only the outer shell. A non-outer growth shell joins only when it
+    // is a genuine separate lump: closed in itself (watertight) and with an
+    // interior that does not overlap the outer shell's interior. Two boxes that
+    // merely touch at a face, edge, or vertex (their bounding boxes meet but
+    // interiors don't) are both real lumps and are kept; a residual fragment
+    // that is still open or shares the outer shell's interior is a
+    // fragmentation sliver, not a separate piece, so it is dropped rather than
+    // polluting the assembled volume. Interior overlap is tested with bounding
+    // boxes shrunk by a hair so a shared boundary does not read as an overlap.
+    // TODO: use a `Compound` for true multi-region results.
+    let outer_aabb = shell_aabb(topo, &growth_shells[outer_idx]);
     let mut outer_faces = growth_shells[outer_idx].clone();
     for (i, gs) in growth_shells.iter().enumerate() {
-        if i != outer_idx {
+        if i == outer_idx {
+            continue;
+        }
+        let interior_disjoint = matches!(
+            (outer_aabb, shell_aabb(topo, gs)),
+            (Some(a), Some(b)) if !a.expanded(-INTERIOR_OVERLAP_MARGIN)
+                .intersects(b.expanded(-INTERIOR_OVERLAP_MARGIN))
+        );
+        if interior_disjoint && shell_is_closed(topo, gs) {
             outer_faces.extend_from_slice(gs);
         }
     }
@@ -710,7 +776,7 @@ fn assemble(
         .map_err(|e| AlgoError::AssemblyFailed(format!("outer shell: {e}")))?;
     let outer_id = topo.add_shell(outer_shell);
 
-    // All hole shells become inner shells of this solid
+    // Genuine hole shells (negative signed volume) become inner shells.
     let mut inner_ids = Vec::new();
     for hole in &hole_shells {
         if let Ok(inner_shell) = Shell::new(hole.clone()) {
