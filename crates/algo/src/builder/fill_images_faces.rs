@@ -1326,6 +1326,31 @@ fn build_section_edges(
                     _ => continue,
                 };
 
+                // Skip a degenerate curved intersection curve: a non-Line curve
+                // whose 3D chord has collapsed to a point AND whose parametric
+                // span is near-zero (the `!Line` filter matches the PaveBlock
+                // sibling below so a degenerate NurbsCurve section is covered too;
+                // the chord test is the universal degeneracy signal and a genuine
+                // section always has a non-tiny chord). The FF intersection of two coaxial corner
+                // cylinders at a shared rim can emit such a remnant on one of two
+                // mismatched-segmentation corner patches (gridfinity 3×3
+                // stacking-lip fuse: one body eighth received a clean π/4 split
+                // arc, its twin received that arc PLUS this zero-span remnant at
+                // the lip-corner vertex). Threading it wove an out-and-back spur
+                // and a degenerate self-loop into that face's wire, so the patch
+                // never split into its lower/upper bands and the shell stayed
+                // open. This mirrors the PaveBlock-branch guard below; the span
+                // test (`curve_ds.t_range`) preserves a genuine full circle
+                // (~2π span) and a genuine partial arc (~π/4 span).
+                if !matches!(curve_ds.curve, EdgeCurve::Line)
+                    && (end - start).length() < tol * 100.0
+                {
+                    let (ct0, ct1) = curve_ds.t_range;
+                    if (ct1 - ct0).abs() < DEGENERATE_ARC_SPAN {
+                        continue;
+                    }
+                }
+
                 // Seam-anchored closed circles: re-parameterize so the
                 // circle starts at the periodic face's seam point. Both
                 // faces of the pair receive the same anchored geometry.
