@@ -331,6 +331,7 @@ pub fn fill_images_faces<S: BuildHasher, S2: BuildHasher>(
             &tol,
             None, // PlaneFrame built internally by face_splitter
             info.as_ref(),
+            edge_images,
         );
 
         log::debug!(

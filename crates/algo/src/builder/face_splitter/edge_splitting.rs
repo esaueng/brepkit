@@ -28,7 +28,9 @@ pub(super) fn split_boundary_edges_at_3d_points(
     let mut result = Vec::new();
     for edge in edges {
         let splits = match &edge.curve_3d {
-            EdgeCurve::Circle(circle) => find_splits_on_circle(circle, &edge, split_pts_3d, tol),
+            EdgeCurve::Circle(circle) => {
+                find_splits_on_circle(circle, &edge, split_pts_3d, surface, tol)
+            }
             EdgeCurve::Ellipse(ellipse) => {
                 find_splits_on_ellipse(ellipse, &edge, split_pts_3d, tol)
             }
@@ -40,12 +42,30 @@ pub(super) fn split_boundary_edges_at_3d_points(
             continue;
         }
 
+        let circle_iso_v_rim = matches!(edge.curve_3d, EdgeCurve::Circle(_))
+            && circle_edge_is_iso_v_rim(&edge, surface, tol);
         let mut prev_uv = edge.start_uv;
         let mut prev_3d = edge.start_3d;
-        for &(t, _) in &splits {
-            let split_3d = evaluate_edge_at_t(&edge.curve_3d, edge.start_3d, edge.end_3d, t);
+        for &(t, pt) in &splits {
+            // Circle splits carry the exact on-curve foot; re-evaluating via
+            // `evaluate_edge_at_t` would re-apply the CCW-span convention
+            // that iso-v rim splits deliberately bypass.
+            let split_3d = if matches!(edge.curve_3d, EdgeCurve::Circle(_)) {
+                pt
+            } else {
+                evaluate_edge_at_t(&edge.curve_3d, edge.start_3d, edge.end_3d, t)
+            };
             let split_uv = if let Some(f) = frame {
                 f.project(split_3d)
+            } else if circle_iso_v_rim {
+                // Interpolate within the edge's own UV span: an iso-v rim's
+                // pcurve is u-linear, and a raw principal-value projection
+                // would break phase coherence with the neighbouring
+                // boundary edges' unwrapped u.
+                brepkit_math::vec::Point2::new(
+                    (edge.end_uv.x() - edge.start_uv.x()).mul_add(t, edge.start_uv.x()),
+                    edge.start_uv.y(),
+                )
             } else {
                 project_point_on_surface(split_3d, surface, &[], None)
             };
@@ -122,6 +142,7 @@ pub(super) fn find_splits_on_circle(
     circle: &brepkit_math::curves::Circle3D,
     edge: &OrientedPCurveEdge,
     split_pts_3d: &[Point3],
+    surface: &FaceSurface,
     tol: f64,
 ) -> Vec<(f64, Point3)> {
     let (t0, t1) = edge
@@ -131,6 +152,21 @@ pub(super) fn find_splits_on_circle(
     if span.abs() < 1e-14 {
         return Vec::new();
     }
+    // `domain_with_endpoints` always returns the CCW span between the stored
+    // endpoints, but an OPEN boundary arc traversed clockwise covers the
+    // COMPLEMENT arc — a rim quarter-arc walked CW reads as its 270°
+    // complement, so an on-arc split point normalizes outside [0,1] and the
+    // split is dropped (the section dangles, the pendant filter removes it,
+    // and the rim never splits at section endpoints — the A1-corner
+    // doubled-dovetail nub). Where the edge is an iso-v rim on a
+    // cylinder/cone, its own UV span IS the true arc (u varies linearly at
+    // constant v), so test containment and parameterize directly in the
+    // edge's unwrapped u-range instead of guessing between the CCW span and
+    // its complement. Everywhere else — plane-face arcs (whose UV image is
+    // an arc, not a segment) and closed circles — keep the original CCW
+    // convention untouched; the d-series lip fuses are calibrated to it.
+    let is_iso_v_rim = circle_edge_is_iso_v_rim(edge, surface, tol);
+    let u_span = edge.end_uv.x() - edge.start_uv.x();
     let mut splits = Vec::new();
     for &sp in split_pts_3d {
         crate::perf::bump_face_split_probe();
@@ -139,15 +175,60 @@ pub(super) fn find_splits_on_circle(
         if (sp - closest).length() > tol {
             continue;
         }
-        let t_norm = normalize_angle_in_span(angle, t0, span);
+        let t_norm = if is_iso_v_rim {
+            // Unwrap the surface u of the split point into the edge's own
+            // u-range (shift by whole turns toward the range midpoint), then
+            // parameterize linearly along the traversal.
+            let Some((u_raw, _)) = surface.project_point(closest) else {
+                continue;
+            };
+            let mid = f64::midpoint(edge.start_uv.x(), edge.end_uv.x());
+            let turns = ((mid - u_raw) / std::f64::consts::TAU).round();
+            let u = std::f64::consts::TAU.mul_add(turns, u_raw);
+            (u - edge.start_uv.x()) / u_span
+        } else if matches!(surface, FaceSurface::Plane { .. }) && !edge.forward {
+            // A reversed-traversal plane arc covers ccw(end→start); the
+            // ccw(start→end) span below is its COMPLEMENT, so on-arc points
+            // would normalize outside [0,1] and drop (a bay ring absorbed
+            // into the outer boundary is walked CW — its section crossings
+            // never split it). Normalize in the physical span and map back
+            // to traversal order.
+            let (p0, p1) = edge
+                .curve_3d
+                .domain_with_endpoints(edge.end_3d, edge.start_3d);
+            let pspan = p1 - p0;
+            if pspan.abs() < 1e-14 {
+                continue;
+            }
+            1.0 - normalize_angle_in_span(angle, p0, pspan)
+        } else {
+            normalize_angle_in_span(angle, t0, span)
+        };
         if t_norm <= tol || t_norm >= 1.0 - tol {
             continue;
         }
-        splits.push((t_norm, sp));
+        splits.push((t_norm, closest));
     }
     splits.sort_by(|a, b| a.0.partial_cmp(&b.0).unwrap_or(std::cmp::Ordering::Equal));
     splits.dedup_by(|a, b| (a.0 - b.0).abs() < tol);
     splits
+}
+
+/// True when a circle boundary edge is an open iso-v rim on a cylinder/cone —
+/// the gate under which `find_splits_on_circle` parameterizes splits in the
+/// edge's own UV span (and the split consumer must interpolate UV the same
+/// way to stay phase-coherent).
+pub(super) fn circle_edge_is_iso_v_rim(
+    edge: &OrientedPCurveEdge,
+    surface: &FaceSurface,
+    tol: f64,
+) -> bool {
+    let u_span = edge.end_uv.x() - edge.start_uv.x();
+    (edge.start_3d - edge.end_3d).length() >= tol
+        && matches!(surface, FaceSurface::Cylinder(_) | FaceSurface::Cone(_))
+        && (edge.start_uv.y() - edge.end_uv.y()).abs() < 1e-9
+        && u_span.abs() > 1e-9
+        && u_span.abs() < std::f64::consts::TAU - 1e-9
 }
 
 /// Find split parameters on a marched-NURBS SECTION edge by sampled

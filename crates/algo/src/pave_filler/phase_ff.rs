@@ -201,25 +201,64 @@ pub fn perform(
             // cylinder, or a full cap circle paired with a smaller distant
             // cap). Such curves fragment faces with spurious holes and bogus
             // sub-faces downstream. Keep a curve only if at least one sample
-            // lies inside both faces' inflated AABBs.
+            // lies inside both faces' inflated AABBs. A fixed sample count
+            // misses an in-both span much shorter than the curve (a marched
+            // plane×cone conic spans the unbounded cone, so a small face's
+            // true crossing can be a ~2mm sliver of a ~30mm curve); before
+            // declaring a miss, refine with a density scaled to the smaller
+            // face AABB dimension — the same escalation the in-both
+            // restriction below applies to grazes.
             let bb_a = bbox_a.expanded(tol.linear * 10.0);
             let bb_b = bbox_b.expanded(tol.linear * 10.0);
             let raw_curves: Vec<RawCurve> = raw_curves
                 .into_iter()
                 .filter(|raw| {
-                    let n = 16;
-                    (0..=n).any(|i| {
-                        let f = f64::from(i) / f64::from(n);
+                    const N: usize = 16;
+                    let sample = |i: usize, n: usize| -> Point3 {
+                        #[allow(clippy::cast_precision_loss)]
+                        let f = i as f64 / n as f64;
                         // Line t_range is absolute arc length, not a
                         // normalized [0,1] span — sample by endpoint lerp.
-                        let p = if matches!(raw.curve, EdgeCurve::Line) {
+                        if matches!(raw.curve, EdgeCurve::Line) {
                             raw.p_start + (raw.p_end - raw.p_start) * f
                         } else {
                             let t = raw.t_range.0 + (raw.t_range.1 - raw.t_range.0) * f;
                             raw.curve.evaluate_with_endpoints(t, raw.p_start, raw.p_end)
-                        };
-                        bb_a.contains_point(p) && bb_b.contains_point(p)
-                    })
+                        }
+                    };
+                    let in_both =
+                        |p: Point3| -> bool { bb_a.contains_point(p) && bb_b.contains_point(p) };
+                    if (0..=N).map(|i| sample(i, N)).any(in_both) {
+                        return true;
+                    }
+                    // Straight lines are exactly represented by their
+                    // endpoints; a uniform scan cannot under-sample them at
+                    // this granularity in practice, and refining every far
+                    // pair would be pure cost.
+                    if matches!(raw.curve, EdgeCurve::Line) {
+                        return false;
+                    }
+                    let approx_len: f64 = (0..N)
+                        .map(|i| (sample(i + 1, N) - sample(i, N)).length())
+                        .sum();
+                    // Smallest POSITIVE extent: a planar face's bbox is flat
+                    // along its normal, and that zero span says nothing about
+                    // how finely the in-both region must be sampled.
+                    let min_dim = |bb: &Aabb3| -> f64 {
+                        let e = bb.max - bb.min;
+                        [e.x(), e.y(), e.z()]
+                            .into_iter()
+                            .filter(|&s| s > tol.linear * 1e2)
+                            .fold(f64::INFINITY, f64::min)
+                    };
+                    let dim_of = |a: &Aabb3, b: &Aabb3| -> f64 {
+                        let d = min_dim(a).min(min_dim(b));
+                        if d.is_finite() { d } else { tol.linear * 1e2 }
+                    };
+                    let dim = dim_of(&bb_a, &bb_b);
+                    #[allow(clippy::cast_possible_truncation, clippy::cast_sign_loss)]
+                    let n_fine = ((8.0 * approx_len / dim).ceil() as usize).clamp(N, 1024);
+                    n_fine > N && (0..=n_fine).map(|i| sample(i, n_fine)).any(in_both)
                 })
                 .collect();
 
@@ -1486,15 +1525,21 @@ fn trim_open_curve_to_plane_face_lines(
     else {
         return None;
     };
-    // All boundary edges must be straight lines — the extent polygon is then
-    // the exact boundary (curved edges are sampled into it, which would make
-    // the "exact" crossing land on a chord instead of the real edge).
+    // Exact crossings are only computed against STRAIGHT boundary edges, so
+    // the plane face's straight edges must dominate where the conic exits.
+    // Curved boundary edges (a prior cut's rim arcs and conics — the second
+    // relief cut of a compound-relieved tongue) are tolerated as long as the
+    // kept pieces never need a crossing against them: their chords still
+    // enter the sampled polygon for containment, and a piece straying into a
+    // curved edge's chord/arc ambiguity is rejected below by the dense
+    // in-polygon sample check (declining to the generic path as before).
     let face = topo.face(plane_face).ok()?;
+    let mut has_curved_boundary = false;
     for wid in std::iter::once(face.outer_wire()).chain(face.inner_wires().iter().copied()) {
         let wire = topo.wire(wid).ok()?;
         for oe in wire.edges() {
             if !matches!(topo.edge(oe.edge()).ok()?.curve(), EdgeCurve::Line) {
-                return None;
+                has_curved_boundary = true;
             }
         }
     }
@@ -1647,6 +1692,62 @@ fn trim_open_curve_to_plane_face_lines(
         }
     }
 
+    // Crossings of the partner face's axial `v`-range rims. The conic is
+    // clipped to the plane face's boundary above and to the cone's angular
+    // window, but a flank conic can also EXIT through the patch's axial
+    // extent (the rim circle at v0/v1) between those — the overshoot then
+    // dangles past the rim, the splitter's pendant filter removes the whole
+    // section chain, and the cone cap never splits out (the A1-corner
+    // doubled-dovetail nub). Bisect v(t) to the exact rim crossing so the
+    // kept piece ends ON the rim. The destructure matches any Analytic
+    // extent, but this function's entry gate already restricted the partner
+    // surface to a Cone, whose `v` is axial and non-periodic.
+    if let FaceExtent::Analytic {
+        surface: other_surface,
+        v0,
+        v1,
+        ..
+    } = ext_other
+    {
+        let v_of =
+            |t: f64| -> Option<f64> { other_surface.project_point(eval_at(t)).map(|(_, v)| v) };
+        let v_eps = 1e-12_f64;
+        for &vb in &[*v0, *v1] {
+            for i in 0..n_samples {
+                let (t_lo, t_hi) = (sample_t(i), sample_t(i + 1));
+                let (Some(w_lo), Some(w_hi)) = (v_of(t_lo), v_of(t_hi)) else {
+                    continue;
+                };
+                let (s_lo, s_hi) = (w_lo - vb, w_hi - vb);
+                let t_star = if s_lo.abs() <= v_eps {
+                    t_lo
+                } else if s_hi.abs() <= v_eps {
+                    t_hi
+                } else if s_lo * s_hi > 0.0 {
+                    continue;
+                } else {
+                    let (mut lo, mut hi, mut sl) = (t_lo, t_hi, s_lo);
+                    for _ in 0..60 {
+                        let mid = f64::midpoint(lo, hi);
+                        let Some(sm) = v_of(mid).map(|w| w - vb) else {
+                            break;
+                        };
+                        if sm * sl < 0.0 {
+                            hi = mid;
+                        } else {
+                            lo = mid;
+                            sl = sm;
+                        }
+                    }
+                    f64::midpoint(lo, hi)
+                };
+                if !crossings.iter().any(|&c| (c - t_star).abs() < 1e-9) {
+                    crossings.push(t_star);
+                }
+            }
+        }
+    }
+
     // Whole curve inside (or outside) the face: no crossings — keep or drop
     // by a single interior test; deferring (None) would hand the generic
     // sample-clip a curve this path has already proven in-plane, so decide
@@ -1680,6 +1781,19 @@ fn trim_open_curve_to_plane_face_lines(
         let sub_pts: Vec<Point3> = (0..=8)
             .map(|k| eval_at(t0 + (t1 - t0) * (f64::from(k) / 8.0)))
             .collect();
+        // With curved boundary edges present, a kept piece must stay strictly
+        // inside the sampled polygon along its whole span: exact crossings
+        // were only computed against straight segments, so a piece straying
+        // out mid-span would have needed a crossing against a curved edge —
+        // where the sampled chord is not the real boundary. Decline the whole
+        // call (the pre-relaxation behavior) rather than emit it.
+        if has_curved_boundary
+            && sub_pts[1..8]
+                .iter()
+                .any(|p| !inside_face(frame.project(*p)))
+        {
+            return None;
+        }
         let bbox = Aabb3::try_from_points(sub_pts)?;
         // Trim the stored NURBS geometry to the kept span. Downstream
         // consumers normalize over `domain_with_endpoints`, which for a NURBS
