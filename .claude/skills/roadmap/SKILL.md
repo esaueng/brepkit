@@ -214,10 +214,73 @@ trusted stored `start_uv` for its hole-rejection polygon and one
 foreign-frame vertex corrupted it — classifier seeds landed inside the
 opening and the slab top was dropped. Fixed by deriving every polygon vertex
 from 3D through the plane frame. Tool-verified: the dovetail suite's
-fractional tile passes; with the tangency-nub PR (#1075) the suite reaches
-9/9. DURABLE: stored `start_uv`/pcurves on hole wires can be fitted in a
-FOREIGN frame — any consumer building polygons from them must re-derive via
-frame.project(3D) (same class as the pcurve-convention lesson).
+fractional tile passes; with the tangency-nub + groove-mouth PR (#1078) the
+suite reaches 9/9. DURABLE: stored `start_uv`/pcurves on hole wires can be
+fitted in a FOREIGN frame — any consumer building polygons from them must
+re-derive via frame.project(3D) (same class as the pcurve-convention lesson).
+
+Fit-offset groove-mouth sliver family — CLOSED (2026-07-16, PR #1078, fixture
+`crates/io/tests/fitoffset_groove_mouth_inmem.rs`): each groove cutter's mouth
+clips the adjacent socket-pocket rim corners, leaving zero-width top-face
+slivers; three variants of the root appear as the chain progresses (each cut
+absorbs its mouth rings into the outer wire as bays). Five coordinated fixes —
+pave-split hole promotion into the combined arrangement (expansion kept OUT of
+the weave input, whose whole-edge re-trace discriminant is calibrated on
+unsplit hole edges — pcut3 foil); a CLEAN-TILING cutoff for even-odd hole
+nesting (a proper subdivision never nests; component and edge-sharing
+discriminants both REFUTED by the divider-lip fuse foil); true circle×section
+splits of boundary bay arcs applied ONLY on the arrangement path (global
+splits broke d4) plus a bay-mouth arrangement entry (≥2 holes); arc-true
+region-polygon probes; at-seam UV endpoint resolution on periodic surfaces
+(a 4th-quadrant corner cone's window read as its complement — span derivation
+from the circle's own parameterization REFUTED, stored normal can oppose the
+surface axis) with orientation-aware plane-arc split normalization. The
+captured export chain runs fully analytic+watertight (182→211 faces; the
+PUBLISHED kernel's "pass" encloses phantom void wedges at every groove-mouth
+corner). DURABLE: the splitter's paths are a web of mutual calibrations — d4,
+honeycomb pcut3, divider-lip, and the nub fixtures are the four foils; run ALL
+of them on any face_splitter change (each caught a wrong discriminant this
+session that fit-offset alone blessed).
+
+Fresh baseplate re-probe on PUBLISHED 2.126.2 (2026-07-16, overlay md5-verified):
+dovetailKey 2/2 and fit-offset 2/2 CONFIRMED on the published build; dovetail
+7/9 @188s (was 6/9 @355s) — the 4×4-interior doubled-dovetail (the relief-cut
+family) passes end-to-end tool-side; snapClip 0/4 with ALL signatures moved
+since the mesh-boolean rewrite (join nm 14→4, key nm 12→0 but bnd=326, 0.6mm
+nozzle nm 1→15, clip volume 46.78→46.70 vs 46.6±0.05). Dovetail residuals:
+
+- **2×2 A1-canonical doubled-dovetail nm=2 — CLOSED (2026-07-16, PR #1078,
+  fixture `crates/io/tests/dovetail_dblcorner_nub_inmem.rs`; tool-verified on
+  the overlay: dovetail 9/9 @37s, dovetailKey 2/2, fit-offset 2/2 — the
+  265s fractional slow case is gone with the groove-mouth fix).** The paired tongue sits offset by exactly the socket corner
+  radius, straddling the wall-plane↔corner-cylinder tangency meridian (the
+  recurring tangential-contact class). THREE stacked roots: (1) the FF
+  raw-curve AABB pre-filter's fixed 16-sample scan missed the flank×cone
+  conic's ~2mm in-both sliver on a ~30mm marched curve — the pair vanished
+  before the exact open-conic clip ever ran (mirror nub survived by sampling
+  luck); now refines adaptively like the restrict graze escalation. (2)
+  `trim_open_curve_to_plane_face_lines` clipped conics to the plane face's
+  boundary + the cone's u-window but NOT the patch's axial v-range — the kept
+  piece overshot the rim circle, dangled, and the splitter's pendant filter
+  removed the whole section chain; now bisects v(t) to exact rim crossings.
+  (3) `find_splits_on_circle` normalized against the CCW start→end span, but
+  a rim quarter-arc traversed CW covers the 270° COMPLEMENT (the #1054
+  reverse-twin mechanism on BOUNDARY arcs; `edge.forward` does NOT
+  disambiguate — the cone rim is fwd=true with u decreasing); now picks the
+  true arc via the edge's own UV midpoint and the consumer uses the returned
+  on-circle foot. Result: 10-face analytic nub (1 cone + 1 cyl + 8 planes),
+  watertight, both boolean entries. LATENT: `find_splits_on_ellipse` has the
+  same complement hazard, no repro yet.
+- **Fractional edge tile 5×4.5 — CLOSED by the seam-edge flush pocket fix
+  (#1076, fixture `fracplate_seam_pocket_inmem.rs`; see the closure entry
+  above).** The old forExport=true capture (F=7928 pocketsCut) was the wrong
+  variant; the true export-variant root was the flush-wall pocket cut.
+- **Mesh-boolean fallback emits OPEN meshes that get CONSUMED — OPEN
+  (discovered 2026-07-16):** on the dblcorner nub operands the co-refinement
+  fallback produced bnd=5/6 output (warn-logged, then used anyway, poisoning
+  every downstream boolean into a 1400-face fallback export). The safety net
+  must be watertight or rejected. Repro: the dblcorner fixture operands with
+  the analytic path disabled, or any pre-fix build.
 
 combinedFeatures re-read (2026-07-10, 2.124.13-based overlay, full 11-case suite):
 all 6 structural cases PASS including "handles + label (back skip)" (7167 tris,
