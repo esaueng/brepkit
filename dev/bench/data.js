@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784435490079,
+  "lastUpdate": 1784435836309,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -107,6 +107,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26796423,
             "range": "± 463690",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "3d2c4b186f84fb25e2fa798e1b9c98903a63e246",
+          "message": "Add OpenZCAD WASM release workflow",
+          "timestamp": "2026-07-19T00:34:47-04:00",
+          "tree_id": "563bd35ea6f376790822927952be4bb0a38efb4c",
+          "url": "https://github.com/esaueng/brepkit/commit/3d2c4b186f84fb25e2fa798e1b9c98903a63e246"
+        },
+        "date": 1784435835529,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 889647,
+            "range": "± 12268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 977798,
+            "range": "± 933",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12712,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 654195,
+            "range": "± 1843",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 27052868,
+            "range": "± 48367",
             "unit": "ns/iter"
           }
         ]
