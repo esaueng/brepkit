@@ -1,5 +1,5 @@
 # BrepKit WASM for OpenZCAD
 
-Generated from `esaueng/brepkit@e81fd6e8354159f62adf25bcbc5da495d64255e3` by the
+Generated from `esaueng/brepkit@cf7a8c3c680ca530889162098306d095d6698674` by the
 `Build OpenZCAD WASM Release` workflow. Consumers should pin the
 resulting distribution commit.
