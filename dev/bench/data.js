@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784436950358,
+  "lastUpdate": 1784437867089,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -323,6 +323,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26887539,
             "range": "± 176120",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "70bc69f07e758c7b556e20165daeb570d08562c6",
+          "message": "Track source lineage in WASM branch",
+          "timestamp": "2026-07-19T01:08:53-04:00",
+          "tree_id": "c14f14c5a3506a3e3156c6cd5353bf5848c2026a",
+          "url": "https://github.com/esaueng/brepkit/commit/70bc69f07e758c7b556e20165daeb570d08562c6"
+        },
+        "date": 1784437866379,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 765079,
+            "range": "± 18678",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 891912,
+            "range": "± 8759",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10695,
+            "range": "± 253",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 577419,
+            "range": "± 14014",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 24482425,
+            "range": "± 265903",
             "unit": "ns/iter"
           }
         ]
