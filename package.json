@@ -32,13 +32,13 @@
     "type": "git",
     "url": "git+https://github.com/esaueng/brepkit.git"
   },
-  "homepage": "https://github.com/esaueng/brepkit",
-  "brepkitSourceCommit": "3d2c4b186f84fb25e2fa798e1b9c98903a63e246",
   "sideEffects": [
     "./brepkit_wasm.js",
     "./snippets/*"
   ],
   "type": "module",
   "types": "brepkit_wasm.d.ts",
-  "version": "2.126.20"
+  "version": "2.126.20",
+  "homepage": "https://github.com/esaueng/brepkit",
+  "brepkitSourceCommit": "e81fd6e8354159f62adf25bcbc5da495d64255e3"
 }
