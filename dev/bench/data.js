@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784436309717,
+  "lastUpdate": 1784436636448,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -215,6 +215,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26762366,
             "range": "± 238557",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "e81fd6e8354159f62adf25bcbc5da495d64255e3",
+          "message": "Fix OpenZCAD package publishing",
+          "timestamp": "2026-07-19T00:48:16-04:00",
+          "tree_id": "04e796f187dce848c4eb19d75b3448a36e08cdc3",
+          "url": "https://github.com/esaueng/brepkit/commit/e81fd6e8354159f62adf25bcbc5da495d64255e3"
+        },
+        "date": 1784436635524,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 888581,
+            "range": "± 1485",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 981860,
+            "range": "± 1662",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12496,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 655989,
+            "range": "± 16442",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26816266,
+            "range": "± 64404",
             "unit": "ns/iter"
           }
         ]
