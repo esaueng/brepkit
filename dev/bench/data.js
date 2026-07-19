@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784435358976,
+  "lastUpdate": 1784435490079,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -53,6 +53,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26977374,
             "range": "± 110084",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0162f1f55246aff99c53f9b62ca51888ebbf1984",
+          "message": "Merge branch 'andymai:main' into main",
+          "timestamp": "2026-07-19T00:28:00-04:00",
+          "tree_id": "8edfdaf744ecbcb49b21adaf7f76266551643b9d",
+          "url": "https://github.com/esaueng/brepkit/commit/0162f1f55246aff99c53f9b62ca51888ebbf1984"
+        },
+        "date": 1784435489341,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 894843,
+            "range": "± 2892",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 978922,
+            "range": "± 3707",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12701,
+            "range": "± 117",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 652595,
+            "range": "± 1629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26796423,
+            "range": "± 463690",
             "unit": "ns/iter"
           }
         ]
