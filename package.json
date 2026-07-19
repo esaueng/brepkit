@@ -40,5 +40,5 @@
   "types": "brepkit_wasm.d.ts",
   "version": "2.126.20",
   "homepage": "https://github.com/esaueng/brepkit",
-  "brepkitSourceCommit": "cf7a8c3c680ca530889162098306d095d6698674"
+  "brepkitSourceCommit": "70bc69f07e758c7b556e20165daeb570d08562c6"
 }
