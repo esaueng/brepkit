@@ -1,0 +1,44 @@
+{
+  "description": "WebAssembly bindings for brepkit — browser-native B-Rep solid modeling",
+  "exports": {
+    ".": {
+      "default": "./brepkit_wasm.js",
+      "import": "./brepkit_wasm.js",
+      "node": "./brepkit_wasm_node.cjs"
+    },
+    "./brepkit_wasm_bg.wasm": "./brepkit_wasm_bg.wasm"
+  },
+  "files": [
+    "brepkit_wasm_bg.wasm",
+    "brepkit_wasm.js",
+    "brepkit_wasm_bg.js",
+    "brepkit_wasm.d.ts",
+    "brepkit_wasm_node.cjs",
+    "LICENSE-MIT",
+    "LICENSE-APACHE"
+  ],
+  "keywords": [
+    "cad",
+    "brep",
+    "wasm",
+    "geometry",
+    "solid-modeling"
+  ],
+  "license": "MIT OR Apache-2.0",
+  "main": "brepkit_wasm_node.cjs",
+  "module": "brepkit_wasm.js",
+  "name": "brepkit-wasm",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/esaueng/brepkit.git"
+  },
+  "homepage": "https://github.com/esaueng/brepkit",
+  "brepkitSourceCommit": "3d2c4b186f84fb25e2fa798e1b9c98903a63e246",
+  "sideEffects": [
+    "./brepkit_wasm.js",
+    "./snippets/*"
+  ],
+  "type": "module",
+  "types": "brepkit_wasm.d.ts",
+  "version": "2.126.20"
+}
