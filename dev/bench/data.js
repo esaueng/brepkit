@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784435836309,
+  "lastUpdate": 1784436309717,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -161,6 +161,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 27052868,
             "range": "± 48367",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "ba62c2b883a3a245c8fa13acb902d8b6df1f9e0c",
+          "message": "Publish fork WASM git dependency",
+          "timestamp": "2026-07-19T00:42:55-04:00",
+          "tree_id": "ec5652d6ac47ce8037b703307190ed194a4ac889",
+          "url": "https://github.com/esaueng/brepkit/commit/ba62c2b883a3a245c8fa13acb902d8b6df1f9e0c"
+        },
+        "date": 1784436309414,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 893185,
+            "range": "± 1507",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 980169,
+            "range": "± 2155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12507,
+            "range": "± 19",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 649468,
+            "range": "± 1405",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26762366,
+            "range": "± 238557",
             "unit": "ns/iter"
           }
         ]
