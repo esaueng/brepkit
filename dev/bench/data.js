@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1784438524110,
+  "lastUpdate": 1784524033539,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -431,6 +431,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26703230,
             "range": "± 113773",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergustafson@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "bb5b70b8ecf34b832025bb2154107936acc22e2d",
+          "message": "Complete production readiness upgrades",
+          "timestamp": "2026-07-20T01:04:39-04:00",
+          "tree_id": "3af692ec2604046ce07b99a2efd2cdd8806c0a5f",
+          "url": "https://github.com/esaueng/brepkit/commit/bb5b70b8ecf34b832025bb2154107936acc22e2d"
+        },
+        "date": 1784524033206,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 894895,
+            "range": "± 4152",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 982848,
+            "range": "± 3032",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12596,
+            "range": "± 22",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 654163,
+            "range": "± 1822",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26885295,
+            "range": "± 94722",
             "unit": "ns/iter"
           }
         ]
