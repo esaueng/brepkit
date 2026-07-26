@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785095656095,
+  "lastUpdate": 1785103078296,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1295,6 +1295,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21996250,
             "range": "± 397080",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eec77c4317f55ae70342bc4badc602923fb2fd72",
+          "message": "fix(operations): real winding number, consolidate classify onto check (#17)\n\n`classify_point_winding` was wrong on every curved solid, and the module\nit lived in was a stale duplicate of `brepkit_check::classify`.\n\nThree defects, all in `crates/operations/src/classify.rs`:\n\n1. `compute_winding_number` was not a winding number. It counted crossings\n   of a single fixed ray and returned exactly 1.0 or 0.0, despite the docs\n   promising \"generalized winding numbers (robust to gaps, uses\n   tessellation)\". It had a single ray's fragility and none of the\n   robustness the name implies.\n\n2. The module was a ~1000-line near-duplicate of `brepkit_check::classify`\n   that never read `inner_wires`, so it still had the face-hole bug fixed\n   in 10556c4. The WASM bindings call THIS copy, so every JS consumer was\n   still on the broken path. It was also wrong in a way `check` never was:\n   on the flange+hub+bolt-hole solid it reported solid material as\n   Outside. Measured 3 of 10 probes wrong; now 0.\n\n3. `component_aabb_centre` unioned only vertex positions. A cylindrical\n   component's only vertices are its two seam points, so the box collapsed\n   in x and y and the \"centre\" landed exactly ON the wall. The boolean\n   Intersect gate samples that point to ask whether a component is interior\n   to an operand — a surface point makes it a coin flip. It survived only\n   because the old single-ray parity happened to answer Inside there; the\n   correct classifier answers Outside, since tessellation inscribes a\n   cylinder and a point on the true surface is outside the facet chords.\n   Now unions `check::util::face_aabb`, which expands for curve extent and\n   surface curvature.\n\nRay casting now delegates to `brepkit_check::classify`, the ground-truth\nclassifier. Winding is reimplemented as a real solid-angle sum over\n`tessellate_solid` output, which is why it stays here: it needs the L3\nmesher, and `brepkit-check` is L2.\n\n`check`'s own winding classifier is kept and its curved-face limitation\ndocumented rather than left implied — the fan is built from a face's\nboundary loop, which equals the face only when the face is planar.\n\nPublic signatures are unchanged; `deflection` on the ray-cast entry point\nis now explicitly documented as ignored. All 21 behavioural tests from the\ndeleted module are ported and pass unchanged against the delegating\nimplementation.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T17:55:35-04:00",
+          "tree_id": "69712e52128076c0fe2c69c997afc6c6e267012d",
+          "url": "https://github.com/esaueng/brepkit/commit/eec77c4317f55ae70342bc4badc602923fb2fd72"
+        },
+        "date": 1785103077441,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 832652,
+            "range": "± 23345",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 922099,
+            "range": "± 16609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13007,
+            "range": "± 15",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 669397,
+            "range": "± 1770",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22082574,
+            "range": "± 82536",
             "unit": "ns/iter"
           }
         ]
