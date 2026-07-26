@@ -635,6 +635,21 @@ round-trip) across 220+ processes, native + wasm batch, debug + release. Pinned 
 `cut_corner_coincident_cylinder_readme_example`; if either regresses, that is the
 tangential-contact class — start at the boolean-debugging skill.
 
+Fork-local "hardening" commits carry geometry hazards (2026-07-25, two closed): the
+`fbb9d7e`/`bb5b70b` "Harden geometry input boundaries"/"production readiness" edits to
+`crates/math` broke (1) bezier-clip line-line crossings — the unconditional
+weight-normalization divide in `NurbsCurve::evaluate` added one ulp of rounding, which
+the degenerate-AABB crossing test cannot tolerate (fixed: normalization gated to
+pathological magnitudes, pin `line_line_crossing_survives_degenerate_aabb_ulp`); and
+(2) miter sweeps — the `u.clamp(domain)` in `NurbsCurve::evaluate/derivatives`
+silently truncated the out-of-domain path extrapolation miter extension relies on
+(fixed: curve clamps removed; surface/evaluator clamps kept — the fillet helper
+evaluates surfaces out of domain and trips the new ww debug_assert without them).
+When a fork-sync suddenly breaks a math-adjacent test that upstream passes, bisect
+the fork-local commits FIRST (`git log e4f8792..ff80688` shape), and expect
+behavior-masking interactions: the clamp bug was masked ON CI by the normalization
+bug's rounding until the latter was fixed.
+
 Export-integrity matrix baseline (2026-07-24, `binGenerator.scenario.export-integrity`, 408 tests
 asserting zero boundary edges + bounded non-manifold on the exported STL — the tool's own version of
 the STL edge-use oracle). Published 2.128.2: **43 failed / 365 passed**. Local main (T-lip #1209 +
