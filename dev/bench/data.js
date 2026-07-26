@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785091650525,
+  "lastUpdate": 1785091782218,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -971,6 +971,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 18263650,
             "range": "± 242512",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2659e0ac677355b0bac4e7000b029f4af9fd6714",
+          "message": "feat(wasm): configurable healing — per-fix config and custom pipelines (#5)\n\nExposes the heal crate's configurability that was hidden behind the two\nfixed-recipe entry points (healSolid/repairSolid):\n\n- fixShapeWithConfig(solid, configJson): the full fix hierarchy driven by\n  FixConfig — all 26 per-fix tri-state switches (off/auto/on) addressable\n  by camelCase name, plus an optional tolerance override. Unknown fix\n  names and modes are hard errors, never silent defaults. Returns the\n  healed solid handle with actionsTaken/done/failed from the Status flags.\n- runHealPipeline(solid, steps): executes named built-in operators in\n  order via HealProcess, returning a per-step report; an unknown step\n  fails the run. healPipelineSteps() lists the 13 registered operators\n  from the live registry.\n- tsify result types (HealFixResult, HealPipelineResult, HealStepResult);\n  logic in natively-testable _impl methods with tests covering the\n  valid-box no-op, all-off config taking zero actions, typo rejection,\n  ordered pipeline reporting, and step-name discovery.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T14:47:30-04:00",
+          "tree_id": "cad5df4ccb6f28dcf18bb4d82614a61332859396",
+          "url": "https://github.com/esaueng/brepkit/commit/2659e0ac677355b0bac4e7000b029f4af9fd6714"
+        },
+        "date": 1785091781866,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 808160,
+            "range": "± 1195",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 901368,
+            "range": "± 3260",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12719,
+            "range": "± 32",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 628613,
+            "range": "± 1783",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21148879,
+            "range": "± 48747",
             "unit": "ns/iter"
           }
         ]
