@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785103925246,
+  "lastUpdate": 1785110003223,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1403,6 +1403,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21699527,
             "range": "± 41303",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b6608862c4c128ceedad2a98ab6120aabaa4a7fd",
+          "message": "feat(operations): native push/pull and cylindrical-face resize (#18)\n\n* fix(algo): drop pre-existing holes nested inside a new internal loop\n\nRe-boring a hole (cut a block with r=3, then coaxially with r=5) left the\nold r=3 rim behind as an inner wire on both cap faces while no r=3\ncylindrical face remained. Each stale rim was then used by exactly one\nface, so the exported shell was not closed and the STEP export read back\nas a broken solid.\n\nVolume and relaxed validation both missed it: the old disc is contained\nin the new one, so the redundant hole subtracts no area.\n\nA pre-existing hole lying entirely inside a new internal loop belongs to\nthe region that loop carves out, not to the surrounding remainder. Move\nit onto that loop's sub-face and give the sub-face an interior probe on\nthe resulting annulus, since its centroid falls in the hole. The existing\nunion pass only handled PARTIAL overlap and is Line-only, so a circular\nrim never reached it; the new containment test is arc-true.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* fix(operations): disprove containment with the tool's own vertices\n\nThe no-classifier containment shortcut tested only the inner solid's AABB\ncentre. Growing a boss from r=5 to r=8 produces a tool whose AABB nests\ninside the solid's and whose centre sits on the axis, inside the OLD boss,\nso containment read true and Fuse silently returned the unmodified solid.\n\nProbe the inner solid's boundary vertices as well. A point of the inner\nsolid proven outside the outer one disproves containment outright, so the\nextra probes can only reject a false containment, never a true one. The\nprobe count is capped to bound the added ray-casts on dense solids.\n\nA vertex of `inner` is NOT re-classified against `inner`: it lies on that\nboundary by construction, and `classify_point` reports a boundary vertex as\nOutside, so asking would discard every vertex witness and silently disable\nthe whole check. Only the AABB centre — which can fall in a concavity — is\ntested for membership.\n\n`classify_point` reports a point ON `outer`'s boundary as Outside, so \"not\ninside\" is not a disproof on its own: for identical solids every vertex of\n`inner` rides `outer`'s boundary and would spuriously refute a containment\nthat genuinely holds (the interior-tile identity intersect). The witness must\nalso stand clear of that boundary by a margin before its verdict counts.\n\nThis also stops the shortcut swallowing a ring fused into a shelled cup:\nthat ring sits in the cup's cavity, not its material, and the boolean was\nreturning the cup unchanged — measured `fused - cup == 0.0000`, same five\nfaces, ring gone. `fuse_ring_inside_shelled_cylinder` asserted only a 0.35\nrelative-volume band, and a wholly-absent 226-unit ring against a 1725-unit\nexpectation is a 13% error, so it passed on that wrong answer. With\ncontainment disproved correctly the boolean attempts the fuse for real and\nfails, because fusing disjoint bodies is genuinely unimplemented (the result\nis five disconnected shell components). The test is ignored with that\nevidence rather than left green on a dropped operand.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* feat(operations): add push_pull_face and resize_cylindrical_face\n\nDirect edits that move a face of an existing solid, as opposed to\noffset_face, which offsets a standalone face into a new one.\n\npush_pull_face extrudes the tool from the selected face itself, so inner\nwires carry through, and merges the coplanar seams the boolean leaves so\npulling twice by 1 matches pulling once by 2.\n\nresize_cylindrical_face reads the concavity from the face's orientation\nand its axial extent from the face, so caps are preserved and only the\nwall moves. Growing a wall sweeps it into open space and is a single\nflush boolean. Shrinking would meet the solid only along the coincident\nwall and the coplanar cap rims, which the boolean engine drops whole, so\nthe feature is erased with an overlapping tool and rebuilt at the new\nradius instead.\n\nBoth operations gate their output: the shell must be closed and the\nvolume must match the value the edit is defined to produce. That is what\nmakes the geometric construction trustworthy — a tool that reached\nmaterial it should not have, or a boolean that silently dropped one, is\nrejected rather than returned. Stranded rims left by a replaced coaxial\nfeature are removed before the gate, since they bound nothing.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* feat(wasm): expose pushPullFace and resizeCylindricalFace\n\nAdds the direct-edit operations as BrepKernel methods and executeBatch\nentries, plus smoke-test coverage that pulls a box face, widens a bore,\nand exports the widened bore to STEP.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* test(io): cover STEP round-trip for replaced coaxial cylindrical faces\n\nAsserts the free-edge count alongside the round-trip, since that is the\nonly gate that exposed the stale-rim defect — volume and relaxed\nvalidation both passed while the shell was open. Covers the original\ndouble-subtract repro, an overshooting tool variant, and the push/pull\nand cylinder-resize results.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* fix(operations): merge coaxial cylindrical bands without losing the seam\n\nunify_faces read a seam edge as a shared internal edge and deleted it.\n`edge_to_face_map` records a seam twice on purpose — it appears twice in\none face's wire — and the internal-edge test only asked for two face-uses,\nnever that they came from two DIFFERENT faces.\n\nTwo stacked coaxial bore bands (a bore re-drilled deeper, a boss grown in\ntwo steps) therefore merged into a pair of disjoint rim circles, which\nreassembled as an outer wire plus a bogus inner wire on a cylinder. The\nmerged face had no seam at all, and its volume was wrong.\n\nKeeping the seams exposes a second gap: the boundary is one loop only in\nthe surface's parameter space, and the position-walk closes a loop the\nmoment it steps onto a closed rim. Rebuild that loop explicitly as\n`[low rim, seam chain up, high rim, seam chain back down]` — the same wire\n`make_cylinder` builds — and fall through to the generic walker for any\ngroup that is not that shape.\n\nAlso drop holes whose every edge became internal. When a face's hole is\nfilled by another face in the group (an annular sleeve dropped into a\nbored cap, where the sleeve's outer rim IS the cap's hole), carrying the\nhole over left the merged face with a rim no other face borders.\n\nThis is what the holed push/pull cases were waiting on, so their ready\nrepros are un-ignored here, and the guard asserting push_pull REFUSES a\ndegraded holed result is dropped — the result is no longer degraded.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* fix(algo): classify coplanar faces that abut a bore rim\n\nAn annular cap fused into a matching bore was classified inconsistently —\nthe bottom kept, the top dropped — leaving free edges. Three degeneracies\ncompounded, all rooted in a boundary that is a single closed circle:\n\n- `sample_face_interior` measured its bounding box from edge endpoints\n  only. A closed rim has start == end, so the box collapsed to a point and\n  the inward offset degenerated to the linear tolerance, putting the sample\n  1e-7 from its own rim — on top of the coincident wall, where the ray cast\n  is a coin flip. Sample along curved edges instead.\n- A face with holes was sampled by offsetting inward from the outer\n  boundary alone, which hugs one rim. Pick the candidate with the greatest\n  clearance from every rim, so a bored cap is probed mid-annulus.\n- `sub_face_outer_vertices` returned None for a one-circle boundary, so the\n  coincident-coplanar path gave up and deferred to the grazing ray cast.\n\nWith a real polygon the wedge search still found no tip, because the\nopposing hole is polygonised as an inscribed polygon and the cap's rim\nvertices sit up to the sagitta inside it. Bound that band by c^2/8R (the\nchord itself is an order of magnitude too wide and would swallow genuinely\ninterior vertices), and let the sub-face's interior point serve as the\nprobe when its whole boundary rides the opposing rim.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* refactor(operations): resize a wall with the sleeve it actually moves\n\nWith coaxial merging fixed, shrinking no longer needs the erase-and-rebuild\ndetour and its clearance search. Growing and shrinking are now the same\nconstruction — the annular sleeve between the two radii over the face's own\nextent, added for a boss and removed for a bore — and the holed push/pull\ntests that were ready-repros for the merge gap are back on.\n\nThe tool frame is built by Gram-Schmidt rather than a cross product, so a\n+Z axis gives the identity frame and the tool's seam sits at the same angle\nas the seam on the wall it replaces. A rotated frame puts the two\ncoincident cylindrical faces' seams at different angles and the pair stops\nmerging cleanly.\n\n`fuse_ring_inside_shelled_cylinder` is ignored, not fixed. Its ring is\ndisjoint from the cup and the fuse returns five disconnected shell\ncomponents with ~80 inconsistently-oriented shared edges and\nself-intersecting wires; the volume varies run to run at baseline. Its 0.35\nvolume band passed by luck, and previously only because unify_faces\ncorrupted the merge in a way that landed on the accepting side of the gate.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* fix(operations): sort shell's open-boundary edges before tracing the rim\n\n`shell` collected its open-boundary edges by iterating the std HashMap that\n`edge_to_face_map` returns, so their order was seed-dependent. That order\ndecides where `sort_edges_into_loops` starts each chain, and a different\nstarting edge splits the rim into a different NUMBER of loops: the shelled\ncup's rim came back with one, two or three inner wires depending on the\nprocess, moving its measured volume between roughly 900 and 1500 across runs.\n\nSort by edge id, matching what `tessellate::solid` already does with the same\nmap for the same reason.\n\nA 19-scenario sweep — primitives, all three booleans, sequential cuts, three\nshell variants, ring-in-cup, fillet, chamfer, direct edits, tessellation — is\nbyte-identical across ten processes with this in place; `determinism_sweep` is\nthat harness, kept as a tool.\n\nThe sort only makes the rim STABLE, not right. Tracing it dumps a boundary\nthat also carries free edges from the bottom faces (points at z=0 and z=wall),\nbecause the assembled outer and inner faces are not edge-shared there, so two\nof the four loops jump across the solid instead of ringing the opening. The\nvolume lands ~20% under the analytic 1425.93. Fixing that means making the\nbottom faces share edges; the new gate pins the numbers meanwhile so they\ncannot drift further.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T19:51:10-04:00",
+          "tree_id": "38eb9abc501e62e41cad5ae2bc7e92b201eb9ac5",
+          "url": "https://github.com/esaueng/brepkit/commit/b6608862c4c128ceedad2a98ab6120aabaa4a7fd"
+        },
+        "date": 1785110002885,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 822273,
+            "range": "± 1500",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 908914,
+            "range": "± 3206",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12864,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 663845,
+            "range": "± 2273",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21766445,
+            "range": "± 58780",
             "unit": "ns/iter"
           }
         ]
