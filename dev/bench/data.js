@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785091782218,
+  "lastUpdate": 1785092047617,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1025,6 +1025,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21148879,
             "range": "± 48747",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e8e073ad410c8aab47011a2be6dc2dcec48fcb43",
+          "message": "fix(math): bezier-clip hull vertex check defeated straight-line clips (#8)\n\nconvex_hull_clip's hull-vertex feasibility check tested only one band\nbound: a vertex far above d_max could extend t_lo to the interval start\n(and symmetrically for t_hi). Against a zero-thickness fat line — any\nstraight curve — every clip returned the full interval, degrading the\nSederberg-Nishita algorithm to plain bisection. That fragile path is\nwhat made prop_known_intersection's perpendicular-line crossings depend\non the ULP-level AABB behavior fixed in #7: with clipping restored, the\ncrossing collapses to a point in two clips instead of ~50 bisections.\n\nVertices now count only when inside the full [d_min, d_max] band, and\nhull-edge crossings are handled against both bounds in a single pass\n(intersect_hull_with_line is folded into convex_hull_clip).\n\nAdds the second known-failing proptest seed (u = 0.2484656653399068)\nand a dense 801-point deterministic scan; before this fix and without\nthe #7 padding, roughly 2.6% of crossing positions returned zero hits.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T14:51:50-04:00",
+          "tree_id": "966cdc3469784be49f769d7600ef6c587355d00c",
+          "url": "https://github.com/esaueng/brepkit/commit/e8e073ad410c8aab47011a2be6dc2dcec48fcb43"
+        },
+        "date": 1785092046723,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 898536,
+            "range": "± 1094",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 965819,
+            "range": "± 1549",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14068,
+            "range": "± 34",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 675556,
+            "range": "± 1995",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22896087,
+            "range": "± 190570",
             "unit": "ns/iter"
           }
         ]
