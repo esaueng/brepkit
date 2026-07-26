@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785092047617,
+  "lastUpdate": 1785092640784,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1079,6 +1079,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22896087,
             "range": "± 190570",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "63294ee6dcfc5281a76dfc8fdb7a4f4f53bdddc4",
+          "message": "fix(blend): stop failed fillets corrupting the model, and close fillet ends (#14)\n\n* fix(wasm,operations): roll back failed blends so they cannot corrupt the input\n\nEvery blend engine mutates the shared topology arena in place: the v2\ntrimmer's `propagate_split` rewrites the wires of every face referencing a\nsplit edge, and the rolling-ball rebuild rewrites cap wires. An attempt that\nfailed partway therefore left the INPUT solid mutated — rounded at the\ncorners it got to, split-but-unclosed at the rest.\n\n`try_fillet` signals failure by returning the input handle, so callers kept\nusing that corrupted body. The OpenZCAD demo bracket shipped with 42 mesh\nboundary edges while reporting only a benign \"fillet could not be created\"\nwarning: the visible defect was the failed fillet's damage, not the failure.\n\nSnapshot the arena and restore it after every rejected engine attempt, so\neach engine starts clean and a total failure is a true no-op. Handle slots\nare preserved, so IDs held by the caller stay valid across a rollback. The\nsame wrapper guards the native `blend_ops` fillet and chamfer entry points.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* fix(blend): close fillet ends and keep the correct side when trimming\n\nThree defects kept the v2 walking builder from producing a watertight\nfillet on anything richer than a simple prism.\n\nWrong-side trim: `keep_side` is derived from `normal · (center - contact)`,\nwhich is constant for a given face orientation and cannot express which\nin-plane side of the contact line to keep. Add an exact rule instead — the\nblended spine edge is consumed by the blend surface, so it can never survive\nin the trimmed face; whenever exactly one boundary chain contains it, keep\nthe other. The old heuristic stays as the fallback when the spine edge is in\nboth chains or neither.\n\nOpen ends: the builder emitted a detached quad blend face, leaving the\nneighbour faces notched open at both ends of the spine. Reuse the trimmer's\ncontact edges as the wall's long boundaries, close each end with the exact\ncircular arc the wall terminates on, and stitch that arc into the\nsurrounding geometry — replacing the sub-edge pair in a cap wire in place,\nor emitting a corner patch where neighbours continue coplanar past the end.\n\nWrong-but-valid results: a misplaced trim can still yield a closed,\nEuler-consistent solid, which every existing postcondition accepts. Add\n`validate_blend_volume` — a blend moves material only inside a tube around\neach edge, so |dV| is bounded by r²·L + 2r³ per edge, and its sign is fixed\nby convexity. This rejects a merged-face case that returned a valid solid\nwhose volume had grown by 547.\n\n`fillet_v2` now falls through to the walking builder when the rolling-ball\nfast path fails, since the two cover different topology classes.\n\nThe box regression previously asserted the broken shape (a 6-edge end face\nwith the notch left open). It now pins the fixed one: 5 edges, the sharp\ncorner replaced by the arc, a fully watertight mesh (0 boundary edges, was\n28 before split propagation) and the exact quarter-round volume 997.854.\n\nNew coverage: the OpenZCAD demo bracket's four base-plate corners, checked\nfor volume, B-rep closure, and mesh watertightness at the consumer's own\ntessellation settings, plus the same shape end-to-end through the wasm\n`try_fillet` chain.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T15:01:41-04:00",
+          "tree_id": "ff5ad899a7ff3d7ad60673047c690d1972d947bf",
+          "url": "https://github.com/esaueng/brepkit/commit/63294ee6dcfc5281a76dfc8fdb7a4f4f53bdddc4"
+        },
+        "date": 1785092639996,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 828019,
+            "range": "± 5215",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 919442,
+            "range": "± 1727",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12972,
+            "range": "± 387",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 667188,
+            "range": "± 1621",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21991087,
+            "range": "± 65030",
             "unit": "ns/iter"
           }
         ]
