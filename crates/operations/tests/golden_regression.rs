@@ -54,7 +54,11 @@ fn assert_golden(name: &str, actual: &str) {
 }
 
 fn round6(v: f64) -> f64 {
-    (v * 1_000_000.0).round() / 1_000_000.0
+    let r = (v * 1_000_000.0).round() / 1_000_000.0;
+    // Normalize -0.0: near-zero sums carry a platform-dependent sign
+    // (Windows libm rounds some tessellation trig differently), and the
+    // formatted "-0.000000" would spuriously mismatch the golden.
+    if r == 0.0 { 0.0 } else { r }
 }
 
 // ── Measurement snapshot ────────────────────────────────────────────
