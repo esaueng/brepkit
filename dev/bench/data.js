@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785040956203,
+  "lastUpdate": 1785089572905,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -755,6 +755,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21799845,
             "range": "± 21439",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e612f34a8358b54c2502a7dee77735b5dfe0b3fc",
+          "message": "test(io,wasm): pin the README corner-drill example as green (#2)\n\n* test(io,wasm): pin the README corner-drill example as green\n\nA report claimed the README's first example — cut a cylinder (r=5, axis =\nz through the origin) from a 30x20x10 box whose vertical corner edge is\nexactly that axis — fails with NonManifoldResult on current main. It does\nnot reproduce at f383a1e: the cut succeeds deterministically (220+\nprocesses, debug and release, native and wasm batch) with an exact\nanalytic result (6 planes + 1 cylinder), ray-cast-verified carve, volume\nwithin tessellation error, and an analytic STEP round-trip.\n\nPin it so the flagship example stays green:\n- crates/io/tests/readme_example.rs runs the full README sequence\n  (box, cylinder, cut, volume, STEP export + re-import) with face census,\n  ray-cast probes, and analytic round-trip asserts.\n- wasm contract test cut_corner_coincident_cylinder_readme_example covers\n  the batch cut path.\n- roadmap: record the re-probe under CLOSED so future sessions do not\n  re-chase the stale report.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* fix(math): gate NURBS weight normalization to pathological magnitudes\n\nCI on main fails prop_known_intersection on every platform: bezier\nclipping loses ~21% of plain perpendicular line-line crossings. Bisected\nto the hardening commit that made NurbsCurve::evaluate divide every\nhomogeneous term by max|basis*weight| unconditionally. The fat-line clip\ncollapses one curve's interval to the exact crossing parameter, so the\nsub-AABB crossing test compares two degenerate (zero-width) boxes that\nmust agree to the last ulp — and the extra rounding from the divide\nshifts the evaluated point one ulp off the partner line, silently\ndropping the hit.\n\nThe normalization exists to keep a common weight factor like 1e-300 from\nunderflowing the perspective divide. Keep that protection but apply it\nonly when the scale is actually pathological (outside 1e-140..1e140);\nordinary weights keep the unscaled, bit-exact summation. Applied to the\nsame pattern in all four sites: NurbsCurve::{evaluate, derivatives},\nNurbsSurface::{evaluate, derivatives}, and SurfaceEvaluator::evaluate.\n\nAdds a deterministic pin (line_line_crossing_survives_degenerate_aabb_ulp:\nthe shrunk proptest case plus a 400-point crossing sweep) and commits the\nproptest regression seed. The tiny-weight stability tests still pass —\nthey exercise the normalization branch.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* fix(math): restore curve extrapolation — drop the domain clamp in evaluate/derivatives\n\nsweep_miter_l_shaped_volume_correct fails on every CI platform once\nevaluation is bit-exact again: the miter sweep extends each path leg\nBEYOND its domain to reach the miter plane, and the hardening commit's\nu.clamp(domain) in NurbsCurve::evaluate/derivatives silently truncates\nthat extrapolation to the endpoint — the L-sweep loses a whole leg\n(volume exactly 5.0 against the test's strict > 5.0). The test only ever\npassed on the fork because the unconditional weight-normalization\nrounding nudged the half-volume a hair above 5.0 on CI builds.\n\nCurve-level out-of-domain evaluation is well-defined (polynomial\nextension of the basis) and load-bearing for miter extension; remove the\nclamp. The surface and SurfaceEvaluator clamps stay: no consumer needs\nsurface extrapolation, and removing them trips the fillet helper's\nout-of-domain evaluation into the new ww-positivity debug_assert.\n\nFull workspace suite: 2712 passed, 0 failed.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* docs(roadmap): record the fork-hardening math regressions and the bisect recipe\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* fix(operations): make golden comparisons line-ending agnostic\n\nThe Windows CI runner checks golden files out with CRLF, and the exact\nstring comparison in assert_golden keeps interior \\r on multi-line\nfiles — golden_boolean_fuse_two_boxes and golden_boolean_box_minus_cylinder\nfail with byte-identical values. This never surfaced before because\nnextest's fail-fast cancelled the Windows run at the earlier math\nfailures before reaching the golden tests.\n\nNormalize CRLF in the comparison and pin tests/golden/data to LF via\n.gitattributes.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T14:10:26-04:00",
+          "tree_id": "3f9116532d9f4a6e3c315efb02c856d3eec0ae45",
+          "url": "https://github.com/esaueng/brepkit/commit/e612f34a8358b54c2502a7dee77735b5dfe0b3fc"
+        },
+        "date": 1785089572301,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 843744,
+            "range": "± 3553",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 939703,
+            "range": "± 15475",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12785,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 681730,
+            "range": "± 5733",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22295897,
+            "range": "± 281814",
             "unit": "ns/iter"
           }
         ]
