@@ -43,6 +43,9 @@ fn assert_golden(name: &str, actual: &str) {
             path.display()
         )
     });
+    // Windows runners check out with autocrlf, so the file on disk may
+    // contain CRLF line endings the generated string never has.
+    let expected = expected.replace("\r\n", "\n");
     assert_eq!(
         actual.trim(),
         expected.trim(),
