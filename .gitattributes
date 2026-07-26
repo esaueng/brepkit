@@ -1,0 +1,2 @@
+# Keep golden reference data byte-stable across platforms.
+tests/golden/data/** text eol=lf

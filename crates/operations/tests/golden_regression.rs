@@ -43,9 +43,11 @@ fn assert_golden(name: &str, actual: &str) {
             path.display()
         )
     });
+    // Normalize line endings: a CRLF checkout (Windows autocrlf) must not
+    // fail an otherwise byte-identical golden comparison.
     assert_eq!(
-        actual.trim(),
-        expected.trim(),
+        actual.replace("\r\n", "\n").trim(),
+        expected.replace("\r\n", "\n").trim(),
         "Golden file mismatch: {name}"
     );
 }
