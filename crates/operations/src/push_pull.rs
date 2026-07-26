@@ -195,117 +195,62 @@ pub fn resize_cylindrical_face(
         before - sleeve
     };
 
-    // Growing the wall sweeps it into open space, so a single boolean with a
-    // tool flush to the face's extent is exact and needs no clearance.
-    if grows {
-        let tool = place_cylinder(topo, base, axis, new_radius, height)?;
-        let op = if concavity == Concavity::Boss {
-            BooleanOp::Fuse
-        } else {
-            BooleanOp::Cut
-        };
-        let result = boolean(topo, op, solid, tool)?;
-        unify_faces(topo, result)?;
-        drop_stranded_inner_wires(topo, result)?;
-        ensure_closed_shell(topo, result, "cylindrical resize")?;
-        ensure_volume(topo, result, expected, "cylindrical resize")?;
-        return Ok(result);
-    }
-
-    // Shrinking sweeps the wall into material that is already there, so the
-    // tool would meet the solid ONLY along the coincident wall and the
-    // coplanar cap rims. The boolean engine generates no section edges for an
-    // all-coincident contact inside a concavity and drops the tool whole (a
-    // sleeve fused into a bore leaves the bore untouched), so the sleeve is
-    // never built directly.
-    //
-    // Instead the wall is erased and rebuilt: clear the whole feature with a
-    // tool that genuinely overlaps material, then re-cut or re-fuse at the new
-    // radius. The clearance only has to be large enough for the overlap to be
-    // unambiguous, and it never reaches the result — both stages are checked
-    // against the exact volume they must produce, and the first clearance that
-    // verifies is the one returned.
-    let cleared = if concavity == Concavity::Hole {
-        before + PI * old_radius * old_radius * height
-    } else {
-        before - PI * old_radius * old_radius * height
+    // Growing the wall sweeps it into open space, shrinking it sweeps back
+    // through material already there. Either way the material that moves is the
+    // annular sleeve between the two radii over the face's own extent — a plain
+    // cylinder when growing (the sleeve's inner radius is the axis), a tube
+    // when shrinking. Only whether it is added or removed changes.
+    let (op, tool) = match (concavity, grows) {
+        (Concavity::Boss, true) => (
+            BooleanOp::Fuse,
+            place_cylinder(topo, base, axis, new_radius, height)?,
+        ),
+        (Concavity::Hole, true) => (
+            BooleanOp::Cut,
+            place_cylinder(topo, base, axis, new_radius, height)?,
+        ),
+        (Concavity::Hole, false) => (
+            BooleanOp::Fuse,
+            make_tube(topo, base, axis, new_radius, old_radius, height)?,
+        ),
+        (Concavity::Boss, false) => (
+            BooleanOp::Cut,
+            make_tube(topo, base, axis, new_radius, old_radius, height)?,
+        ),
     };
-    let mut last_err = None;
-    for fraction in CLEARANCE_FRACTIONS {
-        let clearance = (old_radius * fraction).max(tol.linear * 1e3);
-        match rebuild_wall(
-            topo, solid, base, axis, old_radius, new_radius, height, concavity, clearance, cleared,
-            expected,
-        ) {
-            Ok(result) => return Ok(result),
-            Err(e) => last_err = Some(e),
-        }
-    }
-    Err(
-        last_err.unwrap_or_else(|| crate::OperationsError::InvalidInput {
-            reason: "cylindrical resize could not build a verifiable result".into(),
-        }),
-    )
-}
 
-/// Clearance fractions (of the current radius) tried when rebuilding a wall.
-///
-/// Too small and the overlap is numerically indistinguishable from the
-/// coincident contact it exists to avoid; too large and the tool can reach
-/// material that is not part of the feature. Each candidate's result is
-/// verified before it is accepted, so the list is an ordered set of attempts
-/// rather than a tuned constant.
-const CLEARANCE_FRACTIONS: [f64; 4] = [0.01, 0.03, 0.08, 0.002];
-
-/// Erase the cylindrical feature entirely, then rebuild it at `new_radius`.
-#[allow(clippy::too_many_arguments)]
-fn rebuild_wall(
-    topo: &mut Topology,
-    solid: SolidId,
-    base: Point3,
-    axis: Vec3,
-    old_radius: f64,
-    new_radius: f64,
-    height: f64,
-    concavity: Concavity,
-    clearance: f64,
-    cleared_volume: f64,
-    expected_volume: f64,
-) -> Result<SolidId, crate::OperationsError> {
-    // Stage 1 — clear the feature. A bore is filled by a plug wider than it;
-    // a boss is sliced off by a sleeve-free cut wider and taller than it.
-    let (clear_op, clear_base, clear_height) = match concavity {
-        Concavity::Hole => (BooleanOp::Fuse, base, height),
-        Concavity::Boss => (BooleanOp::Cut, base, height + clearance),
-    };
-    let clear_tool = place_cylinder(topo, clear_base, axis, old_radius + clearance, clear_height)?;
-    let cleared = boolean(topo, clear_op, solid, clear_tool)?;
-    ensure_volume(topo, cleared, cleared_volume, "cylindrical resize (clear)")?;
-
-    // Stage 2 — rebuild at the new radius. The bore is re-cut flush; the boss
-    // is re-fused from just inside its support so its base is not a coplanar
-    // contact with the face it stands on.
-    let result = match concavity {
-        Concavity::Hole => {
-            let drill = place_cylinder(topo, base, axis, new_radius, height)?;
-            boolean(topo, BooleanOp::Cut, cleared, drill)?
-        }
-        Concavity::Boss => {
-            let boss = place_cylinder(
-                topo,
-                base - unit(axis)? * clearance,
-                axis,
-                new_radius,
-                height + clearance,
-            )?;
-            boolean(topo, BooleanOp::Fuse, cleared, boss)?
-        }
-    };
+    let result = boolean(topo, op, solid, tool)?;
     unify_faces(topo, result)?;
     drop_stranded_inner_wires(topo, result)?;
     ensure_closed_shell(topo, result, "cylindrical resize")?;
-    ensure_volume(topo, result, expected_volume, "cylindrical resize")?;
+    ensure_volume(topo, result, expected, "cylindrical resize")?;
     Ok(result)
+}
+
+/// The tube between `inner_r` and `outer_r` over the wall's axial span.
+///
+/// The bore is overshot at both ends so its caps never land on the outer
+/// cylinder's: coincident caps would make the difference a coplanar-face
+/// boolean for no benefit. The tube's own caps stay flush with the wall being
+/// replaced, so the sleeve covers exactly the material that moves.
+fn make_tube(
+    topo: &mut Topology,
+    base: Point3,
+    axis: Vec3,
+    inner_r: f64,
+    outer_r: f64,
+    height: f64,
+) -> Result<SolidId, crate::OperationsError> {
+    let outer = place_cylinder(topo, base, axis, outer_r, height)?;
+    let overshoot = (height * 0.1).max(1e-3);
+    let inner = place_cylinder(
+        topo,
+        base - unit(axis)? * overshoot,
+        axis,
+        inner_r,
+        overshoot.mul_add(2.0, height),
+    )?;
+    boolean(topo, BooleanOp::Cut, outer, inner)
 }
 
 /// A deflection fine enough that the volume check resolves the sleeve.
@@ -494,7 +439,12 @@ fn frame_matrix(base: Point3, axis: Vec3) -> Result<Mat4, crate::OperationsError
     } else {
         Vec3::new(0.0, 1.0, 0.0)
     };
-    let x = unit(seed.cross(z))?;
+    // Gram-Schmidt, not a cross product: for the common +Z axis this yields the
+    // identity frame, so the tool's seam sits at the same angle as the seam on
+    // the wall it is replacing. A rotated frame puts the two coincident
+    // cylindrical faces' seams at different angles, and the pair no longer
+    // merges cleanly.
+    let x = unit(seed - z * seed.dot(z))?;
     let y = z.cross(x);
     Ok(Mat4([
         [x.x(), y.x(), z.x(), base.x()],
@@ -805,6 +755,61 @@ mod tests {
         );
         assert_watertight(&topo, narrow);
         assert_eq!(face_count(&topo, narrow, "cylinder"), 1);
+    }
+
+    /// Regression: an annular sleeve fused into a matching bore.
+    ///
+    /// Every contact is coincident — the sleeve's outer wall IS the bore wall,
+    /// and its end caps sit in the caps' own planes inside their holes. The
+    /// annuli used to classify inconsistently (one kept, one dropped), and the
+    /// coplanar merge then carried the filled r=3 rim onto the merged cap,
+    /// leaving free edges. Exercised directly here, below `resize`.
+    #[test]
+    fn sleeve_fused_into_a_matching_bore_closes_the_shell() {
+        let mut topo = Topology::new();
+        let drilled = drilled_block(&mut topo);
+
+        let outer = cylinder_at(&mut topo, 3.0, 10.0, 20.0, 20.0, 0.0);
+        let inner = cylinder_at(&mut topo, 2.0, 12.0, 20.0, 20.0, -1.0);
+        let sleeve = boolean(&mut topo, BooleanOp::Cut, outer, inner).unwrap();
+
+        let out = boolean(&mut topo, BooleanOp::Fuse, drilled, sleeve).unwrap();
+        unify_faces(&mut topo, out).unwrap();
+
+        assert_volume(&topo, out, 40.0f64.mul_add(40.0 * 10.0, -(PI * 4.0 * 10.0)));
+        assert_watertight(&topo, out);
+        // The r=3 wall is gone and the r=2 one replaces it — one bore, not two.
+        assert_eq!(face_count(&topo, out, "cylinder"), 1);
+        assert_eq!(face_count(&topo, out, "plane"), 6);
+    }
+
+    /// Regression: two coaxial bore bands of equal radius must merge into one
+    /// face. `unify_faces` used to treat each band's seam edge — which appears
+    /// twice in the same wire — as a shared internal edge and delete it,
+    /// leaving two disjoint rim circles that reassembled as an outer wire plus
+    /// a bogus inner wire on a cylinder.
+    #[test]
+    fn stacked_coaxial_bore_bands_merge_into_one_wall() {
+        let mut topo = Topology::new();
+        let drilled = drilled_block(&mut topo);
+
+        // A slab with a coaxial bore, stacked directly on top.
+        let slab = make_box(&mut topo, 40.0, 40.0, 5.0).unwrap();
+        transform_solid(&mut topo, slab, &Mat4::translation(0.0, 0.0, 10.0)).unwrap();
+        let slab_bore = cylinder_at(&mut topo, 3.0, 5.0, 20.0, 20.0, 10.0);
+        let holed_slab = boolean(&mut topo, BooleanOp::Cut, slab, slab_bore).unwrap();
+
+        let out = boolean(&mut topo, BooleanOp::Fuse, drilled, holed_slab).unwrap();
+        unify_faces(&mut topo, out).unwrap();
+
+        assert_volume(&topo, out, 40.0f64.mul_add(40.0 * 15.0, -(PI * 9.0 * 15.0)));
+        assert_watertight(&topo, out);
+        assert_eq!(face_count(&topo, out, "cylinder"), 1);
+        let bore = only_cylinder(&topo, out);
+        assert!(
+            topo.face(bore).unwrap().inner_wires().is_empty(),
+            "a merged bore wall must not acquire an inner wire"
+        );
     }
 
     #[test]
