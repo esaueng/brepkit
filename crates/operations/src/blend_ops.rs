@@ -10,6 +10,33 @@ use brepkit_topology::solid::SolidId;
 
 use crate::OperationsError;
 
+/// Run a blend attempt transactionally: on any failure, roll the arena back
+/// to its pre-attempt state.
+///
+/// The blend engines mutate shared topology in place — `trim_face`'s
+/// `propagate_split` rewrites the wires of every face referencing a split
+/// edge. A failure partway through therefore leaves the INPUT solid mutated:
+/// trimmed side faces, and free edges from half-applied splits. A caller that
+/// reports the failure and keeps using its original solid handle then ships a
+/// corrupted body that meshes with holes. Snapshot/restore makes a failed
+/// blend a true no-op.
+///
+/// Handle slots are preserved so IDs handed out before the attempt stay
+/// valid after a rollback.
+fn transactional<T>(
+    topo: &mut Topology,
+    attempt: impl FnOnce(&mut Topology) -> Result<T, OperationsError>,
+) -> Result<T, OperationsError> {
+    let snapshot = topo.clone();
+    match attempt(topo) {
+        Ok(value) => Ok(value),
+        Err(e) => {
+            topo.restore_preserving_handle_slots(&snapshot);
+            Err(e)
+        }
+    }
+}
+
 fn validate_complete_blend(
     topo: &Topology,
     operation: &'static str,
@@ -152,13 +179,15 @@ pub fn fillet_v2(
         });
     }
     if is_planar_line_blend(topo, solid, edges)? {
-        return planar_fillet_result(topo, solid, edges, radius);
+        return transactional(topo, |t| planar_fillet_result(t, solid, edges, radius));
     }
-    let mut builder = FilletBuilder::new(topo, solid);
-    builder.add_edges(edges, radius);
-    let result = builder.build()?;
-    validate_complete_blend(topo, "fillet", &result)?;
-    Ok(result)
+    transactional(topo, |t| {
+        let mut builder = FilletBuilder::new(t, solid);
+        builder.add_edges(edges, radius);
+        let result = builder.build()?;
+        validate_complete_blend(t, "fillet", &result)?;
+        Ok(result)
+    })
 }
 
 /// Chamfer edges with two distances (v2 engine).
@@ -185,13 +214,15 @@ pub fn chamfer_v2(
     }
     reject_closed_edges(topo, edges, "chamfer")?;
     if is_planar_line_blend(topo, solid, edges)? {
-        return planar_chamfer_result(topo, solid, edges, d1, d2);
+        return transactional(topo, |t| planar_chamfer_result(t, solid, edges, d1, d2));
     }
-    let mut builder = ChamferBuilder::new(topo, solid);
-    builder.add_edges_asymmetric(edges, d1, d2);
-    let result = builder.build()?;
-    validate_complete_blend(topo, "chamfer", &result)?;
-    Ok(result)
+    transactional(topo, |t| {
+        let mut builder = ChamferBuilder::new(t, solid);
+        builder.add_edges_asymmetric(edges, d1, d2);
+        let result = builder.build()?;
+        validate_complete_blend(t, "chamfer", &result)?;
+        Ok(result)
+    })
 }
 
 /// Chamfer edges with distance and angle (v2 engine).
@@ -224,13 +255,17 @@ pub fn chamfer_distance_angle(
     reject_closed_edges(topo, edges, "chamfer")?;
     let d2 = distance * angle.tan();
     if is_planar_line_blend(topo, solid, edges)? {
-        return planar_chamfer_result(topo, solid, edges, distance, d2);
+        return transactional(topo, |t| {
+            planar_chamfer_result(t, solid, edges, distance, d2)
+        });
     }
-    let mut builder = ChamferBuilder::new(topo, solid);
-    builder.add_edges_distance_angle(edges, distance, angle);
-    let result = builder.build()?;
-    validate_complete_blend(topo, "chamfer", &result)?;
-    Ok(result)
+    transactional(topo, |t| {
+        let mut builder = ChamferBuilder::new(t, solid);
+        builder.add_edges_distance_angle(edges, distance, angle);
+        let result = builder.build()?;
+        validate_complete_blend(t, "chamfer", &result)?;
+        Ok(result)
+    })
 }
 
 #[cfg(test)]
