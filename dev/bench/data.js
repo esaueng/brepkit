@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785095516893,
+  "lastUpdate": 1785095656095,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1241,6 +1241,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21838624,
             "range": "± 367483",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ca3a7d9060e6053b108756de3552ca1af357e015",
+          "message": "feat(wasm): default fillet engine order flips to v2-first (#10)\n\nExecutes the recorded product decision: try_fillet (behind the public\nfillet, filletWithEvolution, and batch fillet bindings) now tries the\nmaintained v2 walking engine (blend_ops::fillet_v2) first, with the\ndeprecated v1 rolling-ball engine as the fallback and the v1 flat bevel\nlast. Every candidate still has to pass the closed-shell gate before\nacceptance, so cases v2 cannot complete fall through unchanged.\n\nMeasured before flipping: on the box single-edge, disjoint-4-edge, and\nall-12-edge cases the two primary engines produce identical volumes and\nface counts — the doc comment's 'v2 over-removes corner material (~470\nvs ~975)' rationale for rolling-ball-first predates the corner-solver\nfixes and no longer reproduces. Verified against the OpenZCAD kernel\nparity harness via the BREPKIT_WASM_PKG overlay: no scenario outcome\nchanges from the flip (the bracket demo's 4-corner fillet still fails\nthrough v2 as well — that defect is engine-independent and tracked\nseparately).\n\nUpdates the fillet-blend and roadmap skill docs that pinned the old\norder.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T15:50:15-04:00",
+          "tree_id": "af2f82e32cd427e70aa4fc1477bcc6a1d2751765",
+          "url": "https://github.com/esaueng/brepkit/commit/ca3a7d9060e6053b108756de3552ca1af357e015"
+        },
+        "date": 1785095655730,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 826602,
+            "range": "± 7856",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 915656,
+            "range": "± 1903",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12905,
+            "range": "± 41",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 672589,
+            "range": "± 9002",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21996250,
+            "range": "± 397080",
             "unit": "ns/iter"
           }
         ]
