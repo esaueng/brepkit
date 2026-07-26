@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785089572905,
+  "lastUpdate": 1785090563497,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -809,6 +809,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22295897,
             "range": "± 281814",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "409481cd0ba08465cfcc3f09412059aca4526913",
+          "message": "chore(deps): bump fast-uri to 3.1.4 for GHSA-v2hh-gcrm-f6hx (#12)\n\nThe blocking OSV scan on main fails on fast-uri 3.1.3 (High, npm dev\ndependency of the commitlint toolchain in the root lockfile). 3.1.4 is\nthe patched release; lockfile-only change within the existing ^3.0.1\nrange.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T14:27:05-04:00",
+          "tree_id": "c99ae6073b29b064ec76e9f532ace01d563f2415",
+          "url": "https://github.com/esaueng/brepkit/commit/409481cd0ba08465cfcc3f09412059aca4526913"
+        },
+        "date": 1785090562759,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 829509,
+            "range": "± 9390",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 918677,
+            "range": "± 8958",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12782,
+            "range": "± 82",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 684437,
+            "range": "± 4937",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22187766,
+            "range": "± 81910",
             "unit": "ns/iter"
           }
         ]
