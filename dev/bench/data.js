@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785090563497,
+  "lastUpdate": 1785090722461,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -863,6 +863,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22187766,
             "range": "± 81910",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "10556c45a0dca4ad25267c8f0da3b821aa43bf57",
+          "message": "fix(check): subtract face holes in point classification (#13)\n\n`classify_point` misclassified exterior points as Inside near GFA boolean\nresults. The classifier's containment tests all went through\n`util::face_polygon`, which returns only a face's OUTER wire, so a ray\npassing through a hole in a face was counted as a crossing and flipped\nthe parity.\n\nInstrumenting per-face crossings for probe (34,0,-1) on a flange r45 h12\nfused with a coaxial hub r24 h30 and cut by a bolt hole r3.5 showed the\nz=0 cap reporting a crossing at (35.63, 2.11, 0) -- 2.67mm from the bolt\ncentre, i.e. inside its own r3.5 inner wire. Every reported failure was\nthis one mechanism, through either the bolt hole or the r24 hub circle\nabsorbed into the annuli. Pristine primitives were unaffected because\n`make_cylinder` caps carry no inner wires.\n\nReject hits landing in a face's inner wires across all four containment\npaths: planar, analytic UV (cylinder/cone/torus), sphere 3D-polygon, and\nNURBS. The full-surface branches now filter holes instead of returning\nearly, so a full cylinder or torus with a hole is covered too.\n\nAlso fixes two adjacent instances of the same omission:\n- `is_on_boundary` reported a point sitting in a through-hole as\n  OnBoundary, since it tested only the outer wire.\n- `winding_number` fan-triangulated only the outer wire; holes are now\n  triangulated and subtracted, with orientation resolved per-wire\n  against the outer loop's normal.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T14:29:46-04:00",
+          "tree_id": "fd714c0c1c8246dbc10d8ce27acf7092d0663a79",
+          "url": "https://github.com/esaueng/brepkit/commit/10556c45a0dca4ad25267c8f0da3b821aa43bf57"
+        },
+        "date": 1785090721918,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 892948,
+            "range": "± 1853",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 955853,
+            "range": "± 2222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14093,
+            "range": "± 96",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 666024,
+            "range": "± 1590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22747039,
+            "range": "± 28690",
             "unit": "ns/iter"
           }
         ]
