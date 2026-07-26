@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785103078296,
+  "lastUpdate": 1785103925246,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1349,6 +1349,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22082574,
             "range": "± 82536",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fc5f351d9b6fb24ab22883291ba4c828073f6551",
+          "message": "fix(ci): allow the package sync to be triggered manually (#19)\n\nGitHub does not raise workflow runs for a push that edits files under\n.github/workflows. Verified twice on this repo: the branch push for #16\nproduced no checks until an unrelated commit was added, and the merge\ncommit itself (6a1a5af) produced zero runs and zero check-runs.\n\nThe practical effect is that a change to publish.yml only takes effect on\nthe next ordinary commit, and there is no way to refresh the committed\npackage — or to prove a change to this workflow works — until an unrelated\nPR happens to land.\n\nLet the sync job run from workflow_dispatch as well as push. `publish_version`\nbecomes optional so a bare dispatch means \"just rebuild and commit the\npackage\"; the npm publish job now requires that input to be non-empty, so a\nmanual sync no longer trips the version check.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T18:09:51-04:00",
+          "tree_id": "c57e21cbeabd485fa7beafa08121efbf5dd52aff",
+          "url": "https://github.com/esaueng/brepkit/commit/fc5f351d9b6fb24ab22883291ba4c828073f6551"
+        },
+        "date": 1785103924277,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 822999,
+            "range": "± 1431",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 908672,
+            "range": "± 1362",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12780,
+            "range": "± 16",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 661523,
+            "range": "± 911",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21699527,
+            "range": "± 41303",
             "unit": "ns/iter"
           }
         ]
