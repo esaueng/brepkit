@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785039852508,
+  "lastUpdate": 1785040956203,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -701,6 +701,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 20913852,
             "range": "± 49030",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "df532ee7739c4c56d19ecb4d4934ff9b5006c707",
+          "message": "fix(operations): sweep miter joins collapsed after sub-curve split (#6)\n\n* fix(operations): sweep miter joins collapsed after sub-curve split\n\nsweep_miter splits the path at kinks with curve_split, whose sub-curves\nkeep the parent parameterization — but three parts of the pipeline\nassumed a [0, 1] domain or per-segment frames:\n\n- compute_frames sampled t = k/num_segments literally, evaluating the\n  sub-curves out of domain. This previously leaned on out-of-domain\n  NURBS extrapolation to produce garbage that happened to land in the\n  test's loose volume window; upstream's domain clamp in\n  NurbsCurve::evaluate/derivatives turned it into a collapsed second\n  leg (volume exactly 5). Frames now sample across path.domain().\n- Ring vertices were decomposed in the segment frame's basis instead of\n  the profile's own basis (profile_basis), collapsing any leg whose\n  tangent is not parallel to the profile normal into a flat ribbon.\n- Each segment re-derived its frame up from the profile normal, so ring\n  corner i on the two sides of a kink did not correspond; the frame is\n  now transported through each kink by the rotation taking the incoming\n  tangent to the outgoing one.\n\nThe join itself is rebuilt as a true miter: each non-last segment's end\nring is projected along its end tangent onto the kink's bisector plane\nand the next segment starts from that same ring. The previous\ntransition band (untrimmed end ring to a chord-projected miter ring)\ninherently folded into self-intersecting zero-area bowtie quads.\n\nThe L-sweep now produces a watertight, validation-clean solid with\nvolume exactly 10 (was 5.625 garbage before the upstream sync, 5.0\nafter); the U-sweep gives exactly 15. Both tests are tightened to pin\nthese values plus watertightness so a loose bound can no longer mask a\nbroken construction.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* test(operations): normalize golden-file line endings for Windows CI\n\nWindows runners check out with autocrlf, so golden files gain CRLF and\nthe byte-for-byte comparison fails even when the geometry is identical.\nNormalize CRLF when reading, and pin *.golden to LF via .gitattributes.\nThis surfaced on this branch because Windows CI previously fail-fasted\non the miter sweep test before ever reaching the golden tests.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* test(operations): normalize negative zero in golden measurements\n\nNear-zero center-of-mass components carry a platform-dependent sign\n(Windows rounds some tessellation trig differently), so -0.000000 in a\ngolden generated on macOS mismatches the +0.000000 Windows computes.\nNormalize -0.0 to 0.0 in round6 and regenerate the two affected goldens.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T00:39:29-04:00",
+          "tree_id": "398e0b2c05261e567d550910e5f97b9e62ca2ea6",
+          "url": "https://github.com/esaueng/brepkit/commit/df532ee7739c4c56d19ecb4d4934ff9b5006c707"
+        },
+        "date": 1785040955221,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 832114,
+            "range": "± 2832",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 918571,
+            "range": "± 107199",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12817,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 665360,
+            "range": "± 739",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21799845,
+            "range": "± 21439",
             "unit": "ns/iter"
           }
         ]
