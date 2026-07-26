@@ -260,13 +260,6 @@ impl NurbsSurface {
                 })
             })
             .fold(0.0_f64, f64::max);
-        // Normalize only pathological magnitudes; ordinary weights keep the
-        // unscaled (bit-exact) summation. See `NurbsCurve::evaluate`.
-        let scale = if (1e-140..=1e140).contains(&scale) {
-            1.0
-        } else {
-            scale
-        };
         let mut wx = 0.0;
         let mut wy = 0.0;
         let mut wz = 0.0;
@@ -354,12 +347,6 @@ impl NurbsSurface {
             .copied()
             .fold(0.0_f64, f64::max);
         debug_assert!(weight_scale.is_finite() && weight_scale > 0.0);
-        // Normalize only pathological weight magnitudes (see `evaluate`).
-        let weight_scale = if (1e-140..=1e140).contains(&weight_scale) {
-            1.0
-        } else {
-            weight_scale
-        };
         for k in 0..=du {
             for l in 0..=dv {
                 if k + l > d {

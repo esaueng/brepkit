@@ -1,2 +1,3 @@
-# Keep golden reference data byte-stable across platforms.
-tests/golden/data/** text eol=lf
+# Golden files are compared byte-for-byte against generated strings;
+# never let checkout rewrite their line endings.
+*.golden text eol=lf

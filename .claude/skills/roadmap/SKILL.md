@@ -635,20 +635,23 @@ round-trip) across 220+ processes, native + wasm batch, debug + release. Pinned 
 `cut_corner_coincident_cylinder_readme_example`; if either regresses, that is the
 tangential-contact class — start at the boolean-debugging skill.
 
-Fork-local "hardening" commits carry geometry hazards (2026-07-25, two closed): the
-`fbb9d7e`/`bb5b70b` "Harden geometry input boundaries"/"production readiness" edits to
-`crates/math` broke (1) bezier-clip line-line crossings — the unconditional
-weight-normalization divide in `NurbsCurve::evaluate` added one ulp of rounding, which
-the degenerate-AABB crossing test cannot tolerate (fixed: normalization gated to
-pathological magnitudes, pin `line_line_crossing_survives_degenerate_aabb_ulp`); and
-(2) miter sweeps — the `u.clamp(domain)` in `NurbsCurve::evaluate/derivatives`
-silently truncated the out-of-domain path extrapolation miter extension relies on
-(fixed: curve clamps removed; surface/evaluator clamps kept — the fillet helper
-evaluates surfaces out of domain and trips the new ww debug_assert without them).
-When a fork-sync suddenly breaks a math-adjacent test that upstream passes, bisect
-the fork-local commits FIRST (`git log e4f8792..ff80688` shape), and expect
-behavior-masking interactions: the clamp bug was masked ON CI by the normalization
-bug's rounding until the latter was fixed.
+DO NOT "restore" out-of-domain NURBS extrapolation to fix a caller (2026-07-26,
+refuted mid-session): chasing the CI-red `sweep_miter_l_shaped_volume_correct`, one
+pass diagnosed the fork-sync's `u.clamp(domain)` in `NurbsCurve::evaluate` as the
+root — the L-sweep loses exactly one leg (volume 5.0) — and removed the clamp,
+which does make the test pass. That diagnosis was WRONG at the layer. #6 showed
+`sweep_miter`'s `compute_frames` samples `t = k/num_segments` literally against
+sub-curves that KEEP the parent parameterization, so it was evaluating out of
+domain by accident; the extrapolated garbage merely happened to land inside a loose
+volume window. The clamp exposed a real sweep bug rather than causing one, and the
+fix belongs in `compute_frames` (sample across `path.domain()`) plus the profile-basis
+and kink-transport fixes in that PR. Same session, same shape: the bezier-clip
+line-line crossing loss is owned by the degenerate-AABB early exit
+(`aabb_a.expanded(tolerance)`, #7/#9), NOT by the weight-normalization rounding in
+`evaluate` that makes it observable — a kernel-wide numerical change to silence one
+predicate is the wrong altitude. When a fork-sync reddens a math-adjacent test,
+bisect the fork-local commits (`git log e4f8792..ff80688` shape) to LOCATE it, then
+fix at the layer that owns the artifact.
 
 Export-integrity matrix baseline (2026-07-24, `binGenerator.scenario.export-integrity`, 408 tests
 asserting zero boundary edges + bounded non-manifold on the exported STL — the tool's own version of
