@@ -626,6 +626,15 @@ CLOSED, do not re-open as deferred: honeycomb wall-pattern cut (#925/#928,
 top-face (#932, `extrude_half_*_reversed_edge_volume` pass), multi-arc hemisphere gap
 (#1006).
 
+README first-example axis-on-corner-edge cut (box 30×20×10 ∪cut cylinder r=5 h=15,
+axis = z through the origin = the box's vertical corner edge) — a report of
+`NonManifoldResult` on current main does NOT reproduce at f383a1e: deterministic
+analytic pass (7 faces = 6 planes + 1 cylinder, ray-cast verified, analytic STEP
+round-trip) across 220+ processes, native + wasm batch, debug + release. Pinned by
+`crates/io/tests/readme_example.rs` and the wasm contract test
+`cut_corner_coincident_cylinder_readme_example`; if either regresses, that is the
+tangential-contact class — start at the boolean-debugging skill.
+
 Export-integrity matrix baseline (2026-07-24, `binGenerator.scenario.export-integrity`, 408 tests
 asserting zero boundary edges + bounded non-manifold on the exported STL — the tool's own version of
 the STL edge-use oracle). Published 2.128.2: **43 failed / 365 passed**. Local main (T-lip #1209 +
