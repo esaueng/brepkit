@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785029531702,
+  "lastUpdate": 1785038460994,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -593,6 +593,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21362070,
             "range": "± 65306",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ddb1d437a5c8bd1b3560a69e55af7480ae7dd66d",
+          "message": "fix(math): pad bezier-clip AABB early-exit by intersection tolerance (#7)\n\nThe recursion's early-exit AABB test used exact boxes built from curve\nsamples at clipped parameters. When a fat-line clip collapses one\ninterval to zero width, its box degenerates to a single point carrying\nULP-level rounding from the hull-clip interpolation and de Boor\nevaluation; for u_param = 0.39985989638118474 the two boxes landed one\nULP apart in x and a true perpendicular-line crossing was rejected.\n\nExpand the box by the intersection tolerance so a branch is only\ndiscarded when the curves are provably farther apart than the tolerance\nat which hits are reported. Commits the proptest-regressions seed that\npins the failing input.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-25T23:58:37-04:00",
+          "tree_id": "f44f10dcf884d174fcdacab9b7a53ca02d991784",
+          "url": "https://github.com/esaueng/brepkit/commit/ddb1d437a5c8bd1b3560a69e55af7480ae7dd66d"
+        },
+        "date": 1785038460068,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 865599,
+            "range": "± 1889",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 964308,
+            "range": "± 8144",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14333,
+            "range": "± 47",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 670928,
+            "range": "± 2115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 23036532,
+            "range": "± 48952",
             "unit": "ns/iter"
           }
         ]
