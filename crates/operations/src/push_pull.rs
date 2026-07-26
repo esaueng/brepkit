@@ -676,14 +676,7 @@ mod tests {
         assert_watertight(&topo, twice);
     }
 
-    // Ready repro for the remaining engine gap. Pulling a holed cap needs the
-    // tool's bore wall to merge with the solid's existing coaxial bore wall;
-    // the boolean drops one of the pair instead, so the result comes back
-    // closed but with the original bore filled. `push_pull_face` catches this
-    // with its volume gate and errors rather than returning it — un-ignore
-    // once coaxial same-domain merging is fixed.
     #[test]
-    #[ignore = "coaxial cylindrical face merge: boolean drops the existing bore wall"]
     fn pulling_a_face_with_a_hole_keeps_the_hole() {
         let mut topo = Topology::new();
         let drilled = drilled_block(&mut topo);
@@ -705,7 +698,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "coaxial cylindrical face merge: boolean drops the existing bore wall"]
     fn pushing_a_face_with_a_hole_keeps_the_hole() {
         let mut topo = Topology::new();
         let drilled = drilled_block(&mut topo);
@@ -716,20 +708,6 @@ mod tests {
         assert_volume(&topo, out, 40.0f64.mul_add(40.0 * 6.0, -(PI * 9.0 * 6.0)));
         assert_watertight(&topo, out);
         assert_eq!(face_count(&topo, out, "cylinder"), 1);
-    }
-
-    /// The gap above must surface as an error, never as a plausible-looking
-    /// solid with a filled bore.
-    #[test]
-    fn push_pull_refuses_a_degraded_result() {
-        let mut topo = Topology::new();
-        let drilled = drilled_block(&mut topo);
-        let top = face_facing(&topo, drilled, Vec3::new(0.0, 0.0, 1.0));
-        let err = push_pull_face(&mut topo, drilled, top, 5.0).unwrap_err();
-        assert!(
-            format!("{err}").contains("volume"),
-            "expected a volume-gate rejection, got: {err}"
-        );
     }
 
     #[test]
