@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785090722461,
+  "lastUpdate": 1785091650525,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -917,6 +917,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22747039,
             "range": "± 28690",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b1bc4ef84eead6069938cf6b9d117b3358d3de1e",
+          "message": "feat(wasm): expose mass properties, mesh quality, boolean options, and bounded imports (#3)\n\n* feat(wasm): expose mass properties, mesh quality, boolean options, and bounded imports\n\nBuilds on the upstream inertia work (solid_properties / inertiaTensor /\nimportPly) with two integrator accuracy fixes and the remaining capability\nsurface:\n\n- Accuracy: the trimmed parametric quadrature now uses the same composite\n  patch tiling as the untrimmed path (a single order-5 grid left\n  cylinder-wall second moments ~5% off), and planar faces bounded by lines\n  and circular arcs take an exact Green's-theorem boundary-integral path\n  (a chord polygon undercuts a circular cap by ~0.2%). The in-plane frame\n  derives from the boundary's Newell normal so malformed faces fall back\n  to the fan path instead of silently integrating to zero. Cylinder and\n  sphere inertia now match closed forms to 1e-8 relative.\n- massProperties(solid): full JSON result — volume, center of mass,\n  inertia about the CoM, and principal moments/axes via a new Jacobi\n  GProps::principal_inertia; operations::measure::mass_properties wraps\n  solid_properties at gauss order 8.\n- meshQuality(solid, deflection): position-welded boundary/non-manifold\n  edge counts, Euler characteristic, and isWatertight, via a new\n  welded_mesh_quality in operations::tessellate.\n- fuseWithOptions/cutWithOptions/intersectWithOptions exposing the\n  unifyFaces post-pass (default true).\n- Optional maxInputBytes/maxEntities on every importer (including the new\n  importPly), mapping to the *_with_limits readers so JS callers can\n  tighten hostile-input budgets.\n- Batch dispatch arms for massProperties, meshQuality, and the three\n  *WithOptions booleans; smoke-test coverage for the new bindings.\n\nKnown pre-existing failure on main (not this change):\nsweep_miter_l_shaped_volume_correct fails on pristine f383a1e.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n* docs(operations): drop intra-doc links to the private dedupe-grid const\n\nrustdoc denies public docs linking to the pub(crate) COINCIDENT_DEDUPE_GRID;\nstate the 1 µm grid inline instead.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T14:45:10-04:00",
+          "tree_id": "ee5449f3ecee7c83a6a99be28d7827cf0c1d4ac8",
+          "url": "https://github.com/esaueng/brepkit/commit/b1bc4ef84eead6069938cf6b9d117b3358d3de1e"
+        },
+        "date": 1785091650171,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 698006,
+            "range": "± 2771",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 780619,
+            "range": "± 2843",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10406,
+            "range": "± 150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 550449,
+            "range": "± 1560",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18263650,
+            "range": "± 242512",
             "unit": "ns/iter"
           }
         ]
