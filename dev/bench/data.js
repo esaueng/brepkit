@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785038460994,
+  "lastUpdate": 1785039852508,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -647,6 +647,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 23036532,
             "range": "± 48952",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52550c718332fbb7884aacff875864dd6d681750",
+          "message": "test(math): pin second bezier-clip AABB ULP-reject seed (#9)\n\nu_param = 0.2484656653399068 is a second input hitting the exact-AABB\nearly-exit knife-edge fixed in ddb1d43: the fat-line clip collapses\ncurve A's interval to the single point x = 0.4969313306798137 while the\nbranch of B containing the true crossing tops out one ULP lower at\nx = 0.49693133067981365, so the unpadded box test rejected a true\nperpendicular-line intersection (gap 5.55e-17). Verified the seed fails\nat f383a1e and with the tolerance padding reverted, and passes on\ncurrent main; no code change needed.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T00:21:46-04:00",
+          "tree_id": "9df0158f46930cd65d1a868eb674738884256ad9",
+          "url": "https://github.com/esaueng/brepkit/commit/52550c718332fbb7884aacff875864dd6d681750"
+        },
+        "date": 1785039852011,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 799460,
+            "range": "± 5563",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 907839,
+            "range": "± 9939",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11698,
+            "range": "± 38",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 631157,
+            "range": "± 4990",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 20913852,
+            "range": "± 49030",
             "unit": "ns/iter"
           }
         ]
