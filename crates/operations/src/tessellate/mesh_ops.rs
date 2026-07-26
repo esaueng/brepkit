@@ -76,7 +76,7 @@ pub fn non_manifold_edge_count(mesh: &TriangleMesh) -> usize {
 ///
 /// Unlike the index-based [`boundary_edge_count`] / [`non_manifold_edge_count`],
 /// these are computed after quantizing vertex positions to
-/// [`COINCIDENT_DEDUPE_GRID`], so position-duplicate vertices (distinct indices
+/// the 1 µm coincident-dedupe grid, so position-duplicate vertices (distinct indices
 /// at coincident coordinates) cannot mask a leak or fake a boundary.
 #[derive(Debug, Clone, Copy)]
 pub struct WeldedMeshQuality {
@@ -100,7 +100,7 @@ impl WeldedMeshQuality {
 /// Compute position-welded boundary/non-manifold edge counts and the Euler
 /// characteristic of a mesh.
 ///
-/// Vertices are quantized to the [`COINCIDENT_DEDUPE_GRID`] (1 µm) so that
+/// Vertices are quantized to the coincident-dedupe grid (1 µm) so that
 /// coincident-but-distinct indices weld together; degenerate (collapsed)
 /// triangles are skipped.
 #[must_use]
