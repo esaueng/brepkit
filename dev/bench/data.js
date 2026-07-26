@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785093427751,
+  "lastUpdate": 1785095516893,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1187,6 +1187,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21751694,
             "range": "± 412861",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "863fe9ce2ad621daaa9964b4862152c3684598c9",
+          "message": "fix(operations): drop absorbed hole wires when unify_faces merges faces (#11)\n\nunify_faces filtered group-internal shared edges from merged outer\nboundaries but carried every inner wire over verbatim. When a merge\nabsorbs a hole (e.g. the coaxial-fuse z=0 annulus merged with the hub\ndisc that fills it), the consumed disc's boundary circle survived as a\nstale inner wire on the merged face, leaving the shell open with a free\nedge. Any subsequent boolean on the unified solid then failed with\nNonManifoldResult, breaking the documented contract that unify output\nis safe for further booleans.\n\nInner wires containing a group-internal edge are now dissolved into the\nboundary pool so the internal edges drop out and any remaining edges\nre-chain into loops; untouched hole wires are still carried verbatim.\nloop_area_3d now samples along edge curves instead of endpoint vertices\nonly, so full-circle single-edge loops report their true area during\nouter-loop selection instead of 0.\n\nRepro: fuse make_cylinder(45,12) with coaxial make_cylinder(24,30),\nunify_faces, then cut a bolt cylinder at (34,0,-3) — previously\nNonManifoldResult, now volume matches the no-unify baseline exactly.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T15:49:44-04:00",
+          "tree_id": "1fab8586d5954fcd781b5658139f575a9efdc080",
+          "url": "https://github.com/esaueng/brepkit/commit/863fe9ce2ad621daaa9964b4862152c3684598c9"
+        },
+        "date": 1785095516544,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 827406,
+            "range": "± 2882",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 919198,
+            "range": "± 2454",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12913,
+            "range": "± 22",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 667004,
+            "range": "± 1417",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21838624,
+            "range": "± 367483",
             "unit": "ns/iter"
           }
         ]
