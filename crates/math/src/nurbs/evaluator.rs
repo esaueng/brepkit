@@ -125,6 +125,13 @@ impl<'a> SurfaceEvaluator<'a> {
         let ws = self.surface.weights();
         let weight_scale = ws.iter().flatten().copied().fold(0.0_f64, f64::max);
         debug_assert!(weight_scale.is_finite() && weight_scale > 0.0);
+        // Normalize only pathological weight magnitudes; ordinary weights
+        // keep the unscaled (bit-exact) summation. See `NurbsCurve::evaluate`.
+        let weight_scale = if (1e-140..=1e140).contains(&weight_scale) {
+            1.0
+        } else {
+            weight_scale
+        };
 
         // Tensor-product contraction: v first per u-row, then u. Scale all
         // homogeneous terms first so a harmless common weight factor cannot
@@ -141,6 +148,11 @@ impl<'a> SurfaceEvaluator<'a> {
                 })
             })
             .fold(0.0_f64, f64::max);
+        let scale = if (1e-140..=1e140).contains(&scale) {
+            1.0
+        } else {
+            scale
+        };
         let mut wx = 0.0;
         let mut wy = 0.0;
         let mut wz = 0.0;

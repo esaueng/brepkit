@@ -915,6 +915,35 @@ mod tests {
         assert!(hits.is_empty(), "expected no hits for parallel lines");
     }
 
+    /// Deterministic pin of the evaluate-rounding regression behind
+    /// `prop_known_intersection` failures: the fat-line clip collapses one
+    /// curve's interval to the exact crossing parameter, so the sub-AABB
+    /// crossing test compares two degenerate (zero-width) boxes that must
+    /// agree to the last ulp. Any extra rounding in `NurbsCurve::evaluate`
+    /// (e.g. an unconditional weight-normalization divide) shifts the point
+    /// box one ulp off the partner line and the crossing is silently lost.
+    #[test]
+    fn line_line_crossing_survives_degenerate_aabb_ulp() {
+        let c1 = make_line(Point3::new(0.0, 0.0, 0.0), Point3::new(2.0, 0.0, 0.0));
+        // The shrunk proptest case plus a dense sweep of crossings.
+        let mut params = vec![0.499_949_403_926_037_87, 0.1012];
+        for i in 0..=400 {
+            params.push(0.1 + 0.8 * f64::from(i) / 400.0);
+        }
+        for u in params {
+            let target = c1.evaluate(u);
+            let c2 = make_line(
+                Point3::new(target.x(), -1.0, 0.0),
+                Point3::new(target.x(), 1.0, 0.0),
+            );
+            let hits = curve_curve_intersect(&c1, &c2, 1e-8).expect("no error");
+            assert!(
+                hits.iter().any(|h| (h.point - target).length() < 1e-4),
+                "lost line-line crossing at u={u}"
+            );
+        }
+    }
+
     use proptest::prelude::*;
 
     proptest! {

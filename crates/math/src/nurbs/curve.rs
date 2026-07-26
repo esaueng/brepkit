@@ -188,15 +188,24 @@ impl NurbsCurve {
         };
         basis::basis_funs_into(span, u, p, &self.knots, bf);
 
-        // Scale homogeneous terms before summation. NURBS weights are
-        // projective, so this preserves the point while preventing a common
-        // factor such as 1e-300 from making the perspective divide unstable.
+        // Scale homogeneous terms before summation when a common weight
+        // factor such as 1e-300 would make the perspective divide unstable.
+        // NURBS weights are projective, so dividing by a common factor
+        // preserves the point. Ordinary weights skip the division: it costs
+        // one extra rounding per term, and downstream geometric predicates
+        // (e.g. bezier-clip's degenerate-AABB crossing test) rely on
+        // bit-exact evaluation of simple curves.
         let scale = bf
             .iter()
             .enumerate()
             .take(p + 1)
             .map(|(j, &basis_val)| (basis_val * self.weights[span - p + j]).abs())
             .fold(0.0_f64, f64::max);
+        let scale = if (1e-140..=1e140).contains(&scale) {
+            1.0
+        } else {
+            scale
+        };
         let mut wx = 0.0;
         let mut wy = 0.0;
         let mut wz = 0.0;
@@ -248,6 +257,12 @@ impl NurbsCurve {
         let mut aw = vec![[0.0f64; 4]; du + 1];
         let weight_scale = self.weights.iter().copied().fold(0.0_f64, f64::max);
         debug_assert!(weight_scale.is_finite() && weight_scale > 0.0);
+        // Normalize only pathological weight magnitudes (see `evaluate`).
+        let weight_scale = if (1e-140..=1e140).contains(&weight_scale) {
+            1.0
+        } else {
+            weight_scale
+        };
         for (k, aw_k) in aw.iter_mut().enumerate().take(du + 1) {
             for j in 0..=p {
                 let db = ders_bf[k * stride + j];
