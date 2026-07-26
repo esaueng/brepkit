@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785092640784,
+  "lastUpdate": 1785093427751,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1133,6 +1133,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21991087,
             "range": "± 65030",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "542b491f66d266001e0da14f8ff156420f29edcc",
+          "message": "test(math): pin the bezier-clip hull band with a differential test (#15)\n\nperpendicular_lines_dense_scan pins the end-to-end symptom for straight\nlines only. This adds a differential test on the clip primitive itself:\nover 2000 random hull/band configurations it compares convex_hull_clip\nagainst a brute-force feasible interval and asserts the result is\nneither narrower (would drop real intersections) nor looser (a no-op\nclip, which degrades Sederberg-Nishita to bisection).\n\nVerified to fail against the pre-#8 hull-vertex check with the no-op\nsignature (clip [0, 1] where only [0, 0.39] is feasible).\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T15:14:55-04:00",
+          "tree_id": "818f0785b0c86cff5d9591b6e550f46e3360e4d5",
+          "url": "https://github.com/esaueng/brepkit/commit/542b491f66d266001e0da14f8ff156420f29edcc"
+        },
+        "date": 1785093426868,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 830787,
+            "range": "± 1491",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 921239,
+            "range": "± 6467",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12877,
+            "range": "± 373",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 670603,
+            "range": "± 2183",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21751694,
+            "range": "± 412861",
             "unit": "ns/iter"
           }
         ]
