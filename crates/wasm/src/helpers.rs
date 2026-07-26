@@ -188,24 +188,42 @@ pub fn try_fillet(
                 .unwrap_or(false)
         };
 
-    // Try engines in preference order; accept the first valid result.
+    // Every engine mutates the shared arena in place (the trimmer's
+    // `propagate_split` rewrites the wires of each face touching a split
+    // edge; the rolling-ball rebuild rewrites cap wires). A rejected attempt
+    // therefore leaves the INPUT solid partly filleted — rounded corners plus
+    // free edges where a split was applied but never closed. Since this
+    // function reports failure by returning the input handle, the caller then
+    // ships that corrupted body: the OpenZCAD demo bracket meshed with 42
+    // boundary edges even though its fillet had "failed".
+    //
+    // Snapshot once, roll back after every rejected attempt so the next
+    // engine starts clean and a total failure is a true no-op. Handle slots
+    // are preserved, so IDs held by the caller stay valid.
+    let snapshot = topo.clone();
+
     if let Ok(s) = brepkit_operations::fillet::fillet_rolling_ball(topo, solid_id, edges, radius)
         && is_valid(topo, s)
     {
         return Ok(s);
     }
+    topo.restore_preserving_handle_slots(&snapshot);
+
     if let Ok(r) = brepkit_operations::blend_ops::fillet_v2(topo, solid_id, edges, radius)
         && is_valid(topo, r.solid)
     {
         return Ok(r.solid);
     }
+    topo.restore_preserving_handle_slots(&snapshot);
+
     if let Ok(s) = brepkit_operations::fillet::fillet(topo, solid_id, edges, radius)
         && is_valid(topo, s)
     {
         return Ok(s);
     }
+    topo.restore_preserving_handle_slots(&snapshot);
 
-    // No engine produced a valid solid — leave the input unchanged.
+    // No engine produced a valid solid — the input is unchanged.
     Ok(solid_id)
 }
 
@@ -551,6 +569,39 @@ mod fillet_tests {
             }
         }
         edges
+    }
+
+    // A rejected fillet must be a true no-op. Every engine mutates the arena
+    // in place, so a partly-applied attempt used to leave the INPUT solid
+    // rounded at some corners and split-but-unclosed at others — and since
+    // `try_fillet` signals failure by returning the input handle, the caller
+    // kept using that corrupted body (the OpenZCAD bracket meshed with 42
+    // boundary edges despite reporting "fillet could not be created").
+    // A radius far too large for the box guarantees every engine fails.
+    #[test]
+    fn try_fillet_failure_leaves_the_input_untouched() {
+        let mut topo = Topology::new();
+        let cube = brepkit_operations::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+        let edges = solid_edge_ids(&topo, cube);
+        let before =
+            brepkit_topology::explorer::solid_entity_counts(&topo, cube).expect("counts before");
+        let vol_before = brepkit_operations::measure::solid_volume(&topo, cube, 0.01).unwrap();
+
+        // r = 20 on a 10³ box: no engine can produce a valid solid.
+        let result = try_fillet(&mut topo, cube, &edges, 20.0).expect("try_fillet");
+        assert_eq!(result, cube, "a failed fillet must return the input handle");
+
+        let after =
+            brepkit_topology::explorer::solid_entity_counts(&topo, cube).expect("counts after");
+        assert_eq!(before, after, "failed fillet mutated the input topology");
+        let vol_after = brepkit_operations::measure::solid_volume(&topo, cube, 0.01).unwrap();
+        assert!(
+            (vol_before - vol_after).abs() < 1e-9,
+            "failed fillet changed the input volume: {vol_before} -> {vol_after}"
+        );
+        let shell = topo.shell(topo.solid(cube).unwrap().outer_shell()).unwrap();
+        brepkit_topology::validation::validate_shell_closed(shell, &topo)
+            .expect("input must still be watertight after a failed fillet");
     }
 
     // The wasm `fillet` binding (and its batch sibling) route through
