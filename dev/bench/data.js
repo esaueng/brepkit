@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785127418297,
+  "lastUpdate": 1785128776834,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1889,6 +1889,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21867911,
             "range": "± 116506",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3d0c11c89e61fa7a2ae8d43e7a9d4b3e01cf3b6f",
+          "message": "feat(blend): chamfer closed circular rims (#27)\n\nNo engine could chamfer a cylinder rim. `chamfer_v2` refused every closed\nedge through `reject_closed_edges` (\"closed-edge chamfer assembly is not\nyet supported\"), and the v1 flat-bevel engine — planar-only — failed the\nsame edge with \"cannot normalize zero vector\".\n\nThe guard stood in for missing ASSEMBLY, not missing geometry.\n`plane_cylinder_chamfer` already handled `is_closed_spine` and produced a\ncorrect conical stripe; what could not run was the trim step, because the\nper-face line-based trimmer has no endpoints to cut at on a closed\ninterior contact loop.\n\n`fillet_builder` had already solved exactly this with an annular rebuild\n(`closed_rim_info` / `assemble_closed_rim`): rebuild the disc cap bounded\nby the plate contact, shorten the wall to the wall contact, and emit the\nband between them sharing both edges. Ported to `chamfer_builder` with the\ntwo geometric differences a chamfer implies — the band is a cone rather\nthan a torus, and the seam joining the contacts is a straight ruled\ngenerator rather than a minor arc.\n\nThe wasm `chamfer` binding calls the v1 engine directly, so it would not\nhave benefited. Added `try_chamfer` alongside `try_fillet`: v1 FIRST, so\nevery case it already handles keeps its exact behaviour and this is purely\nadditive rather than an engine reorder, then v2 on failure. It carries the\nsame snapshot/rollback discipline `try_fillet` uses — both engines mutate\nthe shared arena, and a rejected attempt otherwise ships a partly\nchamfered body. Unlike `try_fillet` it returns the error rather than the\ninput handle on total failure, so a chamfer that does nothing cannot\nreport success.\n\nResult on a cylinder rim: volume matches the Pappus closed form to 2e-16,\nmesh watertight, and the band is an exact analytic Cone rather than a\nNURBS approximation. Works on cylinder and cone walls, either rim, and\nboth rims in one call.\n\nThree existing tests pinned the refusal and are updated, not deleted:\n  - `chamfer_{cylinder,cone}_closed_rim_fails_closed` become `..._is_valid`,\n    asserting the real postcondition via `validate_solid`, symmetric with\n    the `fillet_*_closed_rim_is_valid` pair that already existed.\n  - `rejected_closed_rim_chamfer_leaves_cylinder_intact` is RETARGETED to\n    the cylinder seam line rather than dropped: its invariant (a failed\n    blend must not corrupt the input arena) is independent of this change\n    and still worth guarding, and a seam fails deeper than an argument\n    check — the stripe is attempted and abandoned, which is the path that\n    can corrupt. Its new counterpart asserts the closed rim now keeps every\n    surface analytic, so a NURBS band would be caught.\n\nNote the memory of this defect attributed it to \"the tangent/normal frame\ndegenerating where a closed edge's start == end\". That was not it — the\nframe was fine. Also, the v1 error is broader than reported: \"cannot\nnormalize zero vector\" fires on ALL three cylinder edges including the\nstraight seam, because v1 rejects any curved neighbour with an unhelpful\nmessage.\n\nVerified: workspace tests green (121 suites), clippy -D warnings and fmt\nclean, crate boundaries valid. Rebased onto 3e7932d (setback range checks)\nand re-verified against it.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-27T01:03:54-04:00",
+          "tree_id": "8f79ca99b09d2652e8a29211d1927f70a64cb495",
+          "url": "https://github.com/esaueng/brepkit/commit/3d0c11c89e61fa7a2ae8d43e7a9d4b3e01cf3b6f"
+        },
+        "date": 1785128775332,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 863812,
+            "range": "± 1732",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 962236,
+            "range": "± 2551",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14287,
+            "range": "± 457",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 685711,
+            "range": "± 1036",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22819873,
+            "range": "± 340246",
             "unit": "ns/iter"
           }
         ]
