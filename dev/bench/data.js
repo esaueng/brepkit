@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785116387196,
+  "lastUpdate": 1785118469703,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1673,6 +1673,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21741032,
             "range": "± 57294",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d10878809bfdb73545d07199ceed1efcc4e878ee",
+          "message": "fix(algo): respect face holes in the EF containment test (#25)\n\n`build_face_containment` sampled a face's inner wires into the AABB but\nbuilt the planar containment polygon from the OUTER wire alone, so\n`accepts()` treated an annulus as the full disc its outer rim bounds.\n\nFusing the flange rim (r24..45, z0..10) with the hub (r12..24, z0..26)\nput the hub's r12 bore seam — a line at radius 12, in open space as far\nas the rim is concerned — against the rim's z=10 cap, an annulus spanning\nr24..45. The cap accepted the crossing at (12, 0, 10), 12mm inside its own\nhole, and paved a vertex there, splitting the full-height bore seam into\ntwo Line edges.\n\nEvery B-Rep gate still passed: each half is used exactly twice, so edge\nusage reads 0 free / 0 non-manifold and validation is clean. Only the\ncylinder band mesher noticed, mis-stitching the split seam into 8\nunmatched mesh edges — an STL with a hole in it, from a solid every\ntopological check called watertight.\n\n`PlanarContainment` now carries the hole outlines in the same frame and\n`accepts()` rejects a point in a hole's strict interior. Points ON a hole\nrim stay accepted: that rim is real face boundary, and the hub's r24 wall\ngenuinely meets the cap there — rejecting it would open that junction.\nThe rejection uses the same sagitta margin the outer-wire test uses.\n\nWire sampling moved into `sample_wire_outline` so inner wires get the\nsame treatment as the outer one (traversal direction, endpoint dedup,\ncurved-only chord accumulation). Inner wires were previously sampled\nforward regardless of `is_forward`, which would have mis-ordered a\nmulti-edge hole outline.\n\nSame bug class as the classifier's ignored face holes, one layer down in\nthe pave filler. Note `phase_vf` performs no trimming test at all — it\nrecords a VF interference against the infinite surface — but no defect is\nattributable to it, so it is left alone.\n\nVerified: new regression test fail-before/pass-after (the seam test fails\nwithout the fix; the hole-rim guard passes in both states, which is the\npoint of it). Workspace tests green (117 suites), clippy -D warnings and\nfmt clean, crate boundaries valid, boolean approx_census unchanged.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T22:12:31-04:00",
+          "tree_id": "6b4b32050994d4d2852b359ad00da4c3b495771c",
+          "url": "https://github.com/esaueng/brepkit/commit/d10878809bfdb73545d07199ceed1efcc4e878ee"
+        },
+        "date": 1785118469340,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 671190,
+            "range": "± 10954",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 745680,
+            "range": "± 4106",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11293,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 525714,
+            "range": "± 597",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18061266,
+            "range": "± 45192",
             "unit": "ns/iter"
           }
         ]
