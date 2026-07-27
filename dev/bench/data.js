@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785115876254,
+  "lastUpdate": 1785116387196,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1619,6 +1619,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21784201,
             "range": "± 64784",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9ce6cce7d6f857dadd8d6a02d2beb117d3adc43a",
+          "message": "fix(algo): split plane faces carrying several closed section loops (#24)\n\n* fix(algo): split plane faces carrying several closed section loops\n\n`split_face_2d` routed a plane face to the direct internal-loops path only\nwhen it carried exactly ONE closed section curve. A Cut whose subtrahend\nputs two or more closed loops on the same plane face fell through to the\ngeneric wire builder, which returned a single unsplit sub-face — the holes\nwere never carved.\n\nOn the pipe-flange blank (rim r24..45 fused with hub r12..24, unified to 6\nanalytic faces) a 6-hole bolt circle subtracted as ONE body stamps six\nclosed circles onto both the z=0 disc and the z=10 rim cap. With the holes\nuncarved the bore walls had nothing to attach to and were assembled as\ntheir own one-face shells, which the assembler dropped as open slivers:\n2 free boundary edges, GFA rejected, mesh fallback also rejected (8\nboundary edges), and the whole Cut failed with `NonManifoldResult`.\n\nCutting the same holes one at a time always worked — one closed section\nper face per boolean — which is what masked this until the coaxial fuse\nstopped mesh-falling-back in 1dc4541.\n\n`split_face_with_internal_loops` already chains and emits any number of\nloops, so the fix is to relax the gate to \"all sections closed AND\npairwise separate\". Separateness is a conservative frame-projected AABB\ntest: disjoint boxes prove disjoint discs, so nested loops (a re-bored\nopening) and overlapping loops (a deepened pocket) still take the wire\nbuilder's arrangement unchanged. A single loop passes vacuously, so the\nprevious behaviour is preserved exactly.\n\nN=1 through 6 now all produce analytic, watertight results — 3 planes plus\n(3 + N) cylinders, 0 free and 0 non-manifold edges — and the single\nmulti-component cut matches six sequential cuts face-for-face.\n\nVerified: workspace tests green (116 suites), clippy -D warnings and fmt\nclean, crate boundaries valid, and the boolean approx_census is unchanged\n(the pre-existing `cone u box` fallback is the only one, before and after).\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* test(operations): probe mesh watertightness in the multicut repro\n\nThe B-Rep can be closed while the tessellation is not, so the sweep now\nreports both. This surfaces a SEPARATE pre-existing defect the analytic\ncut exposed: the unified rim+hub blank meshes with 8 unmatched edges\nbefore any cut runs, while a lone revolved annulus and a plain cylinder\nboth mesh clean.\n\nCause, printed by the probe: the r12 bore seam is split at z=10 by a\nspurious vertex, so the bore wire carries two Line edges per side instead\nof one full-height seam. The rim cap's unbounded plane paved the bore\nseam even though the cap annulus spans r24..45 and never reaches r=12.\nEach segment is still used twice, so the B-Rep reads closed — only the\ncylinder band mesher mis-stitches it.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T21:37:26-04:00",
+          "tree_id": "f6a012ec80136df4a84e16a5a8d1a84b5765ea32",
+          "url": "https://github.com/esaueng/brepkit/commit/9ce6cce7d6f857dadd8d6a02d2beb117d3adc43a"
+        },
+        "date": 1785116386841,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 828517,
+            "range": "± 10713",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 918304,
+            "range": "± 2964",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14211,
+            "range": "± 40",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 679829,
+            "range": "± 2031",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21741032,
+            "range": "± 57294",
             "unit": "ns/iter"
           }
         ]
