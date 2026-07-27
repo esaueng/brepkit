@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785170984853,
+  "lastUpdate": 1785172008711,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2213,6 +2213,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21711194,
             "range": "± 19450",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c5dc0dc2980edb4fb06a77a1e7517f2e97165395",
+          "message": "test(wasm): gate analytic boolean preservation in the package smoke test (#22)\n\nAdd a shipped-package smoke guard that verifies a coincident-wall annulus fuse preserves analytic cylindrical surfaces instead of silently falling back to a mesh.",
+          "timestamp": "2026-07-27T13:04:36-04:00",
+          "tree_id": "48982f81a545206f91e5e6d1fde7e7817ac1cb97",
+          "url": "https://github.com/esaueng/brepkit/commit/c5dc0dc2980edb4fb06a77a1e7517f2e97165395"
+        },
+        "date": 1785172008315,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 827173,
+            "range": "± 2402",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 919242,
+            "range": "± 11042",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13102,
+            "range": "± 26",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 685337,
+            "range": "± 7426",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21725890,
+            "range": "± 283668",
             "unit": "ns/iter"
           }
         ]
