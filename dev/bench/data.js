@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785132455639,
+  "lastUpdate": 1785169799600,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2105,6 +2105,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17998663,
             "range": "± 128314",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "580badc8db8f7f5aeeff5f3abcbd0bace3588ff4",
+          "message": "fix(blend): rim fillet on a cap that carries holes (#30)\n\nThe fillet twin of #28. `fillet_builder`'s annular rim rebuild was gated on\nthe cap being a bare disc, so filleting any rim of a drilled flange — whose\ncaps are annuli with a central opening and six bolt holes — fell through to\nthe per-face trimmer and reported \"trimming failure\".\n\nRemoving that gate alone produced WRONG GEOMETRY, and the interesting part\nof this change is the second restriction it exposed.\n\n`plane_is_bounded_disc` in `analytic.rs` also bailed on any cap with inner\nwires. That helper decides post-on-a-plate (fillet flares OUTWARD, plate\ncontact at r_c + r) versus the cylinder's own cap rim (rounds INWARD, at\nr_c - r). An annular cap therefore never registered as a rim, and every\nsuch fillet flared outward. On a washer that put the cap's outer boundary\nat r=25.5 while its wall stayed at r=24, so the cap passed straight through\nthe wall:\n\n    plane    inner=1  [(25.50@z26.00) ...]      cap grew, should shrink\n    cylinder r=24     [... (24.00@z27.50) ...]  wall grew, should shorten\n\nThe result was self-intersecting and still reported 0 free and 0\nnon-manifold edges and passed validate_solid. Volume was ~2% off and did\nnot converge under refinement, which is what prompted looking rather than\nshipping.\n\nHoles are irrelevant to the post-vs-rim question: only the OUTER wire can\nreach past r_c, and the radial check already tests exactly that. Dropping\nthe inner-wires bail is the fix. The chamfer was never affected — it has\nits own side logic, which is why #28 came out exact.\n\nAfter the fix a washer rim matches the Pappus closed form to 6e-14, and the\ngeometry reads correctly: cap 22.50, wall shortened to z24.50, torus\nmajor 22.500 centred at z24.50. All three flange rims fillet, watertight,\nholes intact.\n\n`closed_rim_info` also keeps the cap's inner wires now, guarded by a check\nthat the shrinking outer boundary still clears them — a radius reaching a\nbolt hole would need hole and fillet to merge, which the annular rebuild\ncannot express, so it defers to the trim path instead.\n\n`washer_rim_fillet_rounds_inward` asserts on measured geometry — band major\nradius, and that nothing extends past the wall — precisely because the\ntopology counts were clean while the solid was wrong.\n\nVerified: workspace tests green (122 suites), clippy -D warnings and fmt\nclean, crate boundaries valid.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-27T12:27:43-04:00",
+          "tree_id": "9b5aebe3faf5172eb6820b106b5d99199c364b6b",
+          "url": "https://github.com/esaueng/brepkit/commit/580badc8db8f7f5aeeff5f3abcbd0bace3588ff4"
+        },
+        "date": 1785169798393,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 663336,
+            "range": "± 1223",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 741172,
+            "range": "± 1187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11233,
+            "range": "± 18",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 530363,
+            "range": "± 1904",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17753335,
+            "range": "± 25472",
             "unit": "ns/iter"
           }
         ]
