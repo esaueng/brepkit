@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785110900535,
+  "lastUpdate": 1785113094299,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1511,6 +1511,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 18489577,
             "range": "± 70588",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1dc4541f7fbf39bfdf0e24862157d757c5bb8c92",
+          "message": "fix(algo): canonical same-domain key for closed edges (#21)\n\nFusing two coaxial revolved annuli that share a cylindrical wall — the\nrim and hub of a pipe flange — mesh-fell-back to ~1000 planar faces,\nwhich then dragged every downstream boolean into the mesh path too.\n\nThe same-domain edge-set key discriminates two curves sharing an\nendpoint pair by a midpoint sampled in STORED order. For open edges\nthat is deliberate and correct: under the CCW start-to-end convention\n(A,B) and (B,A) are complementary arcs that must hash apart. The code\njustified it with 'identical geometry always stores identical\ndirection', which does not hold for CLOSED edges — a full circle has no\ncomplementary arc, and two instances of one circle can carry different\nparameterizations. The rim's r24 seam and the hub's coincident wall rim\nstart a quarter-turn apart, so a true duplicate hashed apart:\n\n  rim  z=0 circle midpoint (0, -24, 0)\n  hub  z=0 circle midpoint (-24, 0, 0)\n\nWith no same-domain pair, each coincident face was classified alone by\nsampling a point that lies exactly ON the other solid's boundary — and\nthe two interior-sample paths disagreed. The split hub wall (splitter\ninterior point) resolved Inside and was dropped; the unsplit rim wall\n(face sampling) resolved Outside and survived. That leftover interface\nface gave both r24 circles a third user, so the acceptance gate rejected\nthe GFA result as non-manifold.\n\nFor closed edges, use the centroid of samples taken uniformly over the\nwhole period instead. A circle's equally-spaced offsets cancel exactly,\nso it is the centre whatever the start angle or direction; combined with\nthe shared endpoint, which fixes the radius, it discriminates as well as\nthe midpoint did and is canonical.\n\nThe flange fuse now yields 7 analytic faces (0 free, 0 non-manifold),\nand the drilled result 12 faces / 9 cylinders, volume within 3e-5 of\nclosed form, with ray-cast probes confirming the holes are carved.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T20:42:27-04:00",
+          "tree_id": "e08e6637bb42853486e431fe007c1b60169131c4",
+          "url": "https://github.com/esaueng/brepkit/commit/1dc4541f7fbf39bfdf0e24862157d757c5bb8c92"
+        },
+        "date": 1785113093423,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 831032,
+            "range": "± 737",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 916851,
+            "range": "± 10996",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12941,
+            "range": "± 67",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 677371,
+            "range": "± 655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21923480,
+            "range": "± 320879",
             "unit": "ns/iter"
           }
         ]
