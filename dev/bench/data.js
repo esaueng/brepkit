@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785110003223,
+  "lastUpdate": 1785110900535,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1457,6 +1457,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21766445,
             "range": "± 58780",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "98f2a2b68ad8fdcea53800768de4d3f9948338c8",
+          "message": "chore(main): release 2.129.0 (#20)\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-07-26T20:06:07-04:00",
+          "tree_id": "309dd2c8fa572ffbd2bc37989e8485458b25e52d",
+          "url": "https://github.com/esaueng/brepkit/commit/98f2a2b68ad8fdcea53800768de4d3f9948338c8"
+        },
+        "date": 1785110900186,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 717784,
+            "range": "± 14112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 793256,
+            "range": "± 11044",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10456,
+            "range": "± 71",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 555154,
+            "range": "± 5989",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18489577,
+            "range": "± 70588",
             "unit": "ns/iter"
           }
         ]
