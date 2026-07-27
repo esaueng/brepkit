@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785126154199,
+  "lastUpdate": 1785127418297,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1835,6 +1835,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21861995,
             "range": "± 57734",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "3e7932d0807773809b5bdf542726f18ce5f65e8c",
+          "message": "fix(operations): reject chamfer setbacks that do not fit the face\n\nAn out-of-range chamfer used to come back as a confident success. On a\n10 mm box, `chamfer_v2` with 40 mm setbacks returned `is_partial = false`,\n`failed = []`, and a solid that passed `validate_solid` — whose volume had\n*grown* from 1000 mm³ to 2333 mm³. A chamfer that adds material.\n\nThe flat-bevel engine builds each face by sliding its wire vertices along\nthe edges that meet the chamfered one. Nothing checked that distance\nagainst the length of the edge being slid along, so an oversized setback\npushed the vertex past the far end and the polygon folded through itself.\nThe result stayed closed and manifold, which is exactly why every existing\npostcondition passed it.\n\n`chamfer_core` now measures, per face, how far both ends of each wire edge\ntravel and refuses the operation when they consume its whole length. The\ndisplacement is derived from the same offsetting arms the builder uses, so\nthe check cannot drift from the geometry it guards; corners where both\nedges are chamfered use the exact trim-line intersection rather than the\nsetback, which differs by 1/sin once the corner is not square. Rejection\nhappens before the arena is touched and names the distance and the length\nit overran.\n\nThat first pass missed the mirror-image case: with *every* edge chamfered\nthere is no un-chamfered edge left to overrun, and a check that skipped\nchamfered edges saw nothing wrong while the raw engine turned a 10 mm box\ninto a 425,666 mm³ solid. Chamfered edges are now measured too — their\nendpoints only slide along them when a neighbouring edge is chamfered as\nwell, so a lone chamfer still scores zero and is never wrongly refused.\n\nThe accepted range is unchanged and now verified exactly: a single-edge\nsymmetric chamfer removes ½·d²·length for every d below the edge length,\nand chamfering all edges of a cube works up to d < L/2, where opposing\nbevels meet.\n\nAlso gives the planar fast path in `chamfer_v2` the volume guard the\nwalking path already had. It was the only blend path returning without\none, which is how a geometrically wrong bevel reached callers as success.",
+          "timestamp": "2026-07-27T00:34:58-04:00",
+          "tree_id": "80777a3d79eb05ae929f0ed17044c76419558346",
+          "url": "https://github.com/esaueng/brepkit/commit/3e7932d0807773809b5bdf542726f18ce5f65e8c"
+        },
+        "date": 1785127417758,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 833103,
+            "range": "± 1553",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 918941,
+            "range": "± 1602",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12709,
+            "range": "± 93",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 683485,
+            "range": "± 28835",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21867911,
+            "range": "± 116506",
             "unit": "ns/iter"
           }
         ]
