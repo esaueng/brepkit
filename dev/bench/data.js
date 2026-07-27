@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785118469703,
+  "lastUpdate": 1785120760449,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1727,6 +1727,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 18061266,
             "range": "± 45192",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "2c048e90f5ba4af906ae7f5a3c4ea8ae954952b3",
+          "message": "feat(sketch): add five GCS constraints and truthful solve diagnostics\n\nPrepares the typed `gcs*` surface for selection-first direct manipulation\nand constrained sketching.\n\nNew native constraints, each with analytic residuals and Jacobians checked\nagainst central differences at 1e-3, 1 and 1e5 coordinate scales:\n\n- `circleRadius` — pin a circle's radius (radius is the kernel unit)\n- `equalRadiusCircleCircle` — tie two circles to a common radius\n- `equalLength` — tie two line lengths\n- `midpoint` — centre a point on a line\n- `symmetric` — mirror two points about an axis line, formulated as\n  midpoint-on-axis plus segment-perpendicular-to-axis, which is exactly\n  mirror symmetry and leaves no residual freedom\n\nDegenerate inputs are handled explicitly rather than dividing by zero: a\nzero-length line and a zero-length symmetry axis drop their gradient\ncontribution instead of poisoning the Jacobian with NaN. `circleRadius`\nrejects non-finite and non-positive targets at add time.\n\nAdds `GcsSystem::solve_detailed` / `gcsSolveDetailed`, additive alongside\nthe unchanged `solve` / `gcsSolve`. It reports convergence, iterations,\nresiduals, DOF, rank, parameter and equation counts, a per-constraint\nresidual keyed by the caller's constraint handle, and an overall\nclassification of solved / underConstrained / redundant / unsatisfied.\n\nTwo properties the diagnostics deliberately keep:\n\n- Transactional. A solve that misses tolerance is rolled back, so a\n  rejected solve never publishes partially moved geometry. `gcsSolve`\n  keeps its old behaviour of publishing its final iterate.\n- No false blame. `unsatisfied` reports only that the solver did not\n  converge; it never names a conflicting constraint, because\n  non-convergence does not prove one. Per-constraint residuals are\n  measured at the solver's best attempt, where satisfiable constraints\n  have gone to zero, and kernel-internal arc constraints are reported\n  separately rather than attributed to a caller's handle.\n\nAlso adds a regression covering a gap in the blend tests: a failed fillet\nor chamfer must leave the input solid unmutated, not just return `Err`.\nThat holds. It surfaced a separate pre-existing defect, recorded as an\nignored ready-to-run repro: an out-of-range chamfer (40mm setbacks on a\n10mm box) returns a valid-looking solid whose volume has *grown* from\n1000mm³ to 2333mm³ instead of returning a typed error.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T22:44:35-04:00",
+          "tree_id": "ecf58808d62cd2f817235927e203675cb4ec5514",
+          "url": "https://github.com/esaueng/brepkit/commit/2c048e90f5ba4af906ae7f5a3c4ea8ae954952b3"
+        },
+        "date": 1785120759548,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 903447,
+            "range": "± 4638",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 962232,
+            "range": "± 3440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14238,
+            "range": "± 89",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 683814,
+            "range": "± 6960",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22941057,
+            "range": "± 298241",
             "unit": "ns/iter"
           }
         ]
