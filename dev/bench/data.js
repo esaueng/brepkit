@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785120760449,
+  "lastUpdate": 1785126154199,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1781,6 +1781,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22941057,
             "range": "± 298241",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "55f2d51f4a808c7708da96d414411d3e6cbabdac",
+          "message": "fix(operations): measure NURBS-faced solids off the closed mesh (#26)\n\n* fix(operations): measure NURBS-faced solids off the closed mesh\n\n`solid_volume` chooses its integration path from `needs_direct_tessellation`\n— true when any face is \"reversed and non-planar\". That is a property of the\ntopology, not of accuracy, and per-face summation is only exact when each\nface's own mesh tiles the same closed surface the solid does. A trimmed\nNURBS patch need not, so summing those integrates an open surface.\n\nFilleting the mirror-image corner columns of an L-blank shows both halves of\nthe problem at once. The two solids are reflections, their NURBS blend walls\ncarry opposite `reversed` flags, and so they land on opposite sides of that\ntest: one measured 49.03 mm³ removed, the other 36.68, where the solid's own\nwatertight mesh gives both 34.7 against an exact 33.9. The blend geometry was\ncorrect throughout — contact points sit exactly r from the corner — only the\nmeasurement moved.\n\nWhen a NURBS face is present, integrate over the closed whole-solid mesh\ninstead, the same reasoning the scalloped-sphere and torus-notch cases above\nalready apply. Solids without NURBS keep the existing routing, so the common\nbored-solid path costs no extra tessellation: hoisting the whole-mesh attempt\nunconditionally regressed `golden_boolean_box_minus_cylinder` and made every\nsolid with a hole tessellate twice.\n\nThis also protects `blend_ops::validate_blend_volume`, which calls\n`solid_volume` and could otherwise reject a correct blend whose wall is NURBS.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* docs(operations): correct the split-column note on the G1 chain tests\n\nThe note added with the G1 ridgeline work said v1 over-removed on a split\ncolumn and gave mirrored columns different answers, 49.03 against 36.68.\nThat reading was wrong: those figures came from `solid_volume` picking its\nintegration path off a `reversed` flag, not from v1's geometry, whose\ncontact points sit exactly r from the corner.\n\nState the real reason these tests drive `FilletBuilder` directly — the\nwrapper prefers v1 for planar line blends, and v1 builds the wall as NURBS\nwhere the walking engine emits an exact cylinder, so the two tessellate to\n36.68 and 34.07 against an exact 33.91 — and point at the volume regression\ntest for the rest.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-27T00:20:11-04:00",
+          "tree_id": "3d0f88900d51e3954e8d0de4bef037070bb14b0d",
+          "url": "https://github.com/esaueng/brepkit/commit/55f2d51f4a808c7708da96d414411d3e6cbabdac"
+        },
+        "date": 1785126153277,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 832049,
+            "range": "± 12799",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 923082,
+            "range": "± 7551",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13380,
+            "range": "± 261",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 681117,
+            "range": "± 23146",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21861995,
+            "range": "± 57734",
             "unit": "ns/iter"
           }
         ]
