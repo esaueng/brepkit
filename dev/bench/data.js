@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785169799600,
+  "lastUpdate": 1785170984853,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2159,6 +2159,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17753335,
             "range": "± 25472",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1565f0a2e46cff4c2e46fcde3dafc189431769db",
+          "message": "fix(blend): chamfer a bore mouth, and mesh the band it leaves (#29)\n\nAdd exact bore-mouth rim chamfers while preserving cap boundaries, and stitch mismatched revolution-band rings from shared vertices so tessellation remains watertight across tolerances.",
+          "timestamp": "2026-07-27T12:47:16-04:00",
+          "tree_id": "50148bbff89a55ea0fc8db00a57de0f760fbe7cf",
+          "url": "https://github.com/esaueng/brepkit/commit/1565f0a2e46cff4c2e46fcde3dafc189431769db"
+        },
+        "date": 1785170983662,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 824732,
+            "range": "± 1605",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 913397,
+            "range": "± 1435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12725,
+            "range": "± 19",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 677395,
+            "range": "± 17897",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21711194,
+            "range": "± 19450",
             "unit": "ns/iter"
           }
         ]
