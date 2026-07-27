@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785130720220,
+  "lastUpdate": 1785132455639,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2051,6 +2051,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21843444,
             "range": "± 42960",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "0f6dbc6c596f6a67f658a0df73bd48783172c55e",
+          "message": "fix(wasm): route batch chamfer through the same engine chain as the binding\n\n`executeBatch` with op \"chamfer\" called the v1 flat-bevel engine directly,\nwhile the `chamfer` binding had already been routed through `try_chamfer`\n(v1, roll back, then v2). The same operation therefore succeeded one way and\nfailed the other: on a cylinder rim the binding returned a chamfered solid\nand the batch returned \"cannot normalize zero vector\", because the v1 engine\nis planar-only and a cap bounded by one closed circular edge degenerates to\na point.\n\nBatch dispatch now calls `try_chamfer`, wrapped in the same `catch_unwind`\nguard the sibling `fillet` arm uses — the chamfer arm had neither the chain\nnor the panic guard.\n\nTests cover both entry points on a closed rim and assert the volume against\nPappus rather than merely that the call returned Ok: the right triangle of\nlegs d revolved about the axis at centroid radius `r - d/3`. The batch case\nfails with the old routing and passes with the new, so it guards the fix\nrather than just describing it. A third test pins the two paths to the same\nresult on an ordinary box edge, which is the property that had silently\ndiverged.\n\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-27T02:05:21-04:00",
+          "tree_id": "3128a8e5ab76cd430f0e405ac0dcc46950740a6e",
+          "url": "https://github.com/esaueng/brepkit/commit/0f6dbc6c596f6a67f658a0df73bd48783172c55e"
+        },
+        "date": 1785132454805,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 661089,
+            "range": "± 831",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 736856,
+            "range": "± 1588",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11039,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 527368,
+            "range": "± 1479",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17998663,
+            "range": "± 128314",
             "unit": "ns/iter"
           }
         ]
