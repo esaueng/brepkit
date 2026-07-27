@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785113094299,
+  "lastUpdate": 1785115876254,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1565,6 +1565,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21923480,
             "range": "± 320879",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "638d1415a3c1a60b14b5894c3f065450d63b3726",
+          "message": "feat(blend): follow G1 ridgelines when filleting, not just the named edges (#23)\n\nA tangent-continuous ridge is often several edges. The OpenZCAD demo\nbracket's rear corner columns are cut where its wall seats into the base\nplate, so the demo's \"fillet the base corners\" selected only the bottom\npiece of each. Filleting that piece alone has to run out in the middle of a\nsmooth edge, where there is no cap face to close against — the blend failed\noutright, and the demo shipped unfilleted.\n\nExpand each seed to its whole ridgeline before building the spine, so the\nstripe spans the full column and terminates on real end caps. `Spine` and\n`expand_g1_chain` already existed; what was missing was grouping an\nexpansion into per-ridgeline chains, ordering each head-to-tail, and driving\nthe builder per chain instead of per edge. The v1 rolling-ball engine has\nalways propagated this way.\n\nTwo latent bugs surfaced once spines could span several edges:\n\n`Spine::evaluate`/`tangent` read each edge's own start→end orientation.\nOrientation is a property of the arena, not of the ridgeline, so a chain\nholding a \"backwards\" edge was sampled from the wrong end: the blend\ncylinder's origin landed mid-chain with its axis flipped, and the resulting\nwall — geometrically wrong but topologically valid, closed and orientation\nconsistent — inflated the bracket by 10320 mm³. Spine now records a\ntraversal direction per edge and honours it.\n\n`trim_face` handed the trimmed face an empty inner-wire list, silently\nfilling in every hole. Trimming a face a bore passes through dropped the\nbore's boundary, so its cylindrical wall lost one of its two faces, the\nshell opened, and the volume grew by the bore. Holes on the kept side now\ncarry over; those on the discarded side go with it.\n\nVerified on the bracket through the kernel-parity harness: the pinned\n\"Fillet could not be created\" warning is gone, volume drops 184.7 mm³\nagainst 183.5 predicted for two 8 mm and two 39.5 mm corners, face count\ngoes 13 to 17 (one wall per corner), and the body meshes watertight.\n\nThe regression tests drive FilletBuilder directly. `blend_ops::fillet_v2`\nprefers the v1 rolling-ball rebuild for planar line blends, and on a split\ncolumn v1 over-removes and disagrees with itself across mirrored corners\n(49.03 vs 36.68 where 33.91 is correct); the walking engine answers 34.07\nfor both. Going through the wrapper would measure v1, not this change.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-26T21:28:40-04:00",
+          "tree_id": "fd795c7bfb30fcbf922d31fef82e5cf9a4129641",
+          "url": "https://github.com/esaueng/brepkit/commit/638d1415a3c1a60b14b5894c3f065450d63b3726"
+        },
+        "date": 1785115875646,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 827795,
+            "range": "± 18692",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 918598,
+            "range": "± 7493",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12763,
+            "range": "± 46",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 675341,
+            "range": "± 1535",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21784201,
+            "range": "± 64784",
             "unit": "ns/iter"
           }
         ]
