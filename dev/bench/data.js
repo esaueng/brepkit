@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785128776834,
+  "lastUpdate": 1785130290368,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1943,6 +1943,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22819873,
             "range": "± 340246",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "distinct": true,
+          "id": "2e4018dc25e39a279bdb712f1107f8be859a0da8",
+          "message": "fix(operations): close the shell on asymmetric chamfers\n\nA chamfer with d1 != d2 tore the shell open. Any asymmetry did it — even\nd2 = d1 + 1e-4 produced 6 free edges and Euler 0 instead of 2.\n\nThe side faces at each end of a chamfered edge split their corner into two\npoints, one along each of their own edges. Each of those edges is shared\nwith a face that is being bevelled, and that neighbour has already placed\nits chamfer point along the same edge at *its* setback. The split used a\nsingle distance for both directions — max(d1, d2) — so the points only\ncoincided when the two setbacks were equal. Otherwise the two faces stopped\nsharing a boundary and the shell came apart.\n\nEach direction now takes the setback of the face across that edge, which is\nthe same value that face used to place the point being met.\n\nVolume is the oracle, and it is now exact: a single-edge chamfer removes\n(d1·d2/2)·L for every pair tried, including 198:1 lopsided ones. Neither\nmax-twice nor min-twice can produce that product, so this also confirms both\ndistances reach the geometry rather than one being applied twice.\n\nThis repairs `chamferDistanceAngle` for free. It sets d2 = distance·tan(angle),\nwhich equals distance only at 45 degrees — and 45 degrees was the sole angle\nits test covered, so every other angle had been emitting an open shell.\n\n`chamfer_asymmetric_single_edge_volume` asserted 0.965 for d1=0.2, d2=0.3 on\na unit cube and explained the gap from the true 0.97 as \"extra triangular\nwedges\" from the max(d1,d2) offsets. Those wedges were the defect. The test\nhad encoded the buggy output as expected, and because it measured only\nvolume it passed on a solid that was not closed — which is how this survived.\nIt now asserts the analytic 1 - (d1·d2/2)·L and checks closure.\n\nNothing here relaxes the setback fit guard: 10mm and 40mm setbacks on a 10mm\nbox are still refused, and the accepted range is unchanged.",
+          "timestamp": "2026-07-27T01:22:22-04:00",
+          "tree_id": "73d18e497c820091634e25fd6ad1967b34d6bed6",
+          "url": "https://github.com/esaueng/brepkit/commit/2e4018dc25e39a279bdb712f1107f8be859a0da8"
+        },
+        "date": 1785130290014,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 857729,
+            "range": "± 2733",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 954956,
+            "range": "± 2205",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14471,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 684193,
+            "range": "± 16655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22878153,
+            "range": "± 116646",
             "unit": "ns/iter"
           }
         ]
