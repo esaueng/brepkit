@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785130290368,
+  "lastUpdate": 1785130720220,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -1997,6 +1997,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22878153,
             "range": "± 116646",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "91172190ad025afaf192b51a443e751382bbba20",
+          "message": "fix(blend): rim chamfer on a cap that carries holes (#28)\n\n#27 taught the chamfer builder the annular rim rebuild, but gated it on the\ncap being a BARE DISC — `closed_rim_info` bailed on any cap with inner\nwires. That passed the bare-cylinder repro and still failed the case that\nmotivated the work: the drilled flange's rim cap is an annulus with a\ncentral opening and six bolt holes, so all three of the demo's picked rims\nreported \"trimming failure\".\n\nThe gate existed because the rebuild handed the new cap `Vec::new()` for\nits inner wires. Keeping the holes is the actual fix — dropping them would\nfill in every opening and strand each bore wall with no face to pair\nagainst, opening the shell. That is the same failure #23 hit when\n`trim_face` cleared a trimmed face's inner-wire list.\n\nCarrying holes through is only sound while the shrinking outer boundary\nstill clears them, so `closed_rim_info` now samples every inner wire and\ndefers to the trim path when any point reaches the plate-contact radius. A\nsetback that large would need the hole and the chamfer to merge — real\ngeometry the annular rebuild cannot express — so it fails closed rather\nthan emitting a cap whose outer wire crosses its own hole.\n\nAll three flange rims (two r45, the r24 hub lip) now chamfer in one call:\nvolume 78314.31 against Pappus 78313.98 (4e-6), 0 free and 0 non-manifold\nedges, census {cone: 3, cylinder: 9, plane: 3} — fully analytic, with the\nsix bores intact.\n\nThe new `rim_chamfer_preserves_cap_holes` test builds the real drilled\nflange rather than a primitive, and asserts up front that the caps really\nare holed annuli so it cannot silently degrade into re-testing the\nbare-disc case.\n\nVerified: workspace tests green (121 suites), clippy -D warnings and fmt\nclean.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-07-27T01:36:15-04:00",
+          "tree_id": "14ad4f70b5ebda625e7593e7ed50fee87b8a2c72",
+          "url": "https://github.com/esaueng/brepkit/commit/91172190ad025afaf192b51a443e751382bbba20"
+        },
+        "date": 1785130719663,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 832940,
+            "range": "± 2855",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 956524,
+            "range": "± 21440",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13001,
+            "range": "± 21",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 679785,
+            "range": "± 2376",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21843444,
+            "range": "± 42960",
             "unit": "ns/iter"
           }
         ]
