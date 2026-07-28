@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785172008711,
+  "lastUpdate": 1785215029723,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2267,6 +2267,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21725890,
             "range": "± 283668",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "190bc0223393c150a2ce10636958ba4db01d0060",
+          "message": "Merge pull request #32 from esaueng/codex/chamfer-entry-point-parity\n\ntest(wasm): hold both chamfer entry points to one geometry bar",
+          "timestamp": "2026-07-28T01:01:27-04:00",
+          "tree_id": "cf9c7d27634ff4a0579a4ba45ec61f86695954ab",
+          "url": "https://github.com/esaueng/brepkit/commit/190bc0223393c150a2ce10636958ba4db01d0060"
+        },
+        "date": 1785215029196,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 819279,
+            "range": "± 1579",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 911531,
+            "range": "± 1886",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12964,
+            "range": "± 11",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 674780,
+            "range": "± 1409",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21786853,
+            "range": "± 71606",
             "unit": "ns/iter"
           }
         ]
