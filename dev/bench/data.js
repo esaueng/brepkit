@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785215029723,
+  "lastUpdate": 1785530089944,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2321,6 +2321,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21786853,
             "range": "± 71606",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6071fd6b416868b086b8a986d9a8a41036d8f0c1",
+          "message": "fix(operations): exact sphere corner caps for rolling-ball fillets (#33)\n\nAt a 3-edge vertex blend the rolling-ball fillet approximated the corner\nball with a degree-(2,2) rational patch that sags up to ~5% of R, folds\nat its degenerate corner, and meets the fillet strips at up to a 106 deg\ndihedral - rendered as a pinched blob on every filleted box corner.\n\nEmit the cap as an analytic FaceSurface::Sphere with shared great-circle\nCircle rim edges (new FaceSpec::SphereCapFace), tessellated by a\nstructured watertight web with exact on-sphere vertices and normals in\nboth the solid and single-face paths. Adds SphericalSurface::with_frame\n(math) for singularity-safe sphere charts.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01EiKy1AJLjpQGuni43AgdUg",
+          "timestamp": "2026-07-31T15:32:20-05:00",
+          "tree_id": "7f3882c20dbd47066fc874acdebdb8915fcb340e",
+          "url": "https://github.com/esaueng/brepkit/commit/6071fd6b416868b086b8a986d9a8a41036d8f0c1"
+        },
+        "date": 1785530089580,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 857651,
+            "range": "± 12267",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 957380,
+            "range": "± 12005",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14168,
+            "range": "± 313",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 680263,
+            "range": "± 2992",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22801652,
+            "range": "± 91876",
             "unit": "ns/iter"
           }
         ]
