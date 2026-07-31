@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785530089944,
+  "lastUpdate": 1785532991438,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2375,6 +2375,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22801652,
             "range": "± 91876",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "08fa4d9b524df2271e58df4507870165022ef209",
+          "message": "fix(blend): exact tangent-ball vertex blends, fence unsupported corners (#34)\n\nSolve the walking engine's corner ball exactly from face-plane tangency\n(3x3 system, material side from the stripes' rolling-ball section\ncentres) instead of the normal-sum offset that inflated orthogonal\ncorners to sqrt(2) times the fillet radius from un-set-back contacts.\nCorner patches become analytic sphere faces (as in #33); the 15%-of-R\ntest tolerance is replaced with exact-ball assertions. FilletBuilder now\nfails fast with a typed UnsupportedVertexBlend error when multiple G1\nchains share a vertex, routing callers straight to the rolling-ball\nengine's exact corners instead of a doomed build plus rollback.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01EiKy1AJLjpQGuni43AgdUg",
+          "timestamp": "2026-07-31T16:20:41-05:00",
+          "tree_id": "1c34aaca9a5bcbcc36308b1356b1e900f09a0525",
+          "url": "https://github.com/esaueng/brepkit/commit/08fa4d9b524df2271e58df4507870165022ef209"
+        },
+        "date": 1785532989568,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 861618,
+            "range": "± 1842",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 959575,
+            "range": "± 7164",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14111,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 687929,
+            "range": "± 3746",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22855303,
+            "range": "± 105023",
             "unit": "ns/iter"
           }
         ]
