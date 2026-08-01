@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785583751141,
+  "lastUpdate": 1785587126356,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3023,6 +3023,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21688495,
             "range": "± 273723",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "725610af0695c514766df92e44dd4fda8a438b27",
+          "message": "fix(check): a wire's orientation flags must not change what a face measures (#46)\n\nmass_properties read low on any body whose faces the boolean left with\nalternating wire orientation flags, and centre of mass and the inertia tensor\nwere wrong with it.\n\nThe defect was upstream of the integrand: the exact path was being rejected,\nso the face fell back to the chord polygon. Choosing the Green's-theorem\nclosed form needs the boundary's own plane, and wire_newell_normal sampled\nthat plane by pushing edge.start() for every line edge, ignoring the direction\nthe wire traverses it. Wires store edges in loop order but do not guarantee\nthe flags chain head-to-tail — util::wire_polygon and\nplanar_wire_monomial_moments both re-derive traversal from vertex\nconnectivity; this one did not. A rectangle flagged (fwd, rev, fwd, rev)\nsampled as A, B, B, A, whose Newell normal is zero, and a zero normal rejects\nthe exact path for the whole face including its holes. The r=10 bore was then\nsubtracted as an inscribed 32-gon, keeping 2.0147 mm2 of bore as material.\n\nBracket y=32 wall: area 2207.855485 -> 2205.840735 (= 2520 - 100pi). Rev B\n47522.933959 -> exact 47544.424627; Rev C 47339.449389 -> exact 47360.940057.\nThe bracket is mirror-symmetric about x=40 and centre of mass read x = 40.0181;\nit now reads 40.000000000, with the inertia tensor matching a composed closed\nform to 1e-14 relative.\n\nGuards: volume invariant across Gauss orders 4-16, equal to solid_volume at\nevery deflection 1.0 to 1e-6, and Rev B measures identically face-unified\n(13 faces) and raw (19 faces) — those disagreed by 4.3 mm3 before, with\nneither correct.\n\nTwo larger pre-existing defects on the quadric path are documented on\nintegrate_face rather than fixed here: inner wires are never subtracted from\ncurved faces, and a curved face bounded by one closed edge contributes exactly\nzero. A cross-drilled shaft reads 6.38% high. Both are also in solid_volume\nand need their own lane.",
+          "timestamp": "2026-08-01T07:23:03-05:00",
+          "tree_id": "e90ce8c44cd659e55e0afd1babd792efbf09400f",
+          "url": "https://github.com/esaueng/brepkit/commit/725610af0695c514766df92e44dd4fda8a438b27"
+        },
+        "date": 1785587125069,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 828288,
+            "range": "± 1243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 916246,
+            "range": "± 1301",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12717,
+            "range": "± 541",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 685375,
+            "range": "± 1637",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21774493,
+            "range": "± 139299",
             "unit": "ns/iter"
           }
         ]
