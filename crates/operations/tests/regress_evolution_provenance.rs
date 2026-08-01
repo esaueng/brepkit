@@ -9,7 +9,7 @@
 //! Each assertion below is a fact about the construction, not a recording of
 //! what the code happened to output.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::collections::HashSet;
 
@@ -46,7 +46,7 @@ fn face_indices(topo: &Topology, s: SolidId) -> HashSet<usize> {
     solid_faces(topo, s)
         .unwrap()
         .into_iter()
-        .map(|f| f.index())
+        .map(brepkit_topology::arena::Id::index)
         .collect()
 }
 
@@ -77,8 +77,8 @@ fn cylinder_rim_fillet_reports_construction_derived_provenance() {
     let top = edges[2];
 
     let before: HashSet<usize> = face_indices(&topo, cyl);
-    let (result, evo) = blend_ops::fillet_with_evolution(&mut topo, cyl, &[top], 2.0)
-        .expect("cylinder rim fillet");
+    let (result, evo) =
+        blend_ops::fillet_with_evolution(&mut topo, cyl, &[top], 2.0).expect("cylinder rim fillet");
 
     assert_eq!(
         evo.origin,
@@ -196,7 +196,11 @@ fn pattern_instance_faces_descend_from_the_source_face_they_copy() {
             .generated
             .get(&f.index())
             .unwrap_or_else(|| panic!("source face {} generated no instance faces", f.index()));
-        assert_eq!(instances.len(), 2, "count 3 means the source plus two copies");
+        assert_eq!(
+            instances.len(),
+            2,
+            "count 3 means the source plus two copies"
+        );
 
         // The recorded instance faces must actually BE the source face moved by
         // one and two spacings — checked against the geometry, not the record.

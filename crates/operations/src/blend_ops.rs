@@ -1,9 +1,9 @@
 //! Thin wrappers around `brepkit-blend` for the operations API.
 
-pub use brepkit_blend::BlendError;
 use brepkit_blend::BlendResult;
 use brepkit_blend::chamfer_builder::ChamferBuilder;
 use brepkit_blend::fillet_builder::FilletBuilder;
+pub use brepkit_blend::{BlendError, BlendFaceOrigins};
 use brepkit_topology::Topology;
 use brepkit_topology::edge::{EdgeCurve, EdgeId};
 use brepkit_topology::face::FaceSurface;
@@ -836,6 +836,20 @@ pub fn chamfer_distance_angle(
 
 // ── Face provenance ────────────────────────────────────────────
 
+/// [`evolution_from_blend_origins`] for a [`BlendResult`] this crate produced.
+fn evolution_for_blend(
+    topo: &Topology,
+    result: &BlendResult,
+    input_signatures: &[crate::evolution::FaceSignature],
+) -> Result<EvolutionMap, OperationsError> {
+    evolution_from_blend_origins(
+        topo,
+        result.solid,
+        result.face_origins.as_ref(),
+        input_signatures,
+    )
+}
+
 /// Turn a blend engine's own construction record into an [`EvolutionMap`],
 /// falling back to geometric matching when the engine that ran kept none.
 ///
@@ -847,24 +861,33 @@ pub fn chamfer_distance_angle(
 /// trusted. A result face the record does not name is reported as unresolved,
 /// so a record that has drifted from the assembler produces a refusal rather
 /// than a confident half-answer.
-fn evolution_for_blend(
+///
+/// Exposed for callers that drive the blend engines themselves — the WASM
+/// bindings run their own engine cascade — and so still need to turn whatever
+/// record came back into a map.
+///
+/// # Errors
+///
+/// Returns an error if the result solid's faces cannot be read.
+pub fn evolution_from_blend_origins(
     topo: &Topology,
-    result: &BlendResult,
+    result_solid: SolidId,
+    origins: Option<&BlendFaceOrigins>,
     input_signatures: &[crate::evolution::FaceSignature],
 ) -> Result<EvolutionMap, OperationsError> {
     use brepkit_topology::explorer::solid_faces;
 
-    let Some(origins) = result.face_origins.as_ref() else {
-        let output_signatures = crate::boolean::collect_face_signatures(topo, result.solid)?;
+    let Some(origins) = origins else {
+        let output_signatures = crate::boolean::collect_face_signatures(topo, result_solid)?;
         return Ok(crate::evolution::build_evolution_by_geometry(
             input_signatures,
             &output_signatures,
         ));
     };
 
-    let result_faces: std::collections::HashSet<usize> = solid_faces(topo, result.solid)?
+    let result_faces: std::collections::HashSet<usize> = solid_faces(topo, result_solid)?
         .into_iter()
-        .map(|f| f.index())
+        .map(brepkit_topology::arena::Id::index)
         .collect();
 
     let mut evo = EvolutionMap::exact();

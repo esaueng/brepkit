@@ -267,8 +267,7 @@ impl<'a> FilletBuilder<'a> {
                 match assemble_closed_rim(topo, &sr.stripe, &rim, &mut face_replacements) {
                     Ok(band) => {
                         blend_face_ids.push(band);
-                        blend_face_origins
-                            .push((band, vec![sr.stripe.face1, sr.stripe.face2]));
+                        blend_face_origins.push((band, vec![sr.stripe.face1, sr.stripe.face2]));
                     }
                     // A radius the geometry cannot accommodate is a verdict,
                     // not a reason to try another assembler: no engine below
@@ -385,11 +384,8 @@ impl<'a> FilletBuilder<'a> {
             // Falls back to the legacy detached quad when not applicable.
             match stitch_planar_blend(topo, stripe, tr1, tr2, &face_replacements) {
                 Ok(Some(mut faces)) => {
-                    blend_face_origins.extend(
-                        faces
-                            .iter()
-                            .map(|&f| (f, vec![stripe.face1, stripe.face2])),
-                    );
+                    blend_face_origins
+                        .extend(faces.iter().map(|&f| (f, vec![stripe.face1, stripe.face2])));
                     blend_face_ids.append(&mut faces);
                     continue;
                 }
