@@ -208,26 +208,48 @@ impl From<OperationsError> for Refusal {
     }
 }
 
-/// Build one primitive.
+/// Build one primitive, together with its volume **derived by hand**.
+///
+/// The closed form is the harness's only oracle that does not consult the code
+/// under test, so it is computed here from the same local magnitudes that are
+/// handed to the constructor. Returning the two together is deliberate: a
+/// separate `exact_volume(p)` would be free to drift out of step with the
+/// construction, and a silently stale oracle is worse than none.
 ///
 /// # Errors
 ///
 /// Returns [`Refusal`] when the primitive's own contract rejects the drawn
 /// magnitudes (for example a torus whose minor radius reaches its major).
-pub fn build_prim(topo: &mut Topology, p: Prim) -> Result<SolidId, Refusal> {
-    let solid = match p {
-        Prim::Cuboid { dx, dy, dz } => primitives::make_box(topo, dim(dx), dim(dy), dim(dz))?,
-        Prim::Cylinder { r, h } => primitives::make_cylinder(topo, dim(r), dim(h))?,
+pub fn build_prim_measured(topo: &mut Topology, p: Prim) -> Result<(SolidId, f64), Refusal> {
+    let pair = match p {
+        Prim::Cuboid { dx, dy, dz } => {
+            let (x, y, z) = (dim(dx), dim(dy), dim(dz));
+            (primitives::make_box(topo, x, y, z)?, x * y * z)
+        }
+        Prim::Cylinder { r, h } => {
+            let (r, h) = (dim(r), dim(h));
+            (primitives::make_cylinder(topo, r, h)?, PI * r * r * h)
+        }
         Prim::Cone { r0, r1, h } => {
             // One draw in eight is a true point-tipped cone; the rest are
             // frusta, which have caps that booleans can land on.
             let top = if r1 % 8 == 0 { 0.0 } else { dim(r1) };
-            primitives::make_cone(topo, dim(r0), top, dim(h))?
+            let (base, h) = (dim(r0), dim(h));
+            // Frustum: V = pi*h*(r0^2 + r0*r1 + r1^2)/3, which degenerates to
+            // the cone pi*r^2*h/3 at r1 = 0.
+            let v = PI * h * top.mul_add(top, base.mul_add(base, base * top)) / 3.0;
+            (primitives::make_cone(topo, base, top, h)?, v)
         }
         Prim::Sphere { r, seg } => {
             // 8..=16 segments: coarse enough that tessellation stays cheap,
-            // fine enough that the equatorial seam is a real feature.
-            primitives::make_sphere(topo, dim(r), 8 + usize::from(seg % 9))?
+            // fine enough that the equatorial seam is a real feature. The
+            // segment count is a tessellation hint — the surface is analytic,
+            // so the exact volume is the sphere's.
+            let r = dim(r);
+            (
+                primitives::make_sphere(topo, r, 8 + usize::from(seg % 9))?,
+                4.0 / 3.0 * PI * r * r * r,
+            )
         }
         Prim::Torus { major, minor } => {
             let maj = dim(major) + 1.0;
@@ -237,10 +259,35 @@ pub fn build_prim(topo: &mut Topology, p: Prim) -> Result<SolidId, Refusal> {
             if min_r <= 0.0 {
                 return Err(Refusal::Degenerate);
             }
-            primitives::make_torus(topo, maj, min_r, 16)?
+            // Pappus: V = 2*pi^2*R*r^2.
+            (
+                primitives::make_torus(topo, maj, min_r, 16)?,
+                2.0 * PI * PI * maj * min_r * min_r,
+            )
         }
     };
-    Ok(solid)
+    Ok(pair)
+}
+
+/// Build one primitive, discarding the closed form.
+///
+/// # Errors
+///
+/// Returns [`Refusal`] when the primitive's own contract rejects the drawn
+/// magnitudes.
+pub fn build_prim(topo: &mut Topology, p: Prim) -> Result<SolidId, Refusal> {
+    Ok(build_prim_measured(topo, p)?.0)
+}
+
+/// A solid, plus its volume derived outside the kernel where that is possible.
+///
+/// `exact` is `None` as soon as the construction passes through a boolean whose
+/// answer is not determined by the operand volumes alone. It survives rigid
+/// placement — which is the entire reason [`Xform`] has no scale term.
+#[derive(Clone, Copy)]
+pub struct Valued {
+    pub solid: SolidId,
+    pub exact: Option<f64>,
 }
 
 /// What one evaluation step produced, and what it was made from.
@@ -249,6 +296,33 @@ pub struct Combined {
     pub result: SolidId,
     pub lhs: SolidId,
     pub rhs: SolidId,
+    /// The volume the result must have, when the operands were interior-disjoint
+    /// and both of their volumes were known by construction.
+    pub exact: Option<f64>,
+    /// Whether the operands' bounding boxes were interior-disjoint.
+    pub disjoint: bool,
+    pub lhs_exact: Option<f64>,
+    pub rhs_exact: Option<f64>,
+}
+
+/// Do two boxes share no interior?
+///
+/// Bounding boxes contain their solids, so interior-disjoint boxes imply
+/// interior-disjoint solids — the implication runs the sound way round. The
+/// tolerance is deliberately tiny and *positive*, which admits the exactly
+/// tangent configurations the quantized lattice is there to produce: a tool
+/// whose face rests on a target's face is disjoint in the interior, and its
+/// boolean has an exact answer.
+#[must_use]
+pub fn boxes_interior_disjoint(
+    a: &brepkit_math::aabb::Aabb3,
+    b: &brepkit_math::aabb::Aabb3,
+) -> bool {
+    const EPS: f64 = 1e-9;
+    let sep = |amin: f64, amax: f64, bmin: f64, bmax: f64| amax <= bmin + EPS || bmax <= amin + EPS;
+    sep(a.min.x(), a.max.x(), b.min.x(), b.max.x())
+        || sep(a.min.y(), a.max.y(), b.min.y(), b.max.y())
+        || sep(a.min.z(), a.max.z(), b.min.z(), b.max.z())
 }
 
 /// Evaluate a tree, invoking `on_combine` after every boolean node.
@@ -264,30 +338,62 @@ pub fn eval(
     topo: &mut Topology,
     node: &Node,
     on_combine: &mut impl FnMut(&Topology, &Combined),
-) -> Result<SolidId, Refusal> {
+) -> Result<Valued, Refusal> {
     match node {
-        Node::Leaf(p) => build_prim(topo, *p),
+        Node::Leaf(p) => {
+            let (solid, v) = build_prim_measured(topo, *p)?;
+            Ok(Valued {
+                solid,
+                exact: Some(v),
+            })
+        }
         Node::Placed(inner, x) => {
-            let s = eval(topo, inner, on_combine)?;
-            transform_solid(topo, s, &x.matrix())?;
-            Ok(s)
+            let v = eval(topo, inner, on_combine)?;
+            // A rigid motion preserves volume exactly, so the closed form
+            // survives untouched.
+            transform_solid(topo, v.solid, &x.matrix())?;
+            Ok(v)
         }
         Node::Combine(kind, a, b) => {
             let lhs = eval(topo, a, on_combine)?;
             let rhs = eval(topo, b, on_combine)?;
-            // Operand volumes must be read before the boolean consumes them:
-            // the engine is free to reuse or retire operand entities.
-            let result = boolean(topo, kind.op(), lhs, rhs)?;
+
+            // Read the operand boxes before the boolean consumes them: the
+            // engine is free to reuse or retire operand entities.
+            let boxes = brepkit_operations::measure::solid_bounding_box(topo, lhs.solid)
+                .ok()
+                .zip(brepkit_operations::measure::solid_bounding_box(topo, rhs.solid).ok());
+            let disjoint = boxes.is_some_and(|(x, y)| boxes_interior_disjoint(&x, &y));
+
+            // When the operands cannot overlap, the algebra is total and the
+            // result's volume is a number known in advance.
+            let exact = match (disjoint, lhs.exact, rhs.exact) {
+                (true, Some(va), Some(vb)) => match kind {
+                    BoolKind::Fuse => Some(va + vb),
+                    BoolKind::Cut => Some(va),
+                    BoolKind::Intersect => Some(0.0),
+                },
+                _ => None,
+            };
+
+            let result = boolean(topo, kind.op(), lhs.solid, rhs.solid)?;
             on_combine(
                 topo,
                 &Combined {
                     kind: *kind,
                     result,
-                    lhs,
-                    rhs,
+                    lhs: lhs.solid,
+                    rhs: rhs.solid,
+                    exact,
+                    disjoint,
+                    lhs_exact: lhs.exact,
+                    rhs_exact: rhs.exact,
                 },
             );
-            Ok(result)
+            Ok(Valued {
+                solid: result,
+                exact,
+            })
         }
     }
 }
@@ -297,7 +403,7 @@ pub fn eval(
 /// # Errors
 ///
 /// Returns [`Refusal`] as soon as any step declines.
-pub fn eval_quiet(topo: &mut Topology, node: &Node) -> Result<SolidId, Refusal> {
+pub fn eval_quiet(topo: &mut Topology, node: &Node) -> Result<Valued, Refusal> {
     eval(topo, node, &mut |_, _| {})
 }
 
@@ -325,21 +431,38 @@ impl BaseBody {
     /// # Errors
     ///
     /// Returns [`Refusal`] if the stock, the bore, or the cut declines.
-    pub fn build(self, topo: &mut Topology) -> Result<SolidId, Refusal> {
-        let stock = build_prim(topo, self.stock)?;
-        if self.mode % 8 == 0 {
-            return Ok(stock);
+    pub fn build(self, topo: &mut Topology) -> Result<Valued, Refusal> {
+        let (stock, v_stock) = build_prim_measured(topo, self.stock)?;
+        if self.mode.is_multiple_of(8) {
+            return Ok(Valued {
+                solid: stock,
+                exact: Some(v_stock),
+            });
         }
-        let tool = build_prim(topo, self.bore)?;
+        let (tool, v_tool) = build_prim_measured(topo, self.bore)?;
         transform_solid(topo, tool, &self.place.matrix())?;
-        let op = if self.mode % 8 == 1 {
+        let fuse = self.mode % 8 == 1;
+        let op = if fuse {
             // A fuse leaves a boss rather than a bore: modifiers must handle
             // added material as well as removed.
             BooleanOp::Fuse
         } else {
             BooleanOp::Cut
         };
-        Ok(boolean(topo, op, stock, tool)?)
+
+        let boxes = brepkit_operations::measure::solid_bounding_box(topo, stock)
+            .ok()
+            .zip(brepkit_operations::measure::solid_bounding_box(topo, tool).ok());
+        let exact = if boxes.is_some_and(|(a, b)| boxes_interior_disjoint(&a, &b)) {
+            Some(if fuse { v_stock + v_tool } else { v_stock })
+        } else {
+            None
+        };
+
+        Ok(Valued {
+            solid: boolean(topo, op, stock, tool)?,
+            exact,
+        })
     }
 }
 

@@ -80,7 +80,7 @@ fuzz_target!(|case: Case| {
         Err(Refusal::Engine(_) | Refusal::Degenerate) => return,
     };
 
-    let Ok(before) = inv::census(&topo, body) else {
+    let Ok(before) = inv::census(&topo, body.solid) else {
         return;
     };
     if before.faces > FACE_LIMIT {
@@ -92,11 +92,24 @@ fuzz_target!(|case: Case| {
     if before.free_edges > 0 || before.non_manifold_edges > 0 || before.orphan_edges > 0 {
         return;
     }
-    let Some(v_before) = inv::measure(&topo, body) else {
+    let Some(v_before) = inv::measure(&topo, body.solid) else {
         return;
     };
 
-    apply(&mut topo, body, &case.modifier, &before, v_before.volume);
+    // When the stock and the bore were interior-disjoint the base body's volume
+    // is known by construction, so the body is checked against a closed form
+    // before any modifier gets the blame for what comes out of it.
+    if let Some(expected) = body.exact {
+        inv::assert_exact_volume("base body", expected, v_before.volume);
+    }
+
+    apply(
+        &mut topo,
+        body.solid,
+        &case.modifier,
+        &before,
+        v_before.volume,
+    );
 });
 
 fn apply(
@@ -119,7 +132,8 @@ fn apply(
             if sel.is_empty() {
                 return;
             }
-            let Ok(result) = fillet_v2(topo, body, &sel, small(*radius)) else {
+            let r1 = small(*radius);
+            let Ok(result) = fillet_v2(topo, body, &sel, r1) else {
                 return; // RadiusTooLarge, UnsupportedVertexBlend, ... — all passes
             };
             // I8 — a blend that did only some of the edges must be an error,
@@ -130,6 +144,20 @@ fn apply(
                 result.succeeded.len(),
                 result.is_partial,
             );
+            // I8b — the radius is an option, and an option must be honoured.
+            // A second fillet at half the radius must not land on the same
+            // solid (#52's corner mode accepted the request and ignored it).
+            // Run on a clone so the comparison cannot disturb the result.
+            let mut alt = topo.clone();
+            if let Ok(other) = fillet_v2(&mut alt, body, &sel, r1 * 0.5)
+                && !other.is_partial
+                && let (Some(a), Some(b)) = (
+                    inv::measure(topo, result.solid),
+                    inv::measure(&alt, other.solid),
+                )
+            {
+                inv::assert_option_honoured("fillet", "radius r", "radius r/2", a.volume, b.volume);
+            }
             finish(topo, "fillet", result.solid, before, v_before, Growth::Any);
         }
 
@@ -246,6 +274,12 @@ fn finish(
         let diag = (aabb.max - aabb.min).length();
         inv::assert_watertight_mesh(what, topo, result, inv::volume_deflection(diag) * 4.0);
     }
+
+    // I5b — a modifier's own tolerances are the likeliest place for an absolute
+    // distance to hide, because a blend radius and a shell thickness are both
+    // lengths. #51's provenance budget reported surviving faces as deleted at
+    // 1000x, which is this check's exact signature: the census moved with size.
+    inv::assert_scale_invariant(what, topo, result, 1000.0);
 
     let Some(m) = inv::measure(topo, result) else {
         return;

@@ -49,6 +49,18 @@ fuzz_target!(|node: Node| {
                 )
             {
                 inv::assert_volume_bounds(&what, c.kind.name(), &a, &b, &r);
+
+                // I5 (primary) — when the operands cannot overlap, the answer
+                // is a number known before the engine ran, so the inequality
+                // above becomes an equality. This is where a *dropped operand*
+                // shows: a `fuse` that quietly returns its target alone, or a
+                // `cut` that is a no-op, is well-formed, watertight, within
+                // every bound — and wrong by exactly the operand it discarded.
+                if c.disjoint
+                    && let (Some(va), Some(vb)) = (c.lhs_exact, c.rhs_exact)
+                {
+                    inv::assert_disjoint_boolean_exact(&what, c.kind.name(), va, vb, r.volume);
+                }
             }
         }
     });
@@ -61,7 +73,7 @@ fuzz_target!(|node: Node| {
         Err(Refusal::Engine(_) | Refusal::Degenerate) => return,
     };
 
-    let Ok(census) = inv::census(&topo, root) else {
+    let Ok(census) = inv::census(&topo, root.solid) else {
         return;
     };
     inv::assert_closed_manifold("root", &census);
@@ -71,33 +83,52 @@ fuzz_target!(|node: Node| {
     }
 
     // I1 (mesh rung) — a closed B-Rep that tessellates leaky is still broken.
-    if let Ok(aabb) = brepkit_operations::measure::solid_bounding_box(&topo, root) {
+    // Necessary but not sufficient: #52 was watertight with the bore filled and
+    // the bore walls missing, two errors that cancelled.
+    if let Ok(aabb) = brepkit_operations::measure::solid_bounding_box(&topo, root.solid) {
         let diag = (aabb.max - aabb.min).length();
-        inv::assert_watertight_mesh("root", &topo, root, inv::volume_deflection(diag) * 4.0);
+        inv::assert_watertight_mesh(
+            "root",
+            &topo,
+            root.solid,
+            inv::volume_deflection(diag) * 4.0,
+        );
     }
 
-    // I5 — two independent volume routes must agree, and refining the
-    // tessellation must not inflate the answer.
-    if let Some(m) = inv::measure(&topo, root) {
-        inv::assert_measurements_agree("root", &topo, root, m.volume);
-        inv::assert_deflection_stable("root", &topo, root, m.volume);
+    if let Some(m) = inv::measure(&topo, root.solid) {
+        // I5 (primary) — a volume derived outside the kernel. This is the only
+        // measurement oracle here that does not consult the code under test.
+        if let Some(expected) = root.exact {
+            inv::assert_exact_volume("root", expected, m.volume);
+        }
+        // I5 (secondary, weak) — the two internal routes share their face
+        // integrator and agree even when both are wrong (#53). Kept only
+        // because it catches a defect confined to one route (#46).
+        inv::assert_measurements_agree("root", &topo, root.solid, m.volume);
+        inv::assert_deflection_stable("root", &topo, root.solid, m.volume);
+    }
+
+    // I5b — the same shape at another size must give the same relative answers.
+    // Aimed squarely at tolerances written as absolute distances.
+    for s in [1000.0, 0.001] {
+        inv::assert_scale_invariant("root", &topo, root.solid, s);
     }
 
     // I6 — determinism. A second evaluation of the identical tree, in a fresh
     // arena, must produce the identical fingerprint.
-    let Some(fp1) = inv::fingerprint(&topo, root) else {
+    let Some(fp1) = inv::fingerprint(&topo, root.solid) else {
         return;
     };
     let mut topo2 = Topology::new();
     if let Ok(root2) = shapegen::eval_quiet(&mut topo2, &node)
-        && let Some(fp2) = inv::fingerprint(&topo2, root2)
+        && let Some(fp2) = inv::fingerprint(&topo2, root2.solid)
     {
         inv::assert_deterministic("root", &fp1, &fp2);
     }
 
     // I7 — idempotence. `fuse(r, r)` must be `r`. Built on a copy of the root
     // so the self-fuse operates on two distinct handles.
-    check_self_fuse(&topo, root, &census);
+    check_self_fuse(&topo, root.solid, &census);
 });
 
 /// `fuse(a, a)` must be `a`: same hole count, same volume.
