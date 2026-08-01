@@ -861,6 +861,10 @@ impl<'a> StepBuilder<'a> {
                 })?;
                 Ok(FaceSurface::Torus(torus))
             }
+            "SURFACE_OF_REVOLUTION" => self.build_surface_of_revolution(surface_ref, &attrs),
+            "SURFACE_OF_LINEAR_EXTRUSION" => {
+                self.build_surface_of_linear_extrusion(surface_ref, &attrs)
+            }
             "B_SPLINE_SURFACE_WITH_KNOTS" | "BOUNDED_SURFACE" | "B_SPLINE_SURFACE" => {
                 let is_rational = attrs.contains("RATIONAL");
                 self.build_bspline_surface(surface_ref, &attrs, is_rational)
@@ -877,6 +881,232 @@ impl<'a> StepBuilder<'a> {
                 entity: entity_type,
             }),
         }
+    }
+
+    // ── Swept surfaces ─────────────────────────────────────────────
+
+    /// Resolve a swept surface's profile curve, keeping the analytic
+    /// geometry that [`EdgeCurve`] discards.
+    ///
+    /// `EdgeCurve::Line` stores nothing — a line edge's geometry lives in its
+    /// vertices — but a swept surface has no vertices to fall back on, so the
+    /// `LINE` placement is read directly here.
+    ///
+    /// Wrapper curves are unwrapped to their basis. A `TRIMMED_CURVE`'s span
+    /// is deliberately dropped: it bounds the profile, and therefore the
+    /// swept surface, but a [`FaceSurface`] carries no bounds either — the
+    /// face's own wires do. Applying the trim would move a boundary that is
+    /// already stated elsewhere.
+    fn build_swept_profile(&self, curve_ref: u64, depth: u32) -> Result<SweptProfile, IoError> {
+        if depth > MAX_CURVE_INDIRECTION {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "swept profile chain at #{curve_ref} exceeded \
+                     {MAX_CURVE_INDIRECTION} levels (cyclic curve reference?)"
+                ),
+            });
+        }
+        let entity = self.get_entity(curve_ref)?;
+        let entity_type = entity.entity_type.clone();
+        let attrs = entity.attrs.clone();
+
+        match entity_type.as_str() {
+            "SURFACE_CURVE" | "SEAM_CURVE" | "INTERSECTION_CURVE" | "TRIMMED_CURVE" => {
+                let basis =
+                    parse_refs(&attrs)
+                        .first()
+                        .copied()
+                        .ok_or_else(|| IoError::ParseError {
+                            reason: format!(
+                                "{entity_type} #{curve_ref} missing its basis curve reference"
+                            ),
+                        })?;
+                self.build_swept_profile(basis, depth + 1)
+            }
+            "LINE" => Ok(SweptProfile::Line(self.build_line(curve_ref, &attrs)?)),
+            _ => match self.build_curve_geometry_at(curve_ref, depth)? {
+                EdgeCurve::Circle(circle) => Ok(SweptProfile::Circle(circle)),
+                EdgeCurve::Ellipse(ellipse) => Ok(SweptProfile::Ellipse(ellipse)),
+                EdgeCurve::NurbsCurve(nurbs) => Ok(SweptProfile::Nurbs(nurbs)),
+                EdgeCurve::Line => Err(IoError::ParseError {
+                    reason: format!(
+                        "swept profile #{curve_ref} resolved to a line with no placement"
+                    ),
+                }),
+            },
+        }
+    }
+
+    /// Read `LINE('name', #point, #vector)` as an infinite line.
+    fn build_line(
+        &self,
+        curve_ref: u64,
+        attrs: &str,
+    ) -> Result<brepkit_math::curves::Line3D, IoError> {
+        let refs = parse_refs(attrs);
+        let [point_ref, vector_ref, ..] = refs[..] else {
+            return Err(IoError::ParseError {
+                reason: format!("LINE #{curve_ref} needs a point and a direction vector"),
+            });
+        };
+        let origin = self.build_cartesian_point(point_ref)?;
+        let (direction, _) = self.build_vector(vector_ref)?;
+        brepkit_math::curves::Line3D::new(origin, direction).map_err(|e| IoError::ParseError {
+            reason: format!("LINE #{curve_ref}: {e}"),
+        })
+    }
+
+    /// Read `VECTOR('name', #direction, magnitude)` as a unit direction and
+    /// a magnitude in millimetres.
+    fn build_vector(&self, vector_ref: u64) -> Result<(Vec3, f64), IoError> {
+        let entity = self.get_entity(vector_ref)?;
+        let attrs = entity.attrs.clone();
+        let dir_ref = parse_refs(&attrs)
+            .first()
+            .copied()
+            .ok_or_else(|| IoError::ParseError {
+                reason: format!("VECTOR #{vector_ref} missing its direction reference"),
+            })?;
+        let direction = self.build_direction(dir_ref)?;
+        // The magnitude is the only float on the VECTOR itself; the
+        // direction's components live on the referenced DIRECTION.
+        let magnitude =
+            parse_floats(&attrs)
+                .first()
+                .copied()
+                .ok_or_else(|| IoError::ParseError {
+                    reason: format!("VECTOR #{vector_ref} missing its magnitude"),
+                })?
+                * self.units.length;
+        Ok((direction, magnitude))
+    }
+
+    /// Read `AXIS1_PLACEMENT('name', #location, #axis)`.
+    ///
+    /// The axis is optional in STEP and defaults to the z direction.
+    fn build_axis1_placement(&self, axis_ref: u64) -> Result<(Point3, Vec3), IoError> {
+        let attrs = self.get_entity(axis_ref)?.attrs.clone();
+        let refs = parse_refs(&attrs);
+        let location_ref = refs.first().copied().ok_or_else(|| IoError::ParseError {
+            reason: format!("AXIS1_PLACEMENT #{axis_ref} missing its location"),
+        })?;
+        let location = self.build_cartesian_point(location_ref)?;
+        let direction = match refs.get(1) {
+            Some(&dir_ref) => self.build_direction(dir_ref)?,
+            None => Vec3::new(0.0, 0.0, 1.0),
+        };
+        Ok((location, direction))
+    }
+
+    /// Build `SURFACE_OF_REVOLUTION('name', #swept_curve, #axis_position)`.
+    ///
+    /// Revolving simple profiles reproduces brepkit's analytic surfaces
+    /// exactly, and an exact analytic surface is worth far more downstream
+    /// than a NURBS approximation of the same shape:
+    ///
+    /// | profile | configuration | surface |
+    /// |---------|---------------|---------|
+    /// | line | parallel to the axis | cylinder |
+    /// | line | meeting the axis at an angle | cone |
+    /// | line | perpendicular, meeting the axis | plane |
+    /// | circle | plane holds the axis, centred on it | sphere |
+    /// | circle | plane holds the axis, offset from it | torus |
+    ///
+    /// Anything else with a *bounded* profile becomes an exact NURBS surface
+    /// of revolution. A profile that is neither collapsible nor bounded — a
+    /// line skew to the axis, which sweeps a hyperboloid — has no
+    /// representation here and is refused by name rather than approximated.
+    fn build_surface_of_revolution(
+        &self,
+        surface_ref: u64,
+        attrs: &str,
+    ) -> Result<FaceSurface, IoError> {
+        let refs = parse_refs(attrs);
+        let [curve_ref, axis_ref, ..] = refs[..] else {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "SURFACE_OF_REVOLUTION #{surface_ref} needs a swept curve and an axis"
+                ),
+            });
+        };
+        let profile = self.build_swept_profile(curve_ref, 0)?;
+        let (axis_pt, axis_raw) = self.build_axis1_placement(axis_ref)?;
+        let axis = axis_raw.normalize().map_err(|e| IoError::ParseError {
+            reason: format!("SURFACE_OF_REVOLUTION #{surface_ref} has a zero axis: {e}"),
+        })?;
+
+        if let Some(surface) = revolve_analytic(&profile, axis_pt, axis, surface_ref)? {
+            return Ok(surface);
+        }
+
+        let generatrix = profile
+            .into_nurbs()
+            .ok_or_else(|| IoError::UnsupportedEntity {
+                entity: format!(
+                    "SURFACE_OF_REVOLUTION #{surface_ref} over an unbounded profile that is \
+                 not a cylinder, cone, plane, sphere or torus (a line skew to the axis \
+                 sweeps a hyperboloid, which this kernel cannot represent)"
+                ),
+            })?;
+        let surface =
+            revolve_nurbs(&generatrix, axis_pt, axis).map_err(|e| IoError::ParseError {
+                reason: format!("SURFACE_OF_REVOLUTION #{surface_ref}: {e}"),
+            })?;
+        Ok(FaceSurface::Nurbs(surface))
+    }
+
+    /// Build `SURFACE_OF_LINEAR_EXTRUSION('name', #swept_curve, #extrusion_axis)`.
+    ///
+    /// A circle swept along its own normal is a cylinder and a line swept off
+    /// its own direction is a plane; both collapse to the exact analytic
+    /// surface. Every other profile is bounded in the extrusion direction by
+    /// the `VECTOR`'s magnitude, so it converts to an exact tensor-product
+    /// NURBS surface — the profile in u, the sweep in v.
+    fn build_surface_of_linear_extrusion(
+        &self,
+        surface_ref: u64,
+        attrs: &str,
+    ) -> Result<FaceSurface, IoError> {
+        let refs = parse_refs(attrs);
+        let [curve_ref, vector_ref, ..] = refs[..] else {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "SURFACE_OF_LINEAR_EXTRUSION #{surface_ref} needs a swept curve and an \
+                     extrusion vector"
+                ),
+            });
+        };
+        let profile = self.build_swept_profile(curve_ref, 0)?;
+        let (direction, magnitude) = self.build_vector(vector_ref)?;
+        let direction = direction.normalize().map_err(|e| IoError::ParseError {
+            reason: format!("SURFACE_OF_LINEAR_EXTRUSION #{surface_ref} has a zero direction: {e}"),
+        })?;
+        if !(magnitude.is_finite() && magnitude.abs() > SWEEP_LENGTH_EPS) {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "SURFACE_OF_LINEAR_EXTRUSION #{surface_ref} extrudes by {magnitude}, \
+                     which sweeps no surface"
+                ),
+            });
+        }
+
+        if let Some(surface) = extrude_analytic(&profile, direction, surface_ref)? {
+            return Ok(surface);
+        }
+
+        let generatrix = profile
+            .into_nurbs()
+            .ok_or_else(|| IoError::UnsupportedEntity {
+                entity: format!(
+                    "SURFACE_OF_LINEAR_EXTRUSION #{surface_ref} over a line parallel to its \
+                 own extrusion direction, which sweeps no surface"
+                ),
+            })?;
+        let surface =
+            extrude_nurbs(&generatrix, direction * magnitude).map_err(|e| IoError::ParseError {
+                reason: format!("SURFACE_OF_LINEAR_EXTRUSION #{surface_ref}: {e}"),
+            })?;
+        Ok(FaceSurface::Nurbs(surface))
     }
 
     fn build_edge_loop(
@@ -1349,6 +1579,348 @@ impl<'a> StepBuilder<'a> {
             reason: format!("entity #{id} not found"),
         })
     }
+}
+
+// ── Swept surface construction ──────────────────────────────────────
+
+/// A swept surface's profile curve, retaining the placement that
+/// [`EdgeCurve`] drops for lines.
+#[derive(Debug, Clone)]
+enum SweptProfile {
+    Line(brepkit_math::curves::Line3D),
+    Circle(brepkit_math::curves::Circle3D),
+    Ellipse(brepkit_math::curves::Ellipse3D),
+    Nurbs(brepkit_math::nurbs::NurbsCurve),
+}
+
+impl SweptProfile {
+    /// The profile as an exact NURBS curve, or `None` when it is unbounded.
+    ///
+    /// A conic becomes the standard nine-point rational quadratic, which
+    /// represents it exactly rather than approximately. A `LINE` is infinite
+    /// and has no NURBS form; a swept surface over one is only representable
+    /// when it collapses to an analytic surface.
+    fn into_nurbs(self) -> Option<brepkit_math::nurbs::NurbsCurve> {
+        match self {
+            Self::Line(_) => None,
+            Self::Circle(circle) => conic_to_nurbs(
+                circle.center(),
+                circle.u_axis() * circle.radius(),
+                circle.v_axis() * circle.radius(),
+            )
+            .ok(),
+            Self::Ellipse(ellipse) => conic_to_nurbs(
+                ellipse.center(),
+                ellipse.u_axis() * ellipse.semi_major(),
+                ellipse.v_axis() * ellipse.semi_minor(),
+            )
+            .ok(),
+            Self::Nurbs(nurbs) => Some(nurbs),
+        }
+    }
+}
+
+/// Tolerance for direction comparisons between unit vectors.
+///
+/// Applied to dot and cross products of normalized vectors, so it is a
+/// dimensionless sine/cosine bound: about 6e-8 radians of angle. Tight
+/// enough that only a genuinely parallel or perpendicular declaration
+/// collapses to an analytic surface.
+const SWEEP_DIR_EPS: f64 = 1e-9;
+
+/// Tolerance in millimetres for "this distance is zero" tests when deciding
+/// whether a swept profile touches its axis.
+const SWEEP_LENGTH_EPS: f64 = 1e-9;
+
+/// Weights and knots of a full-turn rational quadratic conic.
+const CONIC_ARC_WEIGHT: f64 = std::f64::consts::FRAC_1_SQRT_2;
+
+/// Build the exact nine-control-point rational quadratic for a full turn of
+/// the conic `center + cos(t)·x + sin(t)·y`.
+///
+/// `x` and `y` are the conjugate semi-axis vectors, so this covers both a
+/// circle (equal lengths, perpendicular) and an ellipse.
+fn conic_to_nurbs(
+    center: Point3,
+    x: Vec3,
+    y: Vec3,
+) -> Result<brepkit_math::nurbs::NurbsCurve, brepkit_math::MathError> {
+    let control_points = conic_control_points(center, x, y);
+    let weights = conic_weights();
+    let knots = vec![
+        0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0,
+    ];
+    brepkit_math::nurbs::NurbsCurve::new(2, knots, control_points, weights)
+}
+
+/// The nine control points of a full-turn rational quadratic conic, starting
+/// and ending at `center + x`.
+fn conic_control_points(center: Point3, x: Vec3, y: Vec3) -> Vec<Point3> {
+    vec![
+        center + x,
+        center + x + y,
+        center + y,
+        center - x + y,
+        center - x,
+        center - x - y,
+        center - y,
+        center + x - y,
+        center + x,
+    ]
+}
+
+/// The nine weights matching [`conic_control_points`].
+fn conic_weights() -> Vec<f64> {
+    let w = CONIC_ARC_WEIGHT;
+    vec![1.0, w, 1.0, w, 1.0, w, 1.0, w, 1.0]
+}
+
+/// Distance from `point` to the line through `axis_pt` along the unit
+/// `axis`, together with the point's projection onto that line.
+fn axis_projection(point: Point3, axis_pt: Point3, axis: Vec3) -> (Point3, f64) {
+    let to_point = point - axis_pt;
+    let along = to_point.dot(axis);
+    let foot = axis_pt + axis * along;
+    (foot, (point - foot).length())
+}
+
+/// Collapse a revolved profile to an analytic surface when the configuration
+/// admits one; `Ok(None)` means "no analytic form, try NURBS".
+fn revolve_analytic(
+    profile: &SweptProfile,
+    axis_pt: Point3,
+    axis: Vec3,
+    surface_ref: u64,
+) -> Result<Option<FaceSurface>, IoError> {
+    let fail = |reason: String| IoError::ParseError {
+        reason: format!("SURFACE_OF_REVOLUTION #{surface_ref}: {reason}"),
+    };
+
+    match profile {
+        SweptProfile::Line(line) => {
+            let dir = line.direction();
+            let cross = axis.cross(dir);
+            let (_, radius) = axis_projection(line.origin(), axis_pt, axis);
+
+            if cross.length() <= SWEEP_DIR_EPS {
+                // Parallel to the axis: a cylinder, unless the line *is* the
+                // axis, which sweeps nothing.
+                if radius <= SWEEP_LENGTH_EPS {
+                    return Err(fail(
+                        "the profile line lies on the axis of revolution and sweeps no \
+                         surface"
+                            .to_string(),
+                    ));
+                }
+                let cyl = brepkit_math::surfaces::CylindricalSurface::new(axis_pt, axis, radius)
+                    .map_err(|e| fail(e.to_string()))?;
+                return Ok(Some(FaceSurface::Cylinder(cyl)));
+            }
+
+            // Not parallel. Unless the line meets the axis, the sweep is a
+            // hyperboloid of one sheet, which has no analytic form here.
+            let normal = cross.normalize().map_err(|e| fail(e.to_string()))?;
+            let skew_distance = (line.origin() - axis_pt).dot(normal).abs();
+            if skew_distance > SWEEP_LENGTH_EPS {
+                return Ok(None);
+            }
+
+            let apex = line_line_intersection(axis_pt, axis, line.origin(), dir)
+                .ok_or_else(|| fail("the profile line does not meet the axis".to_string()))?;
+            let cos_to_axis = dir.dot(axis).abs();
+            if cos_to_axis <= SWEEP_DIR_EPS {
+                // Perpendicular and meeting the axis: the sweep is the plane
+                // through the intersection, normal to the axis.
+                let d = axis.dot(Vec3::new(apex.x(), apex.y(), apex.z()));
+                return Ok(Some(FaceSurface::Plane { normal: axis, d }));
+            }
+
+            // brepkit measures a cone's half angle from the radial plane to
+            // the generator, so it is the complement of the angle between the
+            // generator and the axis: sin(half_angle) = |dir · axis|.
+            let half_angle = cos_to_axis.clamp(-1.0, 1.0).asin();
+            let cone = brepkit_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
+                .map_err(|e| fail(e.to_string()))?;
+            Ok(Some(FaceSurface::Cone(cone)))
+        }
+        SweptProfile::Circle(circle) => {
+            // A sphere or torus needs the circle's plane to contain the whole
+            // axis line: the axis direction lies in the plane, and so does a
+            // point of the axis.
+            let plane_normal = circle.normal();
+            if plane_normal.dot(axis).abs() > SWEEP_DIR_EPS {
+                return Ok(None);
+            }
+            if (axis_pt - circle.center()).dot(plane_normal).abs() > SWEEP_LENGTH_EPS {
+                return Ok(None);
+            }
+
+            let (foot, offset) = axis_projection(circle.center(), axis_pt, axis);
+            if offset <= SWEEP_LENGTH_EPS {
+                let sphere = brepkit_math::surfaces::SphericalSurface::with_axis(
+                    circle.center(),
+                    circle.radius(),
+                    axis,
+                )
+                .map_err(|e| fail(e.to_string()))?;
+                return Ok(Some(FaceSurface::Sphere(sphere)));
+            }
+
+            let ref_dir = (circle.center() - foot)
+                .normalize()
+                .map_err(|e| fail(e.to_string()))?;
+            let torus = brepkit_math::surfaces::ToroidalSurface::with_axis_and_ref_dir(
+                foot,
+                offset,
+                circle.radius(),
+                axis,
+                ref_dir,
+            )
+            .map_err(|e| fail(e.to_string()))?;
+            Ok(Some(FaceSurface::Torus(torus)))
+        }
+        SweptProfile::Ellipse(_) | SweptProfile::Nurbs(_) => Ok(None),
+    }
+}
+
+/// Collapse an extruded profile to an analytic surface when it admits one;
+/// `Ok(None)` means "no analytic form, try NURBS".
+fn extrude_analytic(
+    profile: &SweptProfile,
+    direction: Vec3,
+    surface_ref: u64,
+) -> Result<Option<FaceSurface>, IoError> {
+    let fail = |reason: String| IoError::ParseError {
+        reason: format!("SURFACE_OF_LINEAR_EXTRUSION #{surface_ref}: {reason}"),
+    };
+
+    match profile {
+        SweptProfile::Circle(circle) => {
+            if circle.normal().cross(direction).length() > SWEEP_DIR_EPS {
+                // Oblique sweep: still a cylinder in shape but not about the
+                // circle's own axis, so it is not brepkit's CylindricalSurface.
+                return Ok(None);
+            }
+            let cyl = brepkit_math::surfaces::CylindricalSurface::new(
+                circle.center(),
+                direction,
+                circle.radius(),
+            )
+            .map_err(|e| fail(e.to_string()))?;
+            Ok(Some(FaceSurface::Cylinder(cyl)))
+        }
+        SweptProfile::Line(line) => {
+            let normal = line.direction().cross(direction);
+            if normal.length() <= SWEEP_DIR_EPS {
+                return Err(fail(
+                    "the profile line is parallel to the extrusion direction and sweeps \
+                     no surface"
+                        .to_string(),
+                ));
+            }
+            let normal = normal.normalize().map_err(|e| fail(e.to_string()))?;
+            let origin = line.origin();
+            let d = normal.dot(Vec3::new(origin.x(), origin.y(), origin.z()));
+            Ok(Some(FaceSurface::Plane { normal, d }))
+        }
+        SweptProfile::Ellipse(_) | SweptProfile::Nurbs(_) => Ok(None),
+    }
+}
+
+/// Intersect two lines that are known to be coplanar and non-parallel.
+fn line_line_intersection(p0: Point3, u: Vec3, q0: Point3, v: Vec3) -> Option<Point3> {
+    let w0 = p0 - q0;
+    let b = u.dot(v);
+    let denom = b.mul_add(-b, 1.0);
+    if denom.abs() <= f64::EPSILON {
+        return None;
+    }
+    let d = u.dot(w0);
+    let e = v.dot(w0);
+    let s = b.mul_add(e, -d) / denom;
+    Some(p0 + u * s)
+}
+
+/// Revolve a NURBS generatrix a full turn about an axis, exactly.
+///
+/// Piegl & Tiller, *The NURBS Book*, algorithm A8.1: each generatrix control
+/// point traces a circle, represented by the same nine-point rational
+/// quadratic used for conics, and the surface weights are the product of the
+/// circle's and the generatrix's. The result is the exact surface of
+/// revolution, not a sampled approximation.
+///
+/// `u` runs around the revolution, `v` along the generatrix, matching STEP's
+/// own parameterization of `SURFACE_OF_REVOLUTION`.
+fn revolve_nurbs(
+    generatrix: &brepkit_math::nurbs::NurbsCurve,
+    axis_pt: Point3,
+    axis: Vec3,
+) -> Result<brepkit_math::nurbs::NurbsSurface, brepkit_math::MathError> {
+    let arc_weights = conic_weights();
+    let n_cols = generatrix.control_points().len();
+
+    let mut grid: Vec<Vec<Point3>> = vec![Vec::with_capacity(n_cols); arc_weights.len()];
+    let mut weights: Vec<Vec<f64>> = vec![Vec::with_capacity(n_cols); arc_weights.len()];
+
+    for (col, (&cp, &w)) in generatrix
+        .control_points()
+        .iter()
+        .zip(generatrix.weights())
+        .enumerate()
+    {
+        let (foot, radius) = axis_projection(cp, axis_pt, axis);
+        let ring = if radius <= SWEEP_LENGTH_EPS {
+            // On the axis: the whole ring degenerates to the point itself.
+            vec![cp; arc_weights.len()]
+        } else {
+            let x = cp - foot;
+            let y = axis.cross(x);
+            conic_control_points(foot, x, y)
+        };
+        for (row, &point) in ring.iter().enumerate() {
+            debug_assert_eq!(grid[row].len(), col);
+            grid[row].push(point);
+            weights[row].push(arc_weights[row] * w);
+        }
+    }
+
+    let knots_u = vec![
+        0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0,
+    ];
+    brepkit_math::nurbs::NurbsSurface::new(
+        2,
+        generatrix.degree(),
+        knots_u,
+        generatrix.knots().to_vec(),
+        grid,
+        weights,
+    )
+}
+
+/// Extrude a NURBS profile along `offset`, exactly.
+///
+/// The result is the tensor product of the profile with a degree-1 line, so
+/// `P(u, v) = C(u) + v · offset` with `v ∈ [0, 1]` — STEP's own
+/// parameterization of `SURFACE_OF_LINEAR_EXTRUSION`.
+fn extrude_nurbs(
+    profile: &brepkit_math::nurbs::NurbsCurve,
+    offset: Vec3,
+) -> Result<brepkit_math::nurbs::NurbsSurface, brepkit_math::MathError> {
+    let grid: Vec<Vec<Point3>> = profile
+        .control_points()
+        .iter()
+        .map(|&cp| vec![cp, cp + offset])
+        .collect();
+    let weights: Vec<Vec<f64>> = profile.weights().iter().map(|&w| vec![w, w]).collect();
+
+    brepkit_math::nurbs::NurbsSurface::new(
+        profile.degree(),
+        1,
+        profile.knots().to_vec(),
+        vec![0.0, 0.0, 1.0, 1.0],
+        grid,
+        weights,
+    )
 }
 
 // ── Attribute parsing helpers ───────────────────────────────────────
@@ -2741,6 +3313,431 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
             (end - Point3::new(1000.0, 1000.0, 0.0)).length() < 1e-9,
             "metre-declared points should arrive in mm, got {end:?}"
         );
+    }
+
+    // ── Swept surfaces ─────────────────────────────────────────────
+
+    /// The z axis through the origin, as `AXIS1_PLACEMENT` #10/#11/#12.
+    const Z_AXIS1: &str = "#10 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                           #11 = DIRECTION('',(0.,0.,1.));\n\
+                           #12 = AXIS1_PLACEMENT('',#10,#11);\n";
+
+    /// `LINE` #1..#3 from `origin` along `dir`.
+    fn step_line(origin: (f64, f64, f64), dir: (f64, f64, f64)) -> String {
+        format!(
+            "#1 = CARTESIAN_POINT('',({:?},{:?},{:?}));\n\
+             #2 = DIRECTION('',({:?},{:?},{:?}));\n\
+             #3 = VECTOR('',#2,1.);\n\
+             #4 = LINE('',#1,#3);\n",
+            origin.0, origin.1, origin.2, dir.0, dir.1, dir.2
+        )
+    }
+
+    /// `CIRCLE` #1..#5 centred at `center`, with plane normal `normal` and
+    /// in-plane reference direction `ref_dir`.
+    fn step_circle(
+        center: (f64, f64, f64),
+        normal: (f64, f64, f64),
+        ref_dir: (f64, f64, f64),
+        radius: f64,
+    ) -> String {
+        format!(
+            "#1 = CARTESIAN_POINT('',({:?},{:?},{:?}));\n\
+             #2 = DIRECTION('',({:?},{:?},{:?}));\n\
+             #3 = DIRECTION('',({:?},{:?},{:?}));\n\
+             #4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+             #5 = CIRCLE('',#4,{radius:?});\n",
+            center.0,
+            center.1,
+            center.2,
+            normal.0,
+            normal.1,
+            normal.2,
+            ref_dir.0,
+            ref_dir.1,
+            ref_dir.2
+        )
+    }
+
+    #[test]
+    fn line_revolved_about_a_parallel_axis_is_a_cylinder() {
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#4,#12);",
+            step_line((5.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+        );
+        let FaceSurface::Cylinder(cyl) = surface_geometry(&body, 20).unwrap() else {
+            panic!("a line parallel to the axis should revolve into a cylinder");
+        };
+        // Every point on the surface sits at radius 5 from the z axis.
+        for i in 0..12 {
+            let u = f64::from(i) * 0.5;
+            let p = cyl.evaluate(u, 3.0);
+            assert!(
+                (p.x().hypot(p.y()) - 5.0).abs() < 1e-12,
+                "point {p:?} should be 5 from the z axis"
+            );
+            assert!((p.z() - 3.0).abs() < 1e-12, "{p:?}");
+        }
+    }
+
+    #[test]
+    fn line_meeting_the_axis_at_an_angle_revolves_into_a_cone() {
+        // Through the origin, 45° between the +z axis and +x.
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#4,#12);",
+            step_line((0.0, 0.0, 0.0), (s, 0.0, s))
+        );
+        let FaceSurface::Cone(cone) = surface_geometry(&body, 20).unwrap() else {
+            panic!("a line meeting the axis at an angle should revolve into a cone");
+        };
+        // A 45° cone: distance from the axis equals height.
+        for i in 1..8 {
+            let v = f64::from(i);
+            let p = cone.evaluate(0.7, v);
+            assert!(
+                (p.x().hypot(p.y()) - p.z()).abs() < 1e-12,
+                "45 degree cone should have radius == height at {p:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn line_perpendicular_to_the_axis_revolves_into_a_plane() {
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#4,#12);",
+            step_line((0.0, 0.0, 4.0), (1.0, 0.0, 0.0))
+        );
+        let FaceSurface::Plane { normal, d } = surface_geometry(&body, 20).unwrap() else {
+            panic!("a line crossing the axis at a right angle should revolve into a plane");
+        };
+        assert!(
+            (normal - Vec3::new(0.0, 0.0, 1.0)).length() < 1e-12,
+            "{normal:?}"
+        );
+        assert!(
+            (d - 4.0).abs() < 1e-12,
+            "plane should sit at z = 4, got {d}"
+        );
+    }
+
+    #[test]
+    fn circle_centred_on_the_axis_revolves_into_a_sphere() {
+        // A circle in the xz plane, centred at the origin: its plane holds
+        // the z axis and its centre is on it.
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#5,#12);",
+            step_circle((0.0, 0.0, 0.0), (0.0, 1.0, 0.0), (1.0, 0.0, 0.0), 3.0)
+        );
+        let FaceSurface::Sphere(sphere) = surface_geometry(&body, 20).unwrap() else {
+            panic!("a circle centred on the axis should revolve into a sphere");
+        };
+        for (u, v) in [(0.0, 0.0), (1.0, 0.4), (2.5, -0.9), (4.0, 1.2)] {
+            let p = sphere.evaluate(u, v);
+            let r = (p - Point3::new(0.0, 0.0, 0.0)).length();
+            assert!(
+                (r - 3.0).abs() < 1e-12,
+                "point {p:?} should be 3 from origin"
+            );
+        }
+    }
+
+    #[test]
+    fn circle_offset_from_the_axis_revolves_into_a_torus() {
+        // Circle of radius 2 centred at (10, 0, 0), in the xz plane.
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#5,#12);",
+            step_circle((10.0, 0.0, 0.0), (0.0, 1.0, 0.0), (1.0, 0.0, 0.0), 2.0)
+        );
+        let FaceSurface::Torus(torus) = surface_geometry(&body, 20).unwrap() else {
+            panic!("a circle offset from the axis should revolve into a torus");
+        };
+        for i in 0..7 {
+            for j in 0..7 {
+                let (u, v) = (f64::from(i) * 0.9, f64::from(j) * 0.9);
+                let p = torus.evaluate(u, v);
+                // Implicit torus: (hypot(x, y) - R)^2 + z^2 = r^2.
+                let radial = p.x().hypot(p.y()) - 10.0;
+                let implicit = radial.mul_add(radial, p.z() * p.z());
+                assert!(
+                    (implicit - 4.0).abs() < 1e-9,
+                    "point {p:?} is not on the R=10 r=2 torus ({implicit})"
+                );
+            }
+        }
+    }
+
+    /// A line skew to the axis sweeps a hyperboloid of one sheet, which is
+    /// neither one of brepkit's analytic surfaces nor bounded enough to
+    /// become a NURBS patch. It must be named, not approximated.
+    #[test]
+    fn line_skew_to_the_axis_is_refused_by_name() {
+        // Offset in y, tilted in x: never meets the z axis.
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#4,#12);",
+            step_line((0.0, 4.0, 0.0), (s, 0.0, s))
+        );
+        let err = surface_geometry(&body, 20).unwrap_err();
+        assert!(
+            matches!(err, IoError::UnsupportedEntity { .. }),
+            "expected a typed UnsupportedEntity, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("SURFACE_OF_REVOLUTION #20")
+                && err.to_string().contains("hyperboloid"),
+            "the error must name the entity and say why: {err}"
+        );
+    }
+
+    #[test]
+    fn line_on_the_axis_of_revolution_is_refused() {
+        let body = format!(
+            "{}{Z_AXIS1}#20 = SURFACE_OF_REVOLUTION('',#4,#12);",
+            step_line((0.0, 0.0, 0.0), (0.0, 0.0, 1.0))
+        );
+        let err = surface_geometry(&body, 20).unwrap_err();
+        assert!(
+            err.to_string().contains("lies on the axis"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn circle_extruded_along_its_normal_is_a_cylinder() {
+        let body = format!(
+            "{}#10 = DIRECTION('',(0.,0.,1.));\n\
+             #11 = VECTOR('',#10,7.);\n\
+             #20 = SURFACE_OF_LINEAR_EXTRUSION('',#5,#11);",
+            step_circle((1.0, 2.0, 0.0), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), 3.0)
+        );
+        let FaceSurface::Cylinder(cyl) = surface_geometry(&body, 20).unwrap() else {
+            panic!("a circle swept along its own normal should be a cylinder");
+        };
+        for i in 0..10 {
+            let p = cyl.evaluate(f64::from(i) * 0.6, 2.0);
+            let r = (p.x() - 1.0).hypot(p.y() - 2.0);
+            assert!((r - 3.0).abs() < 1e-12, "{p:?}");
+            assert!((p.z() - 2.0).abs() < 1e-12, "{p:?}");
+        }
+    }
+
+    #[test]
+    fn line_extruded_off_its_own_direction_is_a_plane() {
+        let body = format!(
+            "{}#10 = DIRECTION('',(0.,1.,0.));\n\
+             #11 = VECTOR('',#10,5.);\n\
+             #20 = SURFACE_OF_LINEAR_EXTRUSION('',#4,#11);",
+            step_line((0.0, 0.0, 6.0), (1.0, 0.0, 0.0))
+        );
+        let FaceSurface::Plane { normal, d } = surface_geometry(&body, 20).unwrap() else {
+            panic!("a line swept off its own direction should be a plane");
+        };
+        // x cross y = -z (or +z); either orientation describes the z = 6 plane.
+        assert!(
+            normal.cross(Vec3::new(0.0, 0.0, 1.0)).length() < 1e-12,
+            "{normal:?}"
+        );
+        assert!(
+            (d.abs() - 6.0).abs() < 1e-12,
+            "plane should sit at |z| = 6, got {d}"
+        );
+    }
+
+    #[test]
+    fn line_extruded_along_itself_is_refused() {
+        let body = format!(
+            "{}#10 = DIRECTION('',(1.,0.,0.));\n\
+             #11 = VECTOR('',#10,5.);\n\
+             #20 = SURFACE_OF_LINEAR_EXTRUSION('',#4,#11);",
+            step_line((0.0, 0.0, 0.0), (1.0, 0.0, 0.0))
+        );
+        let err = surface_geometry(&body, 20).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("parallel to the extrusion direction"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn zero_length_extrusion_is_refused() {
+        let body = format!(
+            "{}#10 = DIRECTION('',(0.,0.,1.));\n\
+             #11 = VECTOR('',#10,0.);\n\
+             #20 = SURFACE_OF_LINEAR_EXTRUSION('',#5,#11);",
+            step_circle((0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), 3.0)
+        );
+        let err = surface_geometry(&body, 20).unwrap_err();
+        assert!(
+            err.to_string().contains("sweeps no surface"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// An oblique circle sweep is a cylinder in shape but not about the
+    /// circle's own axis, so it is not brepkit's `CylindricalSurface`. It
+    /// becomes an exact NURBS patch instead of being forced into the wrong
+    /// analytic type.
+    #[test]
+    fn obliquely_extruded_circle_becomes_an_exact_nurbs_patch() {
+        let s = std::f64::consts::FRAC_1_SQRT_2;
+        let body = format!(
+            "{}#10 = DIRECTION('',({s:?},0.,{s:?}));\n\
+             #11 = VECTOR('',#10,10.);\n\
+             #20 = SURFACE_OF_LINEAR_EXTRUSION('',#5,#11);",
+            step_circle((0.0, 0.0, 0.0), (0.0, 0.0, 1.0), (1.0, 0.0, 0.0), 4.0)
+        );
+        let FaceSurface::Nurbs(surface) = surface_geometry(&body, 20).unwrap() else {
+            panic!("an oblique circle sweep should become a NURBS surface");
+        };
+        let offset = Vec3::new(s, 0.0, s) * 10.0;
+        for i in 0..=16 {
+            let u = f64::from(i) / 16.0;
+            for j in 0..=4 {
+                let v = f64::from(j) / 4.0;
+                let p = surface.evaluate(u, v);
+                // Undo the sweep: the point must land back on the circle.
+                let base = p - offset * v;
+                assert!(
+                    (base.z() - 0.0).abs() < 1e-9,
+                    "at ({u}, {v}) the profile point {base:?} left its plane"
+                );
+                assert!(
+                    (base.x().hypot(base.y()) - 4.0).abs() < 1e-9,
+                    "at ({u}, {v}) the profile point {base:?} is not on the radius-4 circle"
+                );
+            }
+        }
+    }
+
+    /// A B-spline profile extruded along a vector is the tensor product of
+    /// the profile with a degree-1 line, which is exact.
+    #[test]
+    fn bspline_extrusion_is_the_profile_translated_along_the_vector() {
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #10 = DIRECTION('',(0.,0.,1.));\n\
+             #11 = VECTOR('',#10,6.);\n\
+             #20 = SURFACE_OF_LINEAR_EXTRUSION('',#5,#11);"
+        );
+        let EdgeCurve::NurbsCurve(profile) = curve_geometry(&body, 5).unwrap() else {
+            panic!("fixture should be a NURBS curve");
+        };
+        let FaceSurface::Nurbs(surface) = surface_geometry(&body, 20).unwrap() else {
+            panic!("a B-spline sweep should become a NURBS surface");
+        };
+        for i in 0..=8 {
+            let u = f64::from(i) / 2.0;
+            for j in 0..=4 {
+                let v = f64::from(j) / 4.0;
+                let want = profile.evaluate(u) + Vec3::new(0.0, 0.0, 6.0 * v);
+                let got = surface.evaluate(u, v);
+                assert!(
+                    (want - got).length() < 1e-9,
+                    "at ({u}, {v}) expected {want:?}, got {got:?}"
+                );
+            }
+        }
+    }
+
+    // ── Exactness of the NURBS sweep constructions ─────────────────
+
+    /// The nine-point rational quadratic must trace the conic exactly, not
+    /// approximately — every sample lies on the circle to machine precision.
+    #[test]
+    fn conic_nurbs_lies_exactly_on_its_circle() {
+        let center = Point3::new(1.0, -2.0, 3.0);
+        let x = Vec3::new(0.0, 5.0, 0.0);
+        let y = Vec3::new(0.0, 0.0, 5.0);
+        let curve = conic_to_nurbs(center, x, y).unwrap();
+
+        for i in 0..=64 {
+            let t = f64::from(i) / 64.0;
+            let p = curve.evaluate(t);
+            let offset = p - center;
+            assert!(
+                (offset.length() - 5.0).abs() < 1e-12,
+                "at t={t}: {p:?} is {} from the centre, want 5",
+                offset.length()
+            );
+            assert!(
+                offset.dot(Vec3::new(1.0, 0.0, 0.0)).abs() < 1e-12,
+                "at t={t}: {p:?} left the circle's plane"
+            );
+        }
+    }
+
+    /// `revolve_nurbs` must reproduce the analytic torus exactly, so that
+    /// choosing the NURBS path never silently degrades the geometry.
+    #[test]
+    fn revolved_nurbs_matches_the_analytic_torus() {
+        // Circle of radius 2 at (10, 0, 0) in the xz plane, revolved about z.
+        let profile = conic_to_nurbs(
+            Point3::new(10.0, 0.0, 0.0),
+            Vec3::new(2.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 2.0),
+        )
+        .unwrap();
+        let surface = revolve_nurbs(
+            &profile,
+            Point3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        )
+        .unwrap();
+
+        for i in 0..=24 {
+            let u = f64::from(i) / 24.0;
+            for j in 0..=24 {
+                let v = f64::from(j) / 24.0;
+                let p = surface.evaluate(u, v);
+                let radial = p.x().hypot(p.y()) - 10.0;
+                let implicit = radial.mul_add(radial, p.z() * p.z());
+                assert!(
+                    (implicit - 4.0).abs() < 1e-9,
+                    "at ({u}, {v}) the point {p:?} is off the torus by {}",
+                    (implicit - 4.0).abs()
+                );
+            }
+        }
+    }
+
+    /// A generatrix control point sitting on the axis degenerates to a single
+    /// point rather than producing a ring of the wrong radius.
+    #[test]
+    fn revolved_nurbs_handles_a_generatrix_touching_the_axis() {
+        // A degree-1 profile from the axis out to (4, 0, 4): revolving it
+        // gives a cone, whose apex is the on-axis control point.
+        let profile = brepkit_math::nurbs::NurbsCurve::new(
+            1,
+            vec![0.0, 0.0, 1.0, 1.0],
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(4.0, 0.0, 4.0)],
+            vec![1.0, 1.0],
+        )
+        .unwrap();
+        let surface = revolve_nurbs(
+            &profile,
+            Point3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+        )
+        .unwrap();
+
+        for i in 0..=16 {
+            let u = f64::from(i) / 16.0;
+            let apex = surface.evaluate(u, 0.0);
+            assert!(
+                (apex - Point3::new(0.0, 0.0, 0.0)).length() < 1e-12,
+                "at u={u} the apex moved to {apex:?}"
+            );
+            for j in 1..=8 {
+                let v = f64::from(j) / 8.0;
+                let p = surface.evaluate(u, v);
+                assert!(
+                    (p.x().hypot(p.y()) - p.z()).abs() < 1e-9,
+                    "at ({u}, {v}) the point {p:?} is off the 45 degree cone"
+                );
+            }
+        }
     }
 
     #[test]
