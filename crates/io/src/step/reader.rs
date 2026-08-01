@@ -1041,6 +1041,9 @@ impl<'a> StepBuilder<'a> {
 
         let generatrix = profile
             .into_nurbs()
+            .map_err(|e| IoError::ParseError {
+                reason: format!("SURFACE_OF_REVOLUTION #{surface_ref} profile: {e}"),
+            })?
             .ok_or_else(|| IoError::UnsupportedEntity {
                 entity: format!(
                     "SURFACE_OF_REVOLUTION #{surface_ref} over an unbounded profile that is \
@@ -1096,6 +1099,9 @@ impl<'a> StepBuilder<'a> {
 
         let generatrix = profile
             .into_nurbs()
+            .map_err(|e| IoError::ParseError {
+                reason: format!("SURFACE_OF_LINEAR_EXTRUSION #{surface_ref} profile: {e}"),
+            })?
             .ok_or_else(|| IoError::UnsupportedEntity {
                 entity: format!(
                     "SURFACE_OF_LINEAR_EXTRUSION #{surface_ref} over a line parallel to its \
@@ -1594,38 +1600,43 @@ enum SweptProfile {
 }
 
 impl SweptProfile {
-    /// The profile as an exact NURBS curve, or `None` when it is unbounded.
+    /// The profile as an exact NURBS curve, or `Ok(None)` when it is
+    /// unbounded and therefore has no NURBS form at all.
     ///
     /// A conic becomes the standard nine-point rational quadratic, which
-    /// represents it exactly rather than approximately. A `LINE` is infinite
-    /// and has no NURBS form; a swept surface over one is only representable
-    /// when it collapses to an analytic surface.
-    fn into_nurbs(self) -> Option<brepkit_math::nurbs::NurbsCurve> {
+    /// represents it exactly rather than approximately. A `LINE` is infinite;
+    /// a swept surface over one is representable only when it collapses to an
+    /// analytic surface. The two outcomes are kept apart from a construction
+    /// failure so the caller can report the right reason.
+    fn into_nurbs(
+        self,
+    ) -> Result<Option<brepkit_math::nurbs::NurbsCurve>, brepkit_math::MathError> {
         match self {
-            Self::Line(_) => None,
+            Self::Line(_) => Ok(None),
             Self::Circle(circle) => conic_to_nurbs(
                 circle.center(),
                 circle.u_axis() * circle.radius(),
                 circle.v_axis() * circle.radius(),
             )
-            .ok(),
+            .map(Some),
             Self::Ellipse(ellipse) => conic_to_nurbs(
                 ellipse.center(),
                 ellipse.u_axis() * ellipse.semi_major(),
                 ellipse.v_axis() * ellipse.semi_minor(),
             )
-            .ok(),
-            Self::Nurbs(nurbs) => Some(nurbs),
+            .map(Some),
+            Self::Nurbs(nurbs) => Ok(Some(nurbs)),
         }
     }
 }
 
 /// Tolerance for direction comparisons between unit vectors.
 ///
-/// Applied to dot and cross products of normalized vectors, so it is a
-/// dimensionless sine/cosine bound: about 6e-8 radians of angle. Tight
-/// enough that only a genuinely parallel or perpendicular declaration
-/// collapses to an analytic surface.
+/// Applied to dot and cross products of normalized vectors, so it bounds a
+/// sine or cosine directly: two directions count as parallel or
+/// perpendicular only within 1e-9 radians. Tight enough that only a
+/// genuinely aligned declaration collapses to an analytic surface, rather
+/// than a nearly-aligned one being rounded into the wrong shape.
 const SWEEP_DIR_EPS: f64 = 1e-9;
 
 /// Tolerance in millimetres for "this distance is zero" tests when deciding
