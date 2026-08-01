@@ -63,29 +63,6 @@ pub(super) fn vertex_merge_resolution(
     }
 }
 
-/// Assemble a solid from a set of planar face polygons with normals.
-///
-/// Uses spatial hashing for vertex dedup and edge sharing.
-/// This is a convenience wrapper around [`assemble_solid_mixed`] for the
-/// common case where all faces are planar.
-#[allow(clippy::redundant_pub_crate)]
-pub(crate) fn assemble_solid(
-    topo: &mut Topology,
-    faces: &[(Vec<Point3>, Vec3, f64)],
-    tol: Tolerance,
-) -> Result<SolidId, crate::OperationsError> {
-    let specs: Vec<FaceSpec> = faces
-        .iter()
-        .map(|(verts, normal, d)| FaceSpec::Planar {
-            vertices: verts.clone(),
-            normal: *normal,
-            d: *d,
-            inner_wires: vec![],
-        })
-        .collect();
-    assemble_solid_mixed(topo, &specs, tol)
-}
-
 /// Build inner wire topology from vertex position lists.
 ///
 /// For each inner wire (a closed loop of vertex positions), creates vertices
