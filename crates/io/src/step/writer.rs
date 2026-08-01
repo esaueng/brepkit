@@ -446,10 +446,15 @@ impl StepWriteContext {
                 let ref_dir = compute_ref_direction(cone.axis());
                 let axis = self.write_axis2_placement(cone.apex(), cone.axis(), ref_dir);
                 let id = self.next_id();
+                // ISO 10303-42's `semi_angle` is measured from the axis;
+                // brepkit's `half_angle` is measured from the radial plane.
+                // Emitting the latter unconverted made every cone we wrote
+                // read back at its complement in any other CAD system.
+                let semi_angle = std::f64::consts::FRAC_PI_2 - cone.half_angle();
                 self.write_entity(
                     id,
                     "CONICAL_SURFACE",
-                    &format!("'', #{axis}, 0.0E0, {:.15E})", cone.half_angle()),
+                    &format!("'', #{axis}, 0.0E0, {semi_angle:.15E})"),
                 );
                 id
             }
