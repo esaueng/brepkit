@@ -715,18 +715,50 @@ pub fn plane_cylinder_fillet(
     //    that is not there.
     let convex = plane_bounded == mat_inside_cyl;
 
-    // 3) Radius bound depends on which way the plate contact runs:
-    //    - Outward (major = `r_c + r`): always > minor = `r`, so the only
-    //      regime rejected here is `r ≥ r_c`. The binding constraints for a
-    //      hole rim are the plate's own boundary and its thickness, which the
-    //      rim assembler checks against the actual face.
-    //    - Inward (major = `r_c - r`): needs `r < r_c` to keep major positive
-    //      *and* `r ≤ r_c/2` to keep major ≥ minor. Past `r_c/2` the
-    //      construction becomes a spindle (self-intersecting) torus which is
-    //      invalid as a fillet surface.
-    let max_radius = if inward { r_c * 0.5 } else { r_c };
-    if radius <= tol_lin || radius >= max_radius {
+    // 3) Radius bound depends on which way the plate contact runs.
+    //
+    //    Outward (major = `r_c + r`): always > minor = `r`, so the only regime
+    //    rejected here is `r ≥ r_c`. The binding constraints for a hole rim are
+    //    the plate's own boundary and its thickness, which the rim assembler
+    //    checks against the actual face.
+    //
+    //    Inward (major = `r_c − r`): the ball has to fit inside the cylinder,
+    //    which is exactly `r < r_c`. That is the ONLY bound — the ball's centre
+    //    circle has radius `r_c − r`, so at `r = r_c` it collapses onto the
+    //    axis and there is no ball left to roll.
+    //
+    //    The old bound here was `r ≤ r_c/2`, on the grounds that `r > r_c/2`
+    //    makes the carrier torus a horn (`R = r`) or spindle (`R < r`) — which
+    //    self-intersects. The torus does; the FACE cut from it does not. The
+    //    band this builds spans a quarter of the tube, from the wall contact at
+    //    `v = 0` (tube radial `R + r = r_c`) to the plate contact at
+    //    `v = ±π/2` (tube radial `R`). A spindle torus crosses its own axis
+    //    only where its tube radial goes negative, i.e. `R + r·cos v < 0`, so
+    //    `|v| > arccos(−R/r) ≥ π/2` for every `R ≥ 0`. The self-intersecting
+    //    lobe is therefore disjoint from the quarter actually used, touching it
+    //    at most at the single limit point `R = 0`, `|v| = π/2`. Refusing
+    //    `r > r_c/2` refused sound geometry: a rim rounded to more than half the
+    //    radius is an ordinary shape (at the limit, a hemispherical end).
+    if radius <= tol_lin {
         return Ok(None);
+    }
+    if radius >= r_c {
+        if !inward {
+            return Ok(None);
+        }
+        // Past this the rolling ball does not fit in the cylinder at all, so no
+        // engine below can do better. Name it rather than let the walker fail
+        // and the caller read a bare partial result. At `r = r_c` exactly the
+        // plate contact circle shrinks to a point and the cap face vanishes;
+        // that limit is a different topology (a spherical end) than the band
+        // this assembles, so the bound is open.
+        let Some(&edge) = spine.edges().first() else {
+            return Ok(None);
+        };
+        return Err(BlendError::RadiusTooLarge {
+            edge,
+            max_radius: r_c,
+        });
     }
 
     // 4) Project the cylinder origin onto the plane along axis_c. The
