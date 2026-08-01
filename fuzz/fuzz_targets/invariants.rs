@@ -585,21 +585,34 @@ pub fn assert_deflection_stable(what: &str, topo: &Topology, solid: SolidId, coa
 /// exactly `s³`.
 ///
 /// This is the one oracle here that no amount of single-scale fuzzing reaches,
-/// and it is aimed at a pattern this kernel has now shown three times: a
-/// tolerance written as an absolute distance rather than a fraction of the
-/// model. #51's provenance budget reported surviving faces as deleted at
-/// 1000×. The tessellator's vertex merge grid is a fixed 1e-7 and decides
-/// whether two faces' copies of a shared circle become one vertex or two,
-/// which is why the pointed cone in this harness's first campaign is
-/// watertight at 0.001× and has 418 open edges at 1× and 1000×.
+/// and it is aimed at a pattern this kernel keeps showing: a tolerance written
+/// as an absolute distance rather than as a fraction of the model. #51's
+/// provenance budget reported surviving faces as deleted at 1000×.
 ///
-/// Note what this does *not* do: a body whose defect is scale-free — and most
-/// are — passes at every scale. This oracle isolates the absolute-tolerance
-/// class specifically, and it earns its cost only because that class is
-/// otherwise invisible.
+/// Two honest limits, both measured rather than assumed:
+///
+/// * **A body whose defect is scale-free — most of them — passes at every
+///   scale.** This isolates one class, and earns its cost only because that
+///   class is otherwise invisible.
+/// * **It cannot currently reach the small end.** `transform_solid` rejects a
+///   matrix whose determinant is under `Tolerance.linear` (1e-7). A determinant
+///   is a *volume* ratio and that tolerance is a *length*, so for a uniform
+///   scale the test reduces to `s³ <= 1e-7` and every `s <= 0.00464` is called
+///   degenerate — a metres-to-millimetres conversion among them. Measured: 1×,
+///   0.1×, 0.01×, 0.005× and 0.0047× all transform; 0.0046× and 0.001× are
+///   refused. So the sweep uses 0.01 and the interesting sub-millimetre regime
+///   stays out of reach.
+///
+/// That second limit is why this function must not be read as proving scale
+/// invariance in general. It also means the pointed-cone merge failure — which
+/// *is* scale-dependent, and is watertight when a cone is **constructed** at
+/// 0.001× — is not reproduced by scaling a 1× cone down, because the transform
+/// cannot go that far.
 ///
 /// Non-finite or degenerate scaled geometry, and any refusal from the
-/// transform, are passes.
+/// transform, are passes. A refusal makes the check silently inert, which is
+/// exactly the failure mode this harness hunts elsewhere; it is tolerated only
+/// because the alternative is a false positive on every case.
 ///
 /// # Panics
 ///
