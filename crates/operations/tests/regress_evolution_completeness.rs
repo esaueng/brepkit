@@ -167,8 +167,8 @@ fn generated_sources_of(evo: &EvolutionMap, face: usize) -> Vec<usize> {
 fn box_edge_fillet_attributes_the_blend_band_to_both_faces_the_edge_separated() {
     for scale in SCALES {
         let mut topo = Topology::new();
-        let cube = primitives::make_box(&mut topo, 10.0 * scale, 10.0 * scale, 10.0 * scale)
-            .expect("box");
+        let cube =
+            primitives::make_box(&mut topo, 10.0 * scale, 10.0 * scale, 10.0 * scale).expect("box");
         let edges = solid_edges(&topo, cube).unwrap();
 
         let before = faces_of(&topo, cube);
@@ -282,8 +282,9 @@ fn multi_edge_fillet_lets_one_face_generate_several_bands() {
     let edges = solid_edges(&topo, cube).unwrap();
 
     let before = faces_of(&topo, cube);
-    let (result, evo) = blend_ops::fillet_with_evolution(&mut topo, cube, &[edges[0], edges[2]], 1.0)
-        .expect("two-edge fillet");
+    let (result, evo) =
+        blend_ops::fillet_with_evolution(&mut topo, cube, &[edges[0], edges[2]], 1.0)
+            .expect("two-edge fillet");
     let after = faces_of(&topo, result.solid);
 
     assert_lineage_accounts_for_everything("two-edge box fillet", &evo, &before, &after);
@@ -435,6 +436,71 @@ fn boolean_lineage_is_complete_at_every_modelling_unit() {
     }
 }
 
+// ── Patterns ───────────────────────────────────────────────────────
+
+/// A pattern is the third family that produces a history, and the only one
+/// whose result is a compound. Every face of every instance has to be claimed,
+/// not just the faces of the instance that happens to reuse the source body.
+///
+/// It is also the one case where a source face legitimately appears in both
+/// buckets: it is its own first instance (`modified`) and the origin of every
+/// copy of itself (`generated`).
+#[test]
+fn pattern_lineage_accounts_for_every_instance_face() {
+    for count in [2_usize, 3, 5] {
+        let mut topo = Topology::new();
+        let src = primitives::make_box(&mut topo, 10.0, 4.0, 4.0).unwrap();
+        let before = faces_of(&topo, src);
+
+        let (compound, evo) = brepkit_operations::pattern::linear_pattern_with_evolution(
+            &mut topo,
+            src,
+            brepkit_math::vec::Vec3::new(1.0, 0.0, 0.0),
+            25.0,
+            count,
+        )
+        .expect("linear pattern");
+
+        // A compound's faces are every instance's faces together.
+        let mut after: HashSet<usize> = HashSet::new();
+        for &inst in topo.compound(compound).unwrap().solids() {
+            after.extend(faces_of(&topo, inst));
+        }
+
+        let label = format!("linear pattern of {count}");
+        assert_lineage_accounts_for_everything(&label, &evo, &before, &after);
+
+        assert_eq!(
+            after.len(),
+            before.len() * count,
+            "{label}: every instance carries the source body's faces"
+        );
+        assert!(
+            evo.deleted.is_empty(),
+            "{label}: a pattern deletes nothing: {:?}",
+            evo.deleted
+        );
+        assert!(evo.origin.is_exact(), "{label}: a copy is not an inference");
+
+        for f in &before {
+            assert_eq!(
+                evo.modified.get(f),
+                Some(&vec![*f]),
+                "{label}: source face {f} is its own first instance"
+            );
+            let copies = evo
+                .generated
+                .get(f)
+                .unwrap_or_else(|| panic!("{label}: source face {f} generated no instances"));
+            assert_eq!(
+                copies.len(),
+                count - 1,
+                "{label}: source face {f} -> {copies:?}"
+            );
+        }
+    }
+}
+
 // ── Geometry did not move ──────────────────────────────────────────
 
 /// Provenance is a bookkeeping layer, so repairing it must leave the solid
@@ -459,7 +525,6 @@ fn filleted_cube_volume_matches_the_hand_derived_closed_form() {
     // under-fills it, so the tolerance is the tessellation's error budget and
     // not a fudge factor: it is one-sided and shrinks with the deflection.
     let actual = brepkit_operations::measure::solid_volume(&topo, result.solid, 1e-5).unwrap();
-    println!("filleted cube volume: {actual:.9} vs closed form {expected:.9}");
     assert!(
         (actual - expected).abs() < 1e-3,
         "filleted cube volume {actual} != closed form {expected}"
