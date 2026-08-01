@@ -132,10 +132,9 @@ pub enum FaceSpec {
     /// the assembler can only mint straight edges between consecutive
     /// positions. That vocabulary cannot express a loop whose whole boundary
     /// is one closed curve — a drilled hole's rim is a single circle edge
-    /// with `start == end`, i.e. ONE position — and
-    /// [`super::assembly::assemble_solid_mixed`] used to drop such loops
-    /// (`< 3` positions) outright, which silently filled in the hole and left
-    /// its bore wall with a free edge.
+    /// with `start == end`, i.e. ONE position — and the mixed-spec assembler
+    /// used to drop such loops (`< 3` positions) outright, which silently
+    /// filled in the hole and left its bore wall with a free edge.
     ///
     /// This variant instead deep-copies the source face's wires, preserving
     /// every edge's exact curve, and registers the copies in the same
