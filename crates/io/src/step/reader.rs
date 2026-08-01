@@ -567,6 +567,14 @@ fn approx_same_factor(a: f64, b: f64) -> bool {
 /// stack (which, in the wasm build, aborts the module).
 const MAX_CURVE_INDIRECTION: u32 = 32;
 
+/// Distance (in millimetres) below which two consecutive `POLYLINE` points
+/// are treated as the same point.
+///
+/// Two orders of magnitude tighter than the `1e-7` vertex tolerance this
+/// reader assigns, so it only ever collapses points the kernel could not
+/// tell apart anyway.
+const POLYLINE_WELD_EPS: f64 = 1e-9;
+
 /// Reconstructs topology from parsed STEP entities.
 struct StepBuilder<'a> {
     topo: &'a mut Topology,
@@ -972,6 +980,8 @@ impl<'a> StepBuilder<'a> {
                         })?;
                 self.build_curve_geometry_at(basis, depth + 1)
             }
+            "TRIMMED_CURVE" => self.build_trimmed_curve(curve_ref, &attrs, depth),
+            "POLYLINE" => self.build_polyline(curve_ref, &attrs),
             "LINE" => Ok(EdgeCurve::Line),
             "CIRCLE" => {
                 let refs = parse_refs(&attrs);
@@ -1026,6 +1036,170 @@ impl<'a> StepBuilder<'a> {
             _ => Err(IoError::UnsupportedEntity {
                 entity: format!("{entity_type} (curve #{curve_ref})"),
             }),
+        }
+    }
+
+    /// Build the geometry behind a `TRIMMED_CURVE`.
+    ///
+    /// `TRIMMED_CURVE('name', #basis, (trim_1), (trim_2), sense_agreement,
+    /// master_representation)`, where each trim is a select carrying a
+    /// `PARAMETER_VALUE`, a `CARTESIAN_POINT`, or both.
+    ///
+    /// How much of the trim needs to survive depends on the basis, because
+    /// [`EdgeCurve`] stores no parameter range: an edge's extent is recovered
+    /// from its own vertices by
+    /// [`EdgeCurve::parameter_range_with_endpoints`][pr]. For `Line`,
+    /// `Circle` and `Ellipse` that recovery is exact — brepkit already models
+    /// an arc as the complete circle plus its two vertices, which is how a
+    /// bare `CIRCLE` inside an `EDGE_CURVE` is read — so the basis is
+    /// returned unchanged and the trim is carried by the edge.
+    ///
+    /// A B-spline is different: its parameterization is the knot vector, and
+    /// recovering the span means projecting the endpoints, which is
+    /// ambiguous on a closed or self-approaching curve. When the file states
+    /// the span as parameters, the curve is therefore split down to exactly
+    /// that span, so the resulting domain is the file's, not a projection's.
+    ///
+    /// Trim parameters on a B-spline are knot-space values and carry no
+    /// unit, so no unit scaling applies here.
+    ///
+    /// [pr]: brepkit_topology::edge::EdgeCurve::parameter_range_with_endpoints
+    fn build_trimmed_curve(
+        &self,
+        curve_ref: u64,
+        attrs: &str,
+        depth: u32,
+    ) -> Result<EdgeCurve, IoError> {
+        let basis_ref = parse_refs(attrs)
+            .first()
+            .copied()
+            .ok_or_else(|| IoError::ParseError {
+                reason: format!("TRIMMED_CURVE #{curve_ref} missing its basis curve reference"),
+            })?;
+        let basis = self.build_curve_geometry_at(basis_ref, depth + 1)?;
+
+        let EdgeCurve::NurbsCurve(nurbs) = basis else {
+            // Line, Circle and Ellipse are stored complete; the edge's
+            // vertices already express the trim.
+            return Ok(basis);
+        };
+
+        let params = parse_parameter_values(attrs);
+        let [t0, t1] = params[..] else {
+            // A .CARTESIAN. trim states its ends as points, which are the
+            // edge's own vertices; nothing further to apply.
+            return Ok(EdgeCurve::NurbsCurve(nurbs));
+        };
+
+        // `sense_agreement` only says whether the trim runs along or against
+        // the basis. Direction is carried by the edge's vertices, so order
+        // the span and let the edge decide which way it is traversed.
+        let (lo, hi) = if t0 <= t1 { (t0, t1) } else { (t1, t0) };
+        let (d0, d1) = nurbs.domain();
+        let span = d1 - d0;
+        let tol = 1e-9 * span.abs().max(1.0);
+
+        if lo < d0 - tol || hi > d1 + tol {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "TRIMMED_CURVE #{curve_ref} trims to [{lo}, {hi}], outside its basis \
+                     curve's parameter domain [{d0}, {d1}]"
+                ),
+            });
+        }
+        if hi - lo <= tol {
+            return Err(IoError::ParseError {
+                reason: format!("TRIMMED_CURVE #{curve_ref} trims to the empty span [{lo}, {hi}]"),
+            });
+        }
+        if lo <= d0 + tol && hi >= d1 - tol {
+            // The trim is the whole curve.
+            return Ok(EdgeCurve::NurbsCurve(nurbs));
+        }
+
+        let split = |curve: &brepkit_math::nurbs::NurbsCurve, u: f64| {
+            brepkit_math::nurbs::knot_ops::curve_split(curve, u).map_err(|e| IoError::ParseError {
+                reason: format!("TRIMMED_CURVE #{curve_ref} could not be split at {u}: {e}"),
+            })
+        };
+
+        let trimmed = if lo > d0 + tol {
+            let (_, tail) = split(&nurbs, lo)?;
+            if hi < d1 - tol {
+                split(&tail, hi)?.0
+            } else {
+                tail
+            }
+        } else {
+            split(&nurbs, hi)?.0
+        };
+        Ok(EdgeCurve::NurbsCurve(trimmed))
+    }
+
+    /// Build a `POLYLINE('name', (#p1, #p2, …))` as a degree-1 curve.
+    ///
+    /// A polyline is a chain of straight segments, which is exactly a
+    /// degree-1 B-spline through the same points — so it fits [`EdgeCurve`]
+    /// without inventing a new variant or splitting the edge into several.
+    /// The knots are chord-length spaced, so the curve parameter advances
+    /// with arc length and endpoint projection (which is how an edge
+    /// recovers its span) stays well conditioned.
+    ///
+    /// A two-point polyline is a plain line segment and is read as
+    /// [`EdgeCurve::Line`], whose geometry the edge's vertices already
+    /// determine.
+    fn build_polyline(&self, curve_ref: u64, attrs: &str) -> Result<EdgeCurve, IoError> {
+        let point_refs = parse_list_refs(attrs);
+        if point_refs.is_empty() {
+            return Err(IoError::ParseError {
+                reason: format!("POLYLINE #{curve_ref} has no point list"),
+            });
+        }
+
+        // Coincident consecutive points would force a repeated interior knot,
+        // which a degree-1 B-spline cannot carry. They are geometrically
+        // nothing, so drop them rather than refuse the file.
+        let mut points: Vec<Point3> = Vec::with_capacity(point_refs.len());
+        for point_ref in point_refs {
+            let point = self.build_cartesian_point(point_ref)?;
+            if points
+                .last()
+                .is_none_or(|&prev| (point - prev).length() > POLYLINE_WELD_EPS)
+            {
+                points.push(point);
+            }
+        }
+
+        match points.len() {
+            0 | 1 => Err(IoError::ParseError {
+                reason: format!(
+                    "POLYLINE #{curve_ref} collapses to a single point and has no geometry"
+                ),
+            }),
+            2 => Ok(EdgeCurve::Line),
+            n => {
+                let mut params = Vec::with_capacity(n);
+                let mut total = 0.0;
+                params.push(0.0);
+                for pair in points.windows(2) {
+                    total += (pair[1] - pair[0]).length();
+                    params.push(total);
+                }
+
+                // Clamped degree-1 knot vector: n + 2 entries, with the first
+                // and last parameter doubled.
+                let mut knots = Vec::with_capacity(n + 2);
+                knots.push(params[0]);
+                knots.extend_from_slice(&params);
+                knots.push(params[n - 1]);
+
+                let weights = vec![1.0; n];
+                let nurbs = brepkit_math::nurbs::NurbsCurve::new(1, knots, points, weights)
+                    .map_err(|e| IoError::ParseError {
+                        reason: format!("POLYLINE #{curve_ref}: {e}"),
+                    })?;
+                Ok(EdgeCurve::NurbsCurve(nurbs))
+            }
         }
     }
 
@@ -1219,6 +1393,28 @@ fn parse_refs(attrs: &str) -> Vec<u64> {
         }
     }
     refs
+}
+
+/// Extract every `PARAMETER_VALUE(x)` from an attribute string, in order.
+///
+/// A `TRIMMED_CURVE`'s two trim selects each hold a `CARTESIAN_POINT`, a
+/// `PARAMETER_VALUE`, or both, so the parameters have to be picked out by
+/// name rather than by position.
+fn parse_parameter_values(attrs: &str) -> Vec<f64> {
+    const MARKER: &str = "PARAMETER_VALUE(";
+    let mut values = Vec::new();
+    let mut from = 0usize;
+    while let Some(rel) = attrs[from..].find(MARKER) {
+        let open = from + rel + MARKER.len();
+        let Some(close) = attrs[open..].find(')') else {
+            break;
+        };
+        if let Ok(value) = attrs[open..open + close].trim().parse::<f64>() {
+            values.push(value);
+        }
+        from = open + close;
+    }
+    values
 }
 
 /// Extract `#NNN` references from the first parenthesized list in attrs.
@@ -2288,6 +2484,262 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         assert!(
             err.to_string().contains("missing its 3-D curve reference"),
             "unexpected error: {err}"
+        );
+    }
+
+    // ── TRIMMED_CURVE ──────────────────────────────────────────────
+
+    /// A cubic Bezier on the knot domain `[0, 4]`, so a trim to `[1, 3]` is
+    /// visibly narrower than the whole curve.
+    const TRIM_BASIS_BSPLINE: &str = "\
+#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+#2 = CARTESIAN_POINT('',(1.,3.,0.));\n\
+#3 = CARTESIAN_POINT('',(3.,3.,0.));\n\
+#4 = CARTESIAN_POINT('',(4.,0.,0.));\n\
+#5 = B_SPLINE_CURVE_WITH_KNOTS('',3,(#1,#2,#3,#4),\
+.UNSPECIFIED.,.F.,.F.,(4,4),(0.,4.),.UNSPECIFIED.);\n";
+
+    #[test]
+    fn trimmed_bspline_is_narrowed_to_the_declared_span() {
+        let basis = {
+            let body = TRIM_BASIS_BSPLINE.to_string();
+            let EdgeCurve::NurbsCurve(n) = curve_geometry(&body, 5).unwrap() else {
+                panic!("fixture should be a NURBS curve");
+            };
+            n
+        };
+        assert_eq!(basis.domain(), (0.0, 4.0));
+
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #6 = TRIMMED_CURVE('',#5,(PARAMETER_VALUE(1.)),(PARAMETER_VALUE(3.)),\
+             .T.,.PARAMETER.);\n"
+        );
+        let EdgeCurve::NurbsCurve(trimmed) = curve_geometry(&body, 6).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+
+        let (d0, d1) = trimmed.domain();
+        assert!(
+            (d0 - 1.0).abs() < 1e-9 && (d1 - 3.0).abs() < 1e-9,
+            "trimmed domain should be [1, 3], got [{d0}, {d1}]"
+        );
+        // The trimmed curve must trace exactly the basis over that span.
+        for i in 0..=8 {
+            let t = 1.0 + f64::from(i) * 0.25;
+            let want = basis.evaluate(t);
+            let got = trimmed.evaluate(t);
+            assert!(
+                (want - got).length() < 1e-9,
+                "at t={t}: trimmed {got:?} should equal basis {want:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn trim_covering_the_whole_bspline_leaves_it_alone() {
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #6 = TRIMMED_CURVE('',#5,(PARAMETER_VALUE(0.)),(PARAMETER_VALUE(4.)),\
+             .T.,.PARAMETER.);\n"
+        );
+        let EdgeCurve::NurbsCurve(curve) = curve_geometry(&body, 6).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+        assert_eq!(curve.domain(), (0.0, 4.0));
+        assert_eq!(curve.control_points().len(), 4);
+    }
+
+    /// A reversed trim states the same span; the edge's vertices, not the
+    /// curve, decide which way it is traversed.
+    #[test]
+    fn reversed_trim_bounds_give_the_same_span() {
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #6 = TRIMMED_CURVE('',#5,(PARAMETER_VALUE(3.)),(PARAMETER_VALUE(1.)),\
+             .F.,.PARAMETER.);\n"
+        );
+        let EdgeCurve::NurbsCurve(curve) = curve_geometry(&body, 6).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+        let (d0, d1) = curve.domain();
+        assert!(
+            (d0 - 1.0).abs() < 1e-9 && (d1 - 3.0).abs() < 1e-9,
+            "[{d0},{d1}]"
+        );
+    }
+
+    /// Trimming an analytic curve returns it whole: brepkit stores the
+    /// complete circle and reads the arc extent off the edge's vertices,
+    /// exactly as it does for a bare CIRCLE in an EDGE_CURVE.
+    #[test]
+    fn trimmed_analytic_curves_resolve_to_their_basis() {
+        let circle = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                      #2 = DIRECTION('',(0.,0.,1.));\n\
+                      #3 = DIRECTION('',(1.,0.,0.));\n\
+                      #4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+                      #5 = CIRCLE('',#4,4.);\n";
+        let body = format!(
+            "{circle}#6 = TRIMMED_CURVE('',#5,(PARAMETER_VALUE(0.)),\
+             (PARAMETER_VALUE(1.5707963267948966)),.T.,.PARAMETER.);\n"
+        );
+        let EdgeCurve::Circle(c) = curve_geometry(&body, 6).unwrap() else {
+            panic!("expected the basis circle");
+        };
+        assert!((c.radius() - 4.0).abs() < 1e-12);
+
+        let line = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #2 = DIRECTION('',(1.,0.,0.));\n\
+                    #3 = VECTOR('',#2,1.);\n\
+                    #4 = LINE('',#1,#3);\n";
+        let body = format!(
+            "{line}#5 = TRIMMED_CURVE('',#4,(PARAMETER_VALUE(0.)),\
+             (PARAMETER_VALUE(5.)),.T.,.PARAMETER.);\n"
+        );
+        assert!(matches!(curve_geometry(&body, 5).unwrap(), EdgeCurve::Line));
+    }
+
+    /// A `.CARTESIAN.` trim names its ends as points, which are the edge's
+    /// own vertices; the basis comes back untouched rather than guessed at.
+    #[test]
+    fn cartesian_trim_leaves_the_bspline_whole() {
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #6 = TRIMMED_CURVE('',#5,(#1),(#4),.T.,.CARTESIAN.);\n"
+        );
+        let EdgeCurve::NurbsCurve(curve) = curve_geometry(&body, 6).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+        assert_eq!(curve.domain(), (0.0, 4.0));
+    }
+
+    #[test]
+    fn trim_outside_the_basis_domain_is_refused() {
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #6 = TRIMMED_CURVE('',#5,(PARAMETER_VALUE(1.)),(PARAMETER_VALUE(9.)),\
+             .T.,.PARAMETER.);\n"
+        );
+        let err = curve_geometry(&body, 6).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("outside its basis curve's parameter domain"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn empty_trim_span_is_refused() {
+        let body = format!(
+            "{TRIM_BASIS_BSPLINE}\
+             #6 = TRIMMED_CURVE('',#5,(PARAMETER_VALUE(2.)),(PARAMETER_VALUE(2.)),\
+             .T.,.PARAMETER.);\n"
+        );
+        let err = curve_geometry(&body, 6).unwrap_err();
+        assert!(
+            err.to_string().contains("empty span"),
+            "unexpected error: {err}"
+        );
+    }
+
+    // ── POLYLINE ───────────────────────────────────────────────────
+
+    #[test]
+    fn polyline_becomes_a_degree_one_bspline_through_its_points() {
+        let body = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #2 = CARTESIAN_POINT('',(3.,0.,0.));\n\
+                    #3 = CARTESIAN_POINT('',(3.,4.,0.));\n\
+                    #4 = CARTESIAN_POINT('',(3.,4.,12.));\n\
+                    #5 = POLYLINE('',(#1,#2,#3,#4));";
+        let EdgeCurve::NurbsCurve(curve) = curve_geometry(body, 5).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+        assert_eq!(curve.degree(), 1);
+        assert_eq!(curve.control_points().len(), 4);
+
+        // Chord-length knots: 0, 3, 7, 19.
+        let (d0, d1) = curve.domain();
+        assert!(
+            (d0 - 0.0).abs() < 1e-12 && (d1 - 19.0).abs() < 1e-12,
+            "[{d0},{d1}]"
+        );
+
+        let want = [
+            (0.0, Point3::new(0.0, 0.0, 0.0)),
+            (3.0, Point3::new(3.0, 0.0, 0.0)),
+            (7.0, Point3::new(3.0, 4.0, 0.0)),
+            (19.0, Point3::new(3.0, 4.0, 12.0)),
+            // Halfway along the second segment.
+            (5.0, Point3::new(3.0, 2.0, 0.0)),
+        ];
+        for (t, expected) in want {
+            let got = curve.evaluate(t);
+            assert!(
+                (got - expected).length() < 1e-9,
+                "at t={t} expected {expected:?}, got {got:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn two_point_polyline_is_a_line() {
+        let body = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #2 = CARTESIAN_POINT('',(1.,2.,3.));\n\
+                    #3 = POLYLINE('',(#1,#2));";
+        assert!(matches!(curve_geometry(body, 3).unwrap(), EdgeCurve::Line));
+    }
+
+    /// Repeated points would force an interior knot of multiplicity 2, which
+    /// a degree-1 B-spline cannot carry. They are dropped, not refused.
+    #[test]
+    fn polyline_with_repeated_points_drops_the_duplicates() {
+        let body = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #2 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #3 = CARTESIAN_POINT('',(3.,0.,0.));\n\
+                    #4 = CARTESIAN_POINT('',(3.,0.,0.));\n\
+                    #5 = CARTESIAN_POINT('',(3.,4.,0.));\n\
+                    #6 = POLYLINE('',(#1,#2,#3,#4,#5));";
+        let EdgeCurve::NurbsCurve(curve) = curve_geometry(body, 6).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+        assert_eq!(curve.control_points().len(), 3);
+        assert_eq!(curve.degree(), 1);
+    }
+
+    #[test]
+    fn degenerate_polyline_is_refused() {
+        for body in [
+            "#1 = CARTESIAN_POINT('',(1.,1.,1.));\n#2 = POLYLINE('',(#1));",
+            "#1 = CARTESIAN_POINT('',(1.,1.,1.));\n\
+             #2 = CARTESIAN_POINT('',(1.,1.,1.));\n\
+             #3 = POLYLINE('',(#1,#2));",
+        ] {
+            let id = if body.contains("#3 = POLYLINE") { 3 } else { 2 };
+            let err = curve_geometry(body, id).unwrap_err();
+            assert!(
+                err.to_string().contains("collapses to a single point"),
+                "unexpected error: {err}"
+            );
+        }
+    }
+
+    /// A polyline's points are length-valued and must be scaled like every
+    /// other coordinate the reader takes in.
+    #[test]
+    fn polyline_points_honour_the_declared_unit() {
+        let body = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #2 = CARTESIAN_POINT('',(1.,0.,0.));\n\
+                    #3 = CARTESIAN_POINT('',(1.,1.,0.));\n\
+                    #4 = POLYLINE('',(#1,#2,#3));\n\
+                    #5 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT($,.METRE.) );\n\
+                    #6 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#5));";
+        let EdgeCurve::NurbsCurve(curve) = curve_geometry(body, 4).unwrap() else {
+            panic!("expected a NURBS curve");
+        };
+        let end = curve.control_points()[2];
+        assert!(
+            (end - Point3::new(1000.0, 1000.0, 0.0)).length() < 1e-9,
+            "metre-declared points should arrive in mm, got {end:?}"
         );
     }
 
