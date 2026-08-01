@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785532991438,
+  "lastUpdate": 1785553399816,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2429,6 +2429,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22855303,
             "range": "± 105023",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "077296998ec6328d176564290521d6116ba1bb50",
+          "message": "feat(wasm): report typed fillet errors instead of the silent no-op (#35)\n\nSurface stable machine-readable fillet failure codes across the wasm bridge while preserving rollback semantics.",
+          "timestamp": "2026-07-31T22:00:53-05:00",
+          "tree_id": "f3ed650c960bc016c6088659087b746b1dc55bf4",
+          "url": "https://github.com/esaueng/brepkit/commit/077296998ec6328d176564290521d6116ba1bb50"
+        },
+        "date": 1785553399028,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 865486,
+            "range": "± 6648",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 962002,
+            "range": "± 20675",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14271,
+            "range": "± 46",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 689907,
+            "range": "± 1806",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 23069443,
+            "range": "± 40910",
             "unit": "ns/iter"
           }
         ]
