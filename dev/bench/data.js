@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785607281383,
+  "lastUpdate": 1785607857815,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3293,6 +3293,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21914770,
             "range": "± 25901",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06eb9cebcb6b668e0cdaa10ca7bc5cdb23c8edaf",
+          "message": "fix(blend): a cap rim refused every radius past half, and seamed its wall across the axis (#50)\n\nFilleting the top rim of a bare cylinder succeeded only while f/r < 0.5 and\nfailed for every larger radius with a bare partial-result. The boundary was\nexact, scale-invariant and height-independent: at r = 2, f = 0.9999 worked and\nf = 1.0 did not.\n\nplane_cylinder_fillet capped the inward case at r_c/2 because the carrier torus\nbecomes a horn or spindle past that, \"which is invalid as a fillet surface\".\nThe torus is; the face cut from it is not. The band spans a quarter of the tube,\nfrom the wall contact at v = 0 to the plate contact at v = +/- pi/2, and a\nspindle crosses its own axis only where the tube radial goes negative — that is\n|v| > arccos(-major/minor) >= pi/2 for every major >= 0. The self-intersecting\nlobe is disjoint from the quarter actually used. No trimming work was needed:\nthe trim was already right and the guard was refusing sound geometry. The real\nbound is the rolling ball fitting inside the cylinder, f < r_c.\n\nf >= r_c is genuinely impossible, and now returns a typed RadiusTooLarge naming\nthe edge and r_c rather than 0 succeeded N failed, which was indistinguishable\nfrom an internal failure.\n\nRemoved volume is a solid of revolution: pi(R f^2 (2 - pi/2) + f^3/3) with\nR = r - f, giving pi r^3/3 at f = r so the body is the hemispherical end. At\nr=2 h=12, every hundredth of f/r from 0.01 to 0.99 matches under 1e-15\nrelative. Continuity across 0.5 is measured, not asserted: second differences\nof the measured curve match the closed form's own within 1e-12.\n\nVolume alone cannot prove the trim, since an over-spanning band closes the shell\nidentically. The band's own Pappus area, pi^2 f (r-f) + 2 pi f^2, is the check\nthat can, and it matches at every radius.\n\nThe bound was narrowed to inward && convex after measuring. `inward` also\ncovers a blind hole's floor, which is concave and independently wrong on main —\nan r=3 hole rounded at r=1 LOSES 7.933 where it must ADD 3.744, while passing\nvalidate_solid. That path keeps r_c/2 and is byte-identical to main; it needs\nits own lane.\n\nSecond defect, found by chasing why mass_properties would not agree with\nsolid_volume. Both rim assemblers built contact circles with Circle3D::new,\nwhich seams wherever Frame3::from_normal lands — a quarter turn for a +z axis.\nThe rebuild re-pointed the wall's seam edge at that vertex while keeping the\nseam's curve, so the seam became a straight chord through the inside of the\ncylinder: an edge of the wall face that is not on the wall surface. Nothing\ntopological catches it. An r=2 h=12 cylinder filleted at 0.5 reported mass\n71.882 against volume 150.160, centroid at z = 12.48 on a solid twelve tall;\nthe chamfer twin read 71.079 against 149.357. Both now agree to 1e-13.\n\nAlso not fixed, wanting its own lane: a cone cap rim has no analytic path at\nall, since plane_cone_fillet's convex branch requires the apex on the material\nside, which a frustum's small end never satisfies.\n\nRetires OpenZCAD's 128-cone adapter workaround except for callers passing\nexactly f = r, which now gets a typed refusal.",
+          "timestamp": "2026-08-01T13:08:26-05:00",
+          "tree_id": "d63260b46a200d270996f49b992e9e5a545008bf",
+          "url": "https://github.com/esaueng/brepkit/commit/06eb9cebcb6b668e0cdaa10ca7bc5cdb23c8edaf"
+        },
+        "date": 1785607856615,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 861990,
+            "range": "± 13800",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 956893,
+            "range": "± 2032",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14191,
+            "range": "± 38",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 693454,
+            "range": "± 2131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22914122,
+            "range": "± 38235",
             "unit": "ns/iter"
           }
         ]
