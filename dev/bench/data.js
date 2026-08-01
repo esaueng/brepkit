@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785610908420,
+  "lastUpdate": 1785615185616,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3455,6 +3455,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22987602,
             "range": "± 148559",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4d7e7a91f7f92e6d751cf93f8d262d8a1fc4d1ca",
+          "message": "Fuzz the geometry engines, not just the readers (#54)\n\nAll eight fuzz targets were I/O readers, so the defect class costing this\nkernel the most -- a confident, well-formed, wrong solid -- had no automated\nhunter. A crash fuzzer would have found none of the last fourteen defects.\n\nAdds structured `boolean_tree` and `modifier_ops` targets with a shared\ngenerator and oracle module. The invariants are the deliverable; the\ngenerator is scaffolding.\n\nThe measurement oracle is corrected in the process. Route agreement between\n`mass_properties` and `solid_volume` was to be the primary check, on the\ngrounds that the routes are independent. They are not -- they meet in\n`integrate_face`, and #53's open-arc chord error moved both by the same 2.0%\nwith the check seeing nothing. The primary oracle is now a closed form\nderived outside the kernel; route agreement stays as a documented weak\nsecondary signal that catches a defect confined to one route and nothing in\nthe shared integrator.\n\nThree findings, all open:\n\n- A point-tipped cone tessellates to a mesh that is not closed. 416\n  triangles, 418 boundary edges, 420 vertices where 210 suffice: the cone\n  face and base plane each emit their own copy of the 209-point base circle\n  and are never merged. MERGE_GRID is a fixed absolute 1e-7 whose comment\n  calls grid-boundary splits \"possible but rare\"; here 209 of 209 split.\n  Watertight at 0.001x, open at 1x and 1000x. No measurement oracle sees it\n  -- solid_volume returns the exact pi*r^2*h/3.\n- A fillet reading 55.6% apart between the two routes, plus five results\n  that tessellate open, one with non-manifold edges.\n- transform_solid refuses every uniform scale at or below 0.00464, because\n  it compares a determinant -- a volume ratio -- against a length tolerance.\n  A millimetres-to-metres conversion is inside that band, and it had left\n  the lane's own scale oracle silently inert on half of every case.\n\nTwo corrections to the harness itself, both caught by the fuzzer:\n\n- The Euler check aggregated V-E+F per solid against 2. Euler's formula is\n  per closed surface, so a fuse of non-touching operands is a correct\n  two-shell result with aggregate 4; three of the first four artifacts were\n  that false positive. Now partitioned by connected component, which is also\n  strictly sharper.\n- The first scale-sweep claim was overstated and is corrected: the cone's\n  table came from constructing cones at different sizes, not from the\n  oracle.\n\nMutation coverage gains blend/offset/operations. The config change alone\nwould have been inert -- mutants.yml passes explicit --package flags and\ncargo-mutants intersects those with examine_globs -- so the workflow names\nthe crates too. Examined surface ~48k to ~122k lines, budget 60 to 180 min.\n\nNote this lands the scheduled fuzz job RED, because the cone defect is real\nand open. Hiding a live defect to keep a dashboard green is the habit this\nwork exists to break; the cone fix is queued so the window stays short.\n\nAlso confirmed rather than assumed: the brepkit_approx census is NOT a CI\nmetric. Its probes are live at 7 sites and 4 skills documents tell you to\nrun it, but nothing in .github/workflows/ or scripts/ invokes it.",
+          "timestamp": "2026-08-01T15:09:49-05:00",
+          "tree_id": "893ca4d67ff5725bfa1843a90ad523b3c89b8173",
+          "url": "https://github.com/esaueng/brepkit/commit/4d7e7a91f7f92e6d751cf93f8d262d8a1fc4d1ca"
+        },
+        "date": 1785615184626,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 827377,
+            "range": "± 10567",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 915135,
+            "range": "± 29794",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14412,
+            "range": "± 19",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 684998,
+            "range": "± 1708",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22191216,
+            "range": "± 95490",
             "unit": "ns/iter"
           }
         ]
