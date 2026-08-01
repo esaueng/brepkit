@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785577191826,
+  "lastUpdate": 1785578987038,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2807,6 +2807,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21825272,
             "range": "± 81019",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "84ffa5f521d06982dc5c19732656f84356345656",
+          "message": "fix(measure): volume must not depend on how a solid was decomposed (#42)\n\n`solid_volume` sends a body with holed faces through\n`volume_from_direct_face_tessellation`, which integrates quadric faces\nanalytically but planar faces from their own tessellation. Two things made\nthat sum decomposition-dependent.\n\nThe tessellation dropped the vertex where a wire ARRIVES at a reversed\ncircular arc. `sample_wire_positions` and `tessellate_planar` both walked a\nreversed edge's samples as `(0..n).rev()`, which starts one step inside the\narc: the boundary polygon ran from the previous edge's last sample straight\ninto the arc's interior, and the vertex between them vanished. Where the\nprevious edge was a long straight run the resulting chord sliced a large\ntriangle off the face — 5.4 mm² for a 74 mm run into an r = 3 arc. Both loops\nnow walk `(1..=n).rev()`, so each edge emits the vertex the wire arrives at\nand stops one step short of the one it leaves at.\n\nThe sum then still mixed exact quadric terms with chorded planar ones, whose\npolygons no longer meet the quadrics' true arcs; the sliver between them is\ncharged to nobody, the loss is one-sided and scales with each plane's offset\nfrom the origin. `volume_from_direct_face_tessellation` now integrates the\nwhole boundary in closed form when it can — planes by Green's theorem\n(`planar_cap_signed_volume` generalised to any line-and-arc-bounded face),\nquadrics by their existing analytic integrators — and falls back to the old\nmixed sum otherwise. Its accuracy is documented either way.\n\nGreen's theorem integrates whatever loops a face stores and cannot tell a\nhole from a mis-traced one, so each planar face's closed form is accepted\nonly when it agrees with the area of its own mesh to within what chording\ncould account for. The shelled cup whose rim sorts into loops that jump\nacross the solid keeps its existing (wrong, separately tracked) treatment.\n\nMeasured on the OpenZCAD demo bracket, whose four r = 3 corner blends put an\narc on the z = 39.5 wall top:\n\n    closed form / exact per-face divergence sum   47360.940057\n    before                                        47348.194726   0.027 % light\n    after                                         47360.940057   exact\n\nand on a plate whose corner is scalloped by a single cut, 0.136 % light\nbefore and exact after. The reported walking-builder figure of 47359.866 was\n1.07 mm³ light; the rolling-ball figure of 47348.195 was 12.75 mm³ light.\nNeither was right, and the truth is nearer the older one.\n\nTwo baselines move, both toward a closed form rather than away from one:\n\n* `boolean_box_minus_cylinder.golden` now reads 717.256661, which is exactly\n  `1000 − 90·π`. Its old 717.292793 was 0.036 mm³ high.\n* `regress_plate_hole_fillet` compares a drilled plate's fillet loss against\n  an undrilled one's. The drilled blank is now integrated in closed form\n  while the filleted result still meshes (it carries a NURBS vertex-blend\n  patch), so the bores' inscribed-mesh error lands on one end of\n  `before − after` instead of nearly cancelling. Its `VOLUME_DEFLECTION`\n  drops 0.005 → 0.001, which is what that constant is documented to be for;\n  the tolerance is unchanged.\n\nGates run: `cargo fmt --all -- --check`, `./scripts/check-boundaries.sh`,\n`cargo test -p brepkit-operations` (1103 pass), scoped clippy and rustdoc.\n`brepkit-io` / `brepkit-render` were not built locally — CI is the authority\non the full suite.\n\n\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T05:07:12-05:00",
+          "tree_id": "42ad330f977eefb742808bc1acad68764aa60079",
+          "url": "https://github.com/esaueng/brepkit/commit/84ffa5f521d06982dc5c19732656f84356345656"
+        },
+        "date": 1785578986620,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 863871,
+            "range": "± 1999",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 962992,
+            "range": "± 1522",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14674,
+            "range": "± 58",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 686633,
+            "range": "± 617",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 23145729,
+            "range": "± 707546",
             "unit": "ns/iter"
           }
         ]
