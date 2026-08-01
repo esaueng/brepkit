@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785616046749,
+  "lastUpdate": 1785621630460,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3671,6 +3671,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21989439,
             "range": "± 690734",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5d00fa724a45277f0b7d5ca9fdd5c2727a2f00fc",
+          "message": "Fan a pointed cone's shared rim to its shared apex (#58)\n\nA point-tipped cone tessellated to a mesh that was not closed: 416\ntriangles, 418 boundary edges, 420 vertices where 210 suffice. The volume\nwas meanwhile exactly right -- solid_volume returned 9.42477796076938\nagainst pi*r^2*h/3 of 9.42477796076938 -- so no measurement oracle saw it.\nOnly mesh watertightness did.\n\nMERGE_GRID was the wrong suspect, and so was any merge tolerance: the\nclosest vertex pair in the broken mesh is 2.25e-2 apart, four orders beyond\nsnap_tol. There were no near-coincident vertices failing to merge. The real\nchain is three stages further on:\n\n1. A pointed cone's lateral face has ONE closed rim plus a doubled\n   degenerate seam to the apex, so tessellate_revolution_band_shared, which\n   needs two rims, declines.\n2. tessellate_nonplanar_cdt then returns Ok having emitted ZERO triangles --\n   the seam collapses the UV boundary -- so the caller rolls back to\n   tessellate_nonplanar_snap.\n3. Snap tessellates from the cone's own parametric grid and reconciles with\n   the shared pool by proximity afterwards.\n4. The cone surface's u = 0 ray and the base circle's t = 0 ray are HALF A\n   TURN apart, because make_cone gives the base circle normal +z while the\n   cone's axis runs apex to base, and Frame3::from_normal derives opposite\n   reference directions from those.\n\nSo the two rings coincide only when the segment count is even. At r=3, h=1\nand diag*4e-5 the count is 209 -- odd -- and every rim sample landed exactly\nhalf a step from its counterpart.\n\nThe apparent scale-dependence was a second absolute constant and it was\nluck: tessellate::face floors the segment count with max_radius.max(0.01),\nso the 0.001x copy takes 380 segments, which is even, and closed by\ncoincidence rather than by correctness.\n\nFixed with tessellate_cone_apex_fan_shared, the one-rim sibling of the\ntwo-rim band path, fanning the shared rim to the shared apex. No\nlength-carrying constants: the apex match is relative to rim extent and the\nsliver guard is a dimensionless ratio. It self-validates, declines anything\nit does not recognise, and commits wedges only if all are sound.\n\n  cone at 1x and 1000x   418 boundary edges -> 0\n  cone at 0.001x         0 (by parity luck) -> 0 (by construction)\n  1,800-case fuzz lattice  254 leaking -> 0\n  min vertex separation    2.25e-2 -> 2.25e-2, so nothing was over-merged\n\nFour boolean combinations on pointed cones that returned Err on main now\nsucceed: the open cone had been denying the mesh fallback a watertight\noperand. box_cone_invalid_mesh_fallback_fails_closed pinned exactly that\nrefusal, so it is flipped rather than relaxed, and renamed to\nbox_cone_intersect_returns_quarter_cone. It now asserts success, a manifold\nshell, zero boundary and non-manifold mesh edges, and the exact faceted\nclosed form (h/3)*k*(r^2/2)*sin(2*pi/4k) -- 0.5150283239582457 for k = 5 --\nwhile never exceeding the analytic pi/6 and staying within 5% of it, with k\nderived from the face count.\n\nLeft alone deliberately, all recorded: max_radius.max(0.01) and\nsnap_tol = 1e-6 are absolute length constants of the recurring class, but\nneither is the cause here and changing the first shifts density for every\nsmall cone and cylinder; circle_param_range returning (0, TAU) for closed\ncircles leaves orphan vertices, which is pre-existing and why the tests\ncount referenced vertices; and a frustum with r_top = 3e-6 has 23\nnon-manifold edges before and after.",
+          "timestamp": "2026-08-01T16:58:05-05:00",
+          "tree_id": "88219ebf13d7449f8c6c24757f71e60e79836f26",
+          "url": "https://github.com/esaueng/brepkit/commit/5d00fa724a45277f0b7d5ca9fdd5c2727a2f00fc"
+        },
+        "date": 1785621629834,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 838710,
+            "range": "± 1590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 935196,
+            "range": "± 10936",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12718,
+            "range": "± 19",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 693617,
+            "range": "± 2589",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21983090,
+            "range": "± 52566",
             "unit": "ns/iter"
           }
         ]
