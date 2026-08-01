@@ -295,8 +295,9 @@ pub(super) fn tessellate_cone_apex_fan_shared(
     }
 
     // Order the rim by its angle around the cone axis so consecutive pairs are
-    // adjacent on the circle.
-    rim.sort_by(|&a, &b| {
+    // adjacent on the circle. The ids are distinct, so an unstable sort is both
+    // equivalent and cheaper (no merge buffer, less codegen).
+    rim.sort_unstable_by(|&a, &b| {
         let ua = cone.project_point(merged.positions[a as usize]).0;
         let ub = cone.project_point(merged.positions[b as usize]).0;
         ua.partial_cmp(&ub).unwrap_or(std::cmp::Ordering::Equal)
