@@ -56,9 +56,27 @@ pub struct Census {
     pub orphan_edges: usize,
     /// Per surface-type face counts, for the analytic-vs-mesh tell.
     pub surfaces: BTreeMap<&'static str, usize>,
+    /// One entry per connected component of the face-adjacency graph.
+    ///
+    /// Euler's formula is a statement about a *single* closed surface, and a
+    /// solid is free to be several: a fuse of two operands that do not touch
+    /// is one solid with two shells, which is a correct result. Summing `V-E+F`
+    /// across them gives `2n`, not 2, so the aggregate figure cannot be tested
+    /// against a constant — and worse, a genus error in one shell can cancel
+    /// against an error in another. The test belongs per component.
+    pub shells: Vec<ShellCensus>,
 }
 
-impl Census {
+/// `V`, `E`, `F` and the inner-wire count for one connected shell.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ShellCensus {
+    pub faces: usize,
+    pub edges: usize,
+    pub vertices: usize,
+    pub inner_wires: usize,
+}
+
+impl ShellCensus {
     /// `V - E + F`, unadjusted.
     #[must_use]
     #[allow(clippy::cast_possible_wrap)]
@@ -67,11 +85,22 @@ impl Census {
     }
 
     /// `2 - (V - E + F - L)`, which must be a non-negative even number:
-    /// twice the genus of a closed orientable surface.
+    /// twice the genus of this closed orientable surface.
     #[must_use]
     #[allow(clippy::cast_possible_wrap)]
     pub fn twice_genus(&self) -> i64 {
         2 - (self.euler() - self.inner_wires as i64)
+    }
+}
+
+impl Census {
+    /// `V - E + F` summed over the whole solid.
+    ///
+    /// Only useful for reporting. Test [`ShellCensus::twice_genus`] instead.
+    #[must_use]
+    #[allow(clippy::cast_possible_wrap)]
+    pub fn euler(&self) -> i64 {
+        self.vertices as i64 - self.edges as i64 + self.faces as i64
     }
 }
 
@@ -115,7 +144,79 @@ pub fn census(topo: &Topology, solid: SolidId) -> Result<Census, brepkit_topolog
         non_manifold_edges,
         orphan_edges,
         surfaces,
+        shells: shell_census(topo, solid)?,
     })
+}
+
+/// Split a solid into connected components of the face-adjacency graph and
+/// count `V`, `E`, `F` and `L` within each.
+///
+/// Components are derived from shared edges rather than read off the solid's
+/// shell list, because the question Euler's formula asks is about connectivity,
+/// not about how the arena chose to file the faces.
+///
+/// # Errors
+///
+/// Propagates topology lookup failures.
+pub fn shell_census(
+    topo: &Topology,
+    solid: SolidId,
+) -> Result<Vec<ShellCensus>, brepkit_topology::TopologyError> {
+    use std::collections::{BTreeSet, HashMap};
+
+    let faces = explorer::solid_faces(topo, solid)?;
+    let index: HashMap<_, usize> = faces.iter().enumerate().map(|(i, f)| (*f, i)).collect();
+
+    // Union-find over faces, joined wherever two faces share an edge.
+    let mut parent: Vec<usize> = (0..faces.len()).collect();
+    fn find(parent: &mut [usize], mut x: usize) -> usize {
+        while parent[x] != x {
+            parent[x] = parent[parent[x]];
+            x = parent[x];
+        }
+        x
+    }
+
+    let map = explorer::edge_to_face_map(topo, solid)?;
+    for uses in map.values() {
+        let mut it = uses.iter().filter_map(|f| index.get(f).copied());
+        if let Some(first) = it.next() {
+            for other in it {
+                let (a, b) = (find(&mut parent, first), find(&mut parent, other));
+                if a != b {
+                    parent[a] = b;
+                }
+            }
+        }
+    }
+
+    // Accumulate per component.
+    let mut groups: BTreeMap<usize, (usize, BTreeSet<usize>, BTreeSet<usize>, usize)> =
+        BTreeMap::new();
+    for (i, fid) in faces.iter().enumerate() {
+        let root = find(&mut parent, i);
+        let slot = groups
+            .entry(root)
+            .or_insert_with(|| (0, BTreeSet::new(), BTreeSet::new(), 0));
+        slot.0 += 1;
+        slot.3 += topo.face(*fid)?.inner_wires().len();
+        for eid in explorer::face_edges(topo, *fid)? {
+            slot.1.insert(eid.index());
+        }
+        for vid in explorer::face_vertices(topo, *fid)? {
+            slot.2.insert(vid.index());
+        }
+    }
+
+    Ok(groups
+        .into_values()
+        .map(|(f, e, v, l)| ShellCensus {
+            faces: f,
+            edges: e.len(),
+            vertices: v.len(),
+            inner_wires: l,
+        })
+        .collect())
 }
 
 // ── I1/I2: the result is actually a solid ──────────────────────────────
@@ -130,10 +231,17 @@ pub fn census(topo: &Topology, solid: SolidId) -> Result<Census, brepkit_topolog
 /// `V-E+F = 7` where 3 was required, with 72 open mesh edges (#48); the open
 /// shells left by `draft` (#41) and `chamfer` (#43).
 ///
+/// The Euler test is applied **per connected shell**. A solid may legitimately
+/// be several disjoint shells — fusing two operands that do not touch is a
+/// correct two-shell result — and the aggregate `V-E+F` is then `2n`, not 2.
+/// Testing the sum against a constant reports every such fuse as a defect,
+/// which it is not; and it would let a genus error in one shell cancel against
+/// an error in another.
+///
 /// # Panics
 ///
-/// Panics with the census when the shell is open, non-manifold, or has an
-/// impossible Euler characteristic.
+/// Panics with the census when the shell is open, non-manifold, or when any
+/// component has an impossible Euler characteristic.
 pub fn assert_closed_manifold(what: &str, c: &Census) {
     assert!(
         c.free_edges == 0 && c.non_manifold_edges == 0 && c.orphan_edges == 0,
@@ -144,24 +252,40 @@ pub fn assert_closed_manifold(what: &str, c: &Census) {
         c.orphan_edges,
     );
 
-    let tg = c.twice_genus();
-    assert!(
-        tg >= 0 && tg % 2 == 0,
-        "{what}: Euler characteristic V-E+F = {} with L = {} inner loop(s) implies genus {}, \
-         which is not a non-negative integer; census {c:?}",
-        c.euler(),
-        c.inner_wires,
-        f64::from(i32::try_from(tg).unwrap_or(i32::MAX)) / 2.0,
-    );
+    for (i, s) in c.shells.iter().enumerate() {
+        let tg = s.twice_genus();
+        assert!(
+            tg >= 0 && tg % 2 == 0,
+            "{what}: shell {i} of {} has V-E+F = {} with L = {} inner loop(s), implying genus \
+             {}, which is not a non-negative integer; shell {s:?}; whole solid {c:?}",
+            c.shells.len(),
+            s.euler(),
+            s.inner_wires,
+            f64::from(i32::try_from(tg).unwrap_or(i32::MAX)) / 2.0,
+        );
+    }
 }
 
-/// **Mesh-level watertightness.**
+/// **Mesh-level watertightness. Necessary, and nowhere near sufficient.**
 ///
 /// The B-Rep check above and this one are not the same statement: the
 /// tessellator welds shared boundary vertices and can paper over a small
 /// B-Rep gap, while a B-Rep that is closed can still tessellate to a leaky
 /// mesh through a collapsed seam. Defect #48 was visible here as 72 open mesh
 /// edges, so both rungs are checked.
+///
+/// **Watertightness is satisfied by bodies that are wrong.** #52's
+/// cross-drilled shaft passed this check with the bore filled *and* the bore
+/// walls contributing zero triangles — two errors that cancel into a closed
+/// mesh. Treat it only as a co-signature: pair it with the hole census
+/// ([`assert_holes_preserved`]) and with a volume known independently
+/// ([`assert_exact_volume`]). On its own it proves the mesh is closed, not
+/// that it is the right mesh.
+///
+/// The converse is equally true and is why this check is kept: a solid can
+/// measure exactly right and still tessellate open. The pointed-cone finding
+/// in this harness's first campaign reported the exact analytic `πr²h/3`
+/// through both volume routes while the mesh had 418 open edges.
 ///
 /// # Panics
 ///
@@ -310,18 +434,90 @@ pub fn assert_volume_bounds(what: &str, op: &str, a: &Measured, b: &Measured, r:
     );
 }
 
-// ── I5: measurement agreement ──────────────────────────────────────────
+// ── I5: measurement, against a volume known by construction ────────────
 
-/// **Two independent volume paths must agree.**
+/// **A body whose volume is known by construction must measure that volume.**
 ///
-/// `mass_properties` integrates the exact face geometry with Gauss quadrature
-/// and never tessellates; `solid_volume` runs a tessellation/analytic ladder.
-/// They share no code below the face list, so a disagreement means one of
-/// them is reading the geometry wrong.
+/// This is the *primary* measurement oracle, and it is deliberately not a
+/// comparison between two of the kernel's own routes. Every measurement defect
+/// closed in this batch was found by a hand-derived closed form and by nothing
+/// else — #49 by a Steinmetz solid, #50 by Pappus' band area, #53 by Steiner's
+/// formula for a rounded box. A closed form is the only oracle in this file
+/// that does not consult the code under test.
 ///
-/// Catches #49 directly: a curved face counted its holes as material, and a
-/// bore wall integrated to exactly zero. Both moved `mass_properties` by an
-/// order-one amount while `solid_volume` was unchanged.
+/// The generator is built to keep one available. Every primitive it emits has
+/// an elementary volume, placements are rigid so that volume survives them,
+/// and a boolean over interior-disjoint operands has an exact answer too
+/// (see [`assert_disjoint_boolean_exact`]). Where the closed form is unknown
+/// the case falls back to the inequality in [`assert_volume_bounds`].
+///
+/// # Panics
+///
+/// Panics when the measured volume misses the constructed one.
+pub fn assert_exact_volume(what: &str, expected: f64, measured: f64) {
+    if !expected.is_finite() || !measured.is_finite() {
+        return;
+    }
+    let scale = expected.abs().max(measured.abs()).max(VOL_FLOOR);
+    let rel = (expected - measured).abs() / scale;
+    assert!(
+        rel <= VOL_SLACK,
+        "{what}: volume is {expected:.9} by construction but the kernel measured \
+         {measured:.9} (relative error {rel:.3e}). This is a closed form derived \
+         outside the kernel, so the kernel is wrong.",
+    );
+}
+
+/// **A boolean over interior-disjoint operands has an exact answer.**
+///
+/// When two solids' bounding boxes do not overlap in their interiors, the
+/// solids cannot overlap either, and the algebra is total: `fuse` is the sum,
+/// `cut` is the target untouched, `intersect` is empty. No approximation is
+/// involved and no tolerance is needed, so this converts the loose inequality
+/// of [`assert_volume_bounds`] into an equality.
+///
+/// This is the shape of the "a boolean silently drops an operand" defect: a
+/// tool exactly tangent to a target's planar face makes `fuseAll` return the
+/// target alone and `cut` a no-op. Both results are perfectly formed, both
+/// satisfy every bound, both satisfy watertightness, and both are caught here
+/// because the answer is a number known in advance. The generator's quantized
+/// lattice exists to make tangency common rather than unreachable.
+///
+/// # Panics
+///
+/// Panics when a disjoint boolean did not return its exact algebraic result.
+pub fn assert_disjoint_boolean_exact(what: &str, op: &str, va: f64, vb: f64, vr: f64) {
+    let expected = match op {
+        "fuse" => va + vb,
+        "cut" => va,
+        "intersect" => 0.0,
+        _ => return,
+    };
+    let scale = expected.abs().max(vr.abs()).max(VOL_FLOOR);
+    let rel = (expected - vr).abs() / scale;
+    assert!(
+        rel <= VOL_SLACK,
+        "{what}: the operands do not overlap, so {op} must measure {expected:.9} \
+         (operands {va:.9} and {vb:.9}), but the result measured {vr:.9} \
+         (relative error {rel:.3e}). A disjoint boolean has an exact answer; \
+         a result that merely looks plausible is an operand that was dropped.",
+    );
+}
+
+/// **Two internal volume paths agreeing. A weak, secondary signal.**
+///
+/// `mass_properties` and `solid_volume` are *not* independent: below the face
+/// list they meet in the same `integrate_face`, and they are exact for planar
+/// results. So they agree on the all-planar bodies this is usually tested
+/// against because they share their code, not because either is right — #53's
+/// open-arc chord error moved both by the same 2.0% and this check saw
+/// nothing.
+///
+/// It is kept because it does catch a defect confined to *one* route — #46's
+/// wire-orientation bug rejected the exact planar path while leaving
+/// tessellation alone. That is a real class, and the check is cheap. It is not
+/// a substitute for [`assert_exact_volume`], and nothing in this harness
+/// should be described as proven by it.
 ///
 /// # Panics
 ///
@@ -338,8 +534,9 @@ pub fn assert_measurements_agree(what: &str, topo: &Topology, solid: SolidId, te
     assert!(
         rel <= VOL_SLACK,
         "{what}: mass_properties says {:.9} but solid_volume says {:.9} \
-         (relative difference {rel:.3e}). These integrate the same faces by \
-         independent routes; disagreement means one is misreading the geometry.",
+         (relative difference {rel:.3e}). These two routes share their face \
+         integrator, so they normally agree even when both are wrong; a \
+         disagreement means one route alone is misreading the geometry.",
         props.mass,
         tessellated,
     );
@@ -374,6 +571,118 @@ pub fn assert_deflection_stable(what: &str, topo: &Topology, solid: SolidId, coa
         "{what}: volume moved from {coarse:.9} to {v_fine:.9} when the deflection was \
          refined (relative {rel:.3e}). A sound solid's inscribed mesh converges from \
          below; movement this large signals broken geometry.",
+    );
+}
+
+// ── I5b: scale invariance ──────────────────────────────────────────────
+
+/// **The same shape at a different size must give the same relative answers.**
+///
+/// Modelling is scale-free: a part drawn in metres and the same part drawn in
+/// millimetres are the same part. So under a uniform scale by `s`, with every
+/// deflection scaled to match, the topology census must be *identical*, the
+/// mesh must be watertight in both or neither, and the volume must move by
+/// exactly `s³`.
+///
+/// This is the one oracle here that no amount of single-scale fuzzing reaches,
+/// and it is aimed at a pattern this kernel has now shown three times: a
+/// tolerance written as an absolute distance rather than a fraction of the
+/// model. #51's provenance budget reported surviving faces as deleted at
+/// 1000×. The tessellator's vertex merge grid is a fixed 1e-7 and decides
+/// whether two faces' copies of a shared circle become one vertex or two,
+/// which is why the pointed cone in this harness's first campaign is
+/// watertight at 0.001× and has 418 open edges at 1× and 1000×.
+///
+/// Note what this does *not* do: a body whose defect is scale-free — and most
+/// are — passes at every scale. This oracle isolates the absolute-tolerance
+/// class specifically, and it earns its cost only because that class is
+/// otherwise invisible.
+///
+/// Non-finite or degenerate scaled geometry, and any refusal from the
+/// transform, are passes.
+///
+/// # Panics
+///
+/// Panics when the census, the watertightness or the `s³` volume law breaks.
+pub fn assert_scale_invariant(what: &str, topo: &Topology, solid: SolidId, s: f64) {
+    use brepkit_math::mat::Mat4;
+    use brepkit_operations::transform::transform_solid;
+
+    let Ok(base) = census(topo, solid) else {
+        return;
+    };
+    let Ok(aabb) = solid_bounding_box(topo, solid) else {
+        return;
+    };
+    let diag = (aabb.max - aabb.min).length();
+    if !(diag.is_finite() && diag > 0.0) {
+        return;
+    }
+    // Relative deflections, so the two runs ask for the same mesh density.
+    let defl = volume_deflection(diag) * 4.0;
+    let Ok(v0) = solid_volume(topo, solid, volume_deflection(diag)) else {
+        return;
+    };
+    let watertight0 = tessellate_solid(topo, solid, defl)
+        .map(|m| boundary_edge_count(&m) == 0 && non_manifold_edge_count(&m) == 0);
+
+    let mut scaled = topo.clone();
+    if transform_solid(&mut scaled, solid, &Mat4::scale(s, s, s)).is_err() {
+        return; // a refusal is a pass
+    }
+    let Ok(after) = census(&scaled, solid) else {
+        return;
+    };
+
+    assert!(
+        base.faces == after.faces
+            && base.edges == after.edges
+            && base.vertices == after.vertices
+            && base.inner_wires == after.inner_wires
+            && base.free_edges == after.free_edges
+            && base.non_manifold_edges == after.non_manifold_edges,
+        "{what}: scaling the body by {s}x changed its topology census from \
+         {base:?} to {after:?}. Size is not shape; a count that moves with the \
+         model's units is a tolerance written as an absolute distance.",
+    );
+
+    let Ok(scaled_aabb) = solid_bounding_box(&scaled, solid) else {
+        return;
+    };
+    let scaled_diag = (scaled_aabb.max - scaled_aabb.min).length();
+    if !(scaled_diag.is_finite() && scaled_diag > 0.0) {
+        return;
+    }
+
+    if let Ok(w0) = watertight0
+        && let Ok(mesh) = tessellate_solid(&scaled, solid, volume_deflection(scaled_diag) * 4.0)
+    {
+        let w1 = boundary_edge_count(&mesh) == 0 && non_manifold_edge_count(&mesh) == 0;
+        assert!(
+            w0 == w1,
+            "{what}: at 1x the tessellation is {}, at {s}x the same shape at the \
+             same relative deflection is {}. Whether a mesh closes must not depend \
+             on the units the model is drawn in.",
+            if w0 { "watertight" } else { "leaky" },
+            if w1 { "watertight" } else { "leaky" },
+        );
+    }
+
+    let Ok(v1) = solid_volume(&scaled, solid, volume_deflection(scaled_diag)) else {
+        return;
+    };
+    if !v0.is_finite() || !v1.is_finite() {
+        return;
+    }
+    let expected = v0 * s * s * s;
+    let denom = expected.abs().max(v1.abs()).max(VOL_FLOOR);
+    let rel = (expected - v1).abs() / denom;
+    assert!(
+        rel <= VOL_SLACK,
+        "{what}: volume {v0:.9} scaled by {s}x should measure {expected:.9} \
+         but measured {v1:.9} (relative error {rel:.3e}). Volume goes as the \
+         cube of length; a different ratio is a length compared against a \
+         constant somewhere.",
     );
 }
 
@@ -471,5 +780,36 @@ pub fn assert_complete(what: &str, requested: usize, succeeded: usize, is_partia
         "{what}: asked for {requested} item(s), reported {succeeded} succeeded \
          (is_partial = {is_partial}) and still returned Ok. A partial result must be \
          a typed error naming what it skipped, never a success.",
+    );
+}
+
+/// **An option the caller set must change what comes back.**
+///
+/// Completeness is not only about how many entities were touched — it is about
+/// whether the request was honoured at all. `SweepCornerMode::Round` accepted
+/// the request and returned the `Smooth` result (#52); the blend binding
+/// accepted five edges and blended four (#44). Both are the same shape of
+/// failure: `Ok`, well-formed, and not what was asked for.
+///
+/// The check is the crude one that actually works — run the operation twice
+/// with two genuinely different settings and require the answers to differ. An
+/// implementation that ignores the option produces the same solid twice and is
+/// caught; one that honours it cannot fail this.
+///
+/// Both operations *refusing* is a pass, and so is one refusing where the other
+/// did not — that is the option changing the outcome.
+///
+/// # Panics
+///
+/// Panics when two different requests produced indistinguishable results.
+pub fn assert_option_honoured(what: &str, setting_a: &str, setting_b: &str, va: f64, vb: f64) {
+    if !va.is_finite() || !vb.is_finite() {
+        return;
+    }
+    let scale = va.abs().max(vb.abs()).max(VOL_FLOOR);
+    assert!(
+        (va - vb).abs() / scale > VOL_FLOOR,
+        "{what}: {setting_a} and {setting_b} are different requests but both \
+         produced volume {va:.9}. The option was accepted and then ignored.",
     );
 }
