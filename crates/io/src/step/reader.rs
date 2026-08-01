@@ -1,9 +1,21 @@
-//! STEP AP203 file reader.
+//! STEP Part 21 file reader.
 //!
-//! Parses ISO 10303-21 (STEP Part 21) files and reconstructs B-Rep
-//! topology. Supports the entity types produced by our STEP writer:
-//! `MANIFOLD_SOLID_BREP`, `CLOSED_SHELL`, `ADVANCED_FACE`, `PLANE`,
-//! `EDGE_CURVE`, `LINE`, `CARTESIAN_POINT`, `DIRECTION`, etc.
+//! Parses ISO 10303-21 files and reconstructs B-Rep topology from
+//! `MANIFOLD_SOLID_BREP` / `BREP_WITH_VOIDS`, `CLOSED_SHELL`,
+//! `ADVANCED_FACE`, `EDGE_CURVE` and the analytic and NURBS geometry they
+//! reference.
+//!
+//! # Schema tolerance
+//!
+//! The `FILE_SCHEMA` declaration is not consulted. AP203
+//! (`CONFIG_CONTROL_DESIGN`), AP214 (`AUTOMOTIVE_DESIGN`, including the
+//! `AUTOMOTIVE_DESIGN { 1 0 10303 214 … }` object-identifier form) and AP242
+//! (`AP242_MANAGED_MODEL_BASED_3D_ENGINEERING`) all express solid geometry
+//! with the same ISO 10303-42 entities, which are what this reader consumes.
+//! Dispatching on the schema string would reject files whose geometry is
+//! perfectly readable, so entity support is decided per entity: anything
+//! genuinely unhandled fails with [`IoError::UnsupportedEntity`] naming it.
+//! The writer continues to emit AP203.
 
 use std::collections::HashMap;
 
@@ -1770,6 +1782,58 @@ mod tests {
         let mut topo = Topology::new();
         let result = read_step("ISO-10303-21;\nHEADER;\nENDSEC;\n", &mut topo);
         assert!(result.is_err());
+    }
+
+    // ── Schema tolerance ───────────────────────────────────────────
+
+    /// Files declaring AP214 or AP242 import exactly like the AP203 the
+    /// writer emits.
+    ///
+    /// All three application protocols carry solid geometry as the same
+    /// ISO 10303-42 entities, so the schema string says nothing about
+    /// whether this reader can read the file. OpenZCAD's own exporter writes
+    /// `AUTOMOTIVE_DESIGN`, so refusing AP214 would reject its round trips.
+    #[test]
+    fn ap214_and_ap242_schemas_import_like_ap203() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 2.0, 3.0, 4.0).unwrap();
+        let ap203 = writer::write_step(&write_topo, &[solid]).unwrap();
+        assert!(
+            ap203.contains("FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));"),
+            "the writer must keep emitting AP203"
+        );
+
+        let baseline_volume = {
+            let mut topo = Topology::new();
+            let solids = read_step(&ap203, &mut topo).unwrap();
+            brepkit_operations::measure::solid_volume(&topo, solids[0], 0.01).unwrap()
+        };
+        assert!((baseline_volume - 24.0).abs() < 1e-9, "{baseline_volume}");
+
+        for schema in [
+            "AUTOMOTIVE_DESIGN",
+            "AUTOMOTIVE_DESIGN_CC2",
+            "AUTOMOTIVE_DESIGN { 1 0 10303 214 1 1 1 1 }",
+            "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING",
+            "AP242_MANAGED_MODEL_BASED_3D_ENGINEERING_MIM_LF { 1 0 10303 442 3 1 4 }",
+        ] {
+            let swapped = ap203.replace(
+                "FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));",
+                &format!("FILE_SCHEMA(('{schema}'));"),
+            );
+            assert!(swapped.contains(schema), "schema swap failed for {schema}");
+
+            let mut topo = Topology::new();
+            let solids = read_step(&swapped, &mut topo)
+                .unwrap_or_else(|e| panic!("schema `{schema}` should import: {e}"));
+            assert_eq!(solids.len(), 1, "schema {schema}");
+            let volume = brepkit_operations::measure::solid_volume(&topo, solids[0], 0.01).unwrap();
+            assert!(
+                (volume - baseline_volume).abs() < 1e-9,
+                "schema {schema} changed the imported solid: {volume} vs {baseline_volume}"
+            );
+        }
     }
 
     #[test]
