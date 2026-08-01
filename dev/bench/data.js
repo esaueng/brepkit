@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785574250285,
+  "lastUpdate": 1785574807809,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2699,6 +2699,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21917988,
             "range": "± 28484",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2d0b76ffb7a55898766ddc35534816bbbb6bf892",
+          "message": "fix(fillet): emit straight-edge plane-to-plane blends as exact cylinders (#40)\n\n* fix(tessellate): triangulate non-planar faces in a square parameter box\n\n`tessellate_nonplanar_cdt` inserted its points in raw (u, v). For a\ncylinder or cone that mixes units — an angle across, a length along — so\na 90-degree blend wall 39.5 mm tall lands in a 1.57 x 39.5 box, a 25:1\nsliver, and the incremental Delaunay insertion loses triangles on it.\nThe wall above meshed to 181.6 mm2 against its own exact 186.1, and the\nsolid it bounded then measured about 0.1% light: on a filleted L-blank,\n43.9 mm3 removed where the true figure is 33.9.\n\nScale the long parameter axis down to the short one's length before\ninserting, and scale back when reading vertices out. A triangulation is\naffine-invariant in its topology, so nothing else about the result\nchanges — the same boundary points, the same interior samples, the same\nconstraints, evaluated on the same surface.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(fillet): emit straight-edge plane-to-plane blends as exact cylinders\n\nA constant-radius fillet along a STRAIGHT edge between two planes is a\nportion of a right circular cylinder, exactly. The rolling-ball rebuild\nemitted a NURBS stripe for it instead, and since #38 taught that path to\ncarry holed caps it is now the path a drilled, face-unified body takes —\nso OpenZCAD's \"Mounting Bracket\" demo went from 8 cylinders + 0 b-splines\nto 4 + 8, its four corner blends arriving as eight NURBS patches.\n\nThat is a real loss. A b-spline face drops out of the analytic volume\nand boolean fast paths, exports as a B_SPLINE_SURFACE rather than a\nCYLINDRICAL_SURFACE, and — because OpenZCAD's topology identity scheme\n(ADR-011/ADR-013) fingerprints analytic faces but fails closed on\nb-splines — stops resolving the feature references a user's later edits\nhang off. The geometry was never wrong: the patches sat on the exact\nr=3 cylinders to 3e-14. Only the representation was.\n\nPhase 4 now reconstructs that cylinder and emits a `CylindricalFace`,\nbut only when the reconstruction carries all four stripe corners. That\nguard keeps the swap purely representational: a stripe whose sampled\ngeometry is not exactly this cylinder — a non-right dihedral, whose\ncontacts this engine places at `radius` rather than `radius / tan(t/2)`;\na G1 junction whose ends were snapped to a neighbour — keeps the NURBS\nform it had, unchanged. The wire is wound to the cylinder's own normal\nrather than the grid normal the NURBS stripe induced, or half the\nstripes read as inconsistently oriented against their neighbours.\n\n`assemble_solid_mixed` gains an ordering rule to match: a copied face\nwhose outer wire is REBUILT (a blend-trimmed holed cap) is materialised\nAFTER the arc-minting specs, so it picks up the stripe's end arcs\ninstead of minting chords across them — which flattened the blend into a\nchamfer wherever it met such a cap.\n\nResult on the bracket: 9 planes + 8 cylinders + 0 b-splines, one face\nper filleted corner, matching the census from before #38. A plain box\ncorner chain, which was b-splines before #38 too, now comes out\nanalytic as well.\n\nFour tests asserted the b-spline result as a proxy for \"the blend face\".\nThey now name it by the cylinder it is, which is the stronger assertion.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T03:57:36-05:00",
+          "tree_id": "fe6940abdae3b825eee342a669db0827735ced3e",
+          "url": "https://github.com/esaueng/brepkit/commit/2d0b76ffb7a55898766ddc35534816bbbb6bf892"
+        },
+        "date": 1785574807241,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 835580,
+            "range": "± 3977",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 922339,
+            "range": "± 1837",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13069,
+            "range": "± 27",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 685974,
+            "range": "± 1320",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22098285,
+            "range": "± 90607",
             "unit": "ns/iter"
           }
         ]
