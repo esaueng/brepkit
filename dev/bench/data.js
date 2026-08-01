@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785581878424,
+  "lastUpdate": 1785582443544,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2915,6 +2915,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21986433,
             "range": "± 89540",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "80e78f35fcb1e70432d357a62f70895d2dc4878c",
+          "message": "fix(blend): the corner patch was inside out, and the binding returned a silent subset (#44)\n\nThree defects, all in selections that involve a VERTEX. Single edges and\nparallel pairs were exact and stay exact.\n\n1. Corner blends \"over-removed\" material — 147 % on a corner chain, 259 %\n   on a top perimeter. Nothing was over-cut: the corner patch was emitted\n   INSIDE OUT. Its outward reference was \"away from the original vertex\",\n   which is backwards on a convex corner — rounding it removes the vertex,\n   so the vertex ends up outside the new surface and outward points toward\n   it. The shell still closed, so the divergence-theorem volume integral\n   simply counted that face with the wrong sign. Oriented against the\n   corner ball's centre instead, the way the rational fallback already did.\n\n   The two-edge corner is now the EXACT pair of faces a rolling ball\n   leaves: the octant of the corner ball (the same spherical patch the\n   three-edge corner uses) plus the planar ledge the still-sharp third edge\n   runs out onto, one radius in from the shared face. It replaces one patch\n   that approximated both. A plain box now matches the closed form\n   r²(1−π/4)·Σ(Lᵢ − r·kᵢ) + r³(1−π/6)·corners to quadrature.\n\n2. The corner-chain mesh carried 56 inconsistently wound edges while\n   `validate_solid` reported none — wire winding against face normal is\n   only a Warning there. Same root cause; the count is now zero, and the\n   three-edge corner's ShellOrientationConsistent errors go with it.\n\n3. `fillet` retried on the PLANAR SUBSET of a failing selection and\n   returned that subset's solid as the answer. A plate's top perimeter\n   picked with its bore rim came back byte-identical to the perimeter-only\n   result: fresh valid handle, plausible volume, no error — and the rim,\n   which rounds fine alone, missing. The retry still runs but its solid is\n   never the answer; a strict subset is now `edges-not-blended`, naming the\n   edges. The rolling-ball engine gets the same postcondition: every\n   `continue` in its strip loop used to drop an edge and assemble anyway.\n\n`measure`'s per-face volume path integrates a sphere face over the [u]x[v]\nbox its wire spans, which is the patch only for a latitude band; a corner\nball fills a quarter of that box. Bodies with a hole route through that\npath, so a drilled plate's corner fillets read as removing half of what the\nundrilled plate's removed. Such solids now take the watertight whole-solid\nmesh, as NURBS-bearing ones already did.\n\n\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T06:04:57-05:00",
+          "tree_id": "7ff4835c15df85fe4dae9ca2a55bdee83179bb96",
+          "url": "https://github.com/esaueng/brepkit/commit/80e78f35fcb1e70432d357a62f70895d2dc4878c"
+        },
+        "date": 1785582443107,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 831126,
+            "range": "± 1432",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 920681,
+            "range": "± 18309",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12927,
+            "range": "± 30",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 684977,
+            "range": "± 1676",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21811385,
+            "range": "± 38486",
             "unit": "ns/iter"
           }
         ]
