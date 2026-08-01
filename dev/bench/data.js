@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785582443544,
+  "lastUpdate": 1785583751141,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2969,6 +2969,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21811385,
             "range": "± 38486",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "be781ee466cd319b9258990844a6ed3ec9864055",
+          "message": "fix(operations): split must cut the topology, not the vertex positions (#45)\n\nsplit filled every hole, dropped face orientation, returned two invalid\nhalves, and invented material: an 80x60x6 plate with four bores split clear\nof them summed to 29328.684 against an input of 27593.628.\n\nThe split is now topological rather than positional. Every edge is classified\nby the exact extent of its own curve, and crossed edges are split once so two\nfaces meeting along a cut edge still meet along it. A face wholly on one side\nkeeps its exact surface, orientation and inner wires; a trimmed face is closed\nby the curve the plane actually cut; the cap traverses those same curves the\nother way, so a rim enclosed by the section becomes a hole in the cap rather\nthan a second circle lying on it.\n\nBoth halves must pass strict validate_solid, enclose positive finite volume,\nand sum to the input at 1e-9 relative. Cases that previously returned invalid\nsolids are now typed Unsupported refusals that leave the body untouched.\n\nCorrects #41's audit, which classified the cut cap at split.rs:130/136 as\ncorrect as-is. Newly minted geometry cannot inherit a source face's holes, but\nit must acquire its own where the plane crosses a bore, and the angular-sort\nconstruction could not express that — it produced a self-intersecting 12-gon.\n\nLast of four after #39 (defeature), #41 (draft) and #43 (chamfer).",
+          "timestamp": "2026-08-01T06:26:50-05:00",
+          "tree_id": "3ff268d78e1490f01c336d15a30e63be5765074d",
+          "url": "https://github.com/esaueng/brepkit/commit/be781ee466cd319b9258990844a6ed3ec9864055"
+        },
+        "date": 1785583750368,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 825610,
+            "range": "± 1136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 914330,
+            "range": "± 12527",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13529,
+            "range": "± 31",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 687131,
+            "range": "± 958",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21688495,
+            "range": "± 273723",
             "unit": "ns/iter"
           }
         ]
