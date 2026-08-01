@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785607857815,
+  "lastUpdate": 1785609630564,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3347,6 +3347,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22914122,
             "range": "± 38235",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6d9e45b0753653b2443630fd8a4bb794f15f3c9a",
+          "message": "fix(operations): a sweep asked for round corners got smooth ones instead (#52)\n\nSweepCornerMode::Round was declared, accepted and ignored. The dispatch matched\nonly Miter, so Round fell through to the ordinary smooth sweep — not to Miter,\nto Smooth, byte-identical. On an L path with two 5-unit legs and a unit square\nprofile: Smooth 9.166667 over 26 faces, Miter 10.0 over 34, Round 9.166667 over\n26. A corner that is neither mitered nor rounded, the ring at the kink swung\nonto the outgoing tangent and a wedge of material lost with it — in a valid,\nwatertight solid that validated clean, so nothing downstream could tell.\n\nRound now rounds. Each kink becomes a circular arc tangent to both adjacent\npath directions, with the profile carried around by rigid rotation about the\narc axis, which is the exact rotation-minimizing frame for a planar arc. A\nradius-1 circular profile on a radius-2 corner with 5-unit legs is two cylinders\nplus a torus quadrant, 2 pi r^2 (leg - R) + pi^2 R r^2 / 2 = 28.719160; the\nbuilt solid measures 28.669092, where an inscribed 64-gon profile and a 32-ring\nchorded quadrant put it. Inner wires go round the corner with the outer\nboundary.\n\nThe radius lives on the variant, Round { radius }, because there is no\ndefensible default and a mode that cannot be requested without one cannot be\nrequested wrongly. Every unbuildable corner is a typed Unsupported naming the\nreason rather than a silent switch to another mode — the defect class of #44.\nThe wasm binding takes \"round:2.5\"; a bare \"round\" is rejected rather than swept\nsmooth.\n\nSecond: the inner-wire TODO on tessellate_analytic_with_boundary claimed\nignoring holes was safe because the holed sub-face is discarded by\nclassification. Both halves are false. That function is unreachable with a holed\nface — instrumented across the whole operations suite, zero hits — but the\ndefect is real one branch over, on the analytic grid. A cross-drilled shaft\nrenders as an undrilled one: the wall's two bore rims are paved over, 565.179228\nrendered against a true 493.486678, and each bore lobe is a quadric bounded by\none closed edge yielding zero triangles by the same collapsed-uv route #49 found\nin the integrator. The mesh reports watertight because the hole is filled and\nthe walls are absent.\n\nNot fixed here, deliberately. A prototype constraining holes out in uv produced\na correct per-face wall but the solid pipeline welds at display deflection while\nellipse rims sample on the curvature floor, collapsing 1633 triangles to 31 and\ntaking solid volume from 831.109 to 249.935 against a true 704.230 — worse than\nleaving it. A correct fix changes three subsystems together. What lands is the\nrecord: the false comment replaced with what is true of that function and why,\nthe routing predicate extracted so a test can assert it, and an ignored test\ncarrying the closed form and the measured 565.179 that fires the day someone\nfixes it.",
+          "timestamp": "2026-08-01T13:37:53-05:00",
+          "tree_id": "e7d1b2b4c81f4b65211661e12a3b431ab02f8787",
+          "url": "https://github.com/esaueng/brepkit/commit/6d9e45b0753653b2443630fd8a4bb794f15f3c9a"
+        },
+        "date": 1785609629656,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 834951,
+            "range": "± 897",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 924202,
+            "range": "± 12940",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12738,
+            "range": "± 21",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 692049,
+            "range": "± 5964",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22489973,
+            "range": "± 77650",
             "unit": "ns/iter"
           }
         ]
