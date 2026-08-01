@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785574807809,
+  "lastUpdate": 1785577191826,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2753,6 +2753,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22098285,
             "range": "± 90607",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1f52d5e3e3b40df24b62a099c694352039b8a621",
+          "message": "fix(operations): draft must close the shell it opens, and keep the holes (#41)\n\n`draft` rebuilt every face of the solid from a list of outer-wire vertex\npositions and passed `inner_wires: vec![]` for all of them. Any face\ncarrying an inner wire — a through bore's mouth, a pocket opening, a bore\nrim — came back solid: the walls kept their rims but nothing referenced\nthem, and the drafted body silently gained the material the holes had\nremoved. Drafting a two-bore plate returned a plate with no bores.\n\nThe same rebuild also left the neighbours of a drafted face at their\noriginal corners while the drafted face's corners moved, so the shell did\nnot close at all: a 5 degree draft on a plain unit cube came back with six\nboundary edges and V-E+F = 1. Nothing checked, because `draft` returned\nwhatever the assembler produced.\n\nThis is the defect that made `defeature` lose the second bore of a\ntwo-bore plate, and it is the class this repo cannot ship: a confident,\nwell-formed, wrong solid.\n\nThe taper is now defined as an affine map — a point of a drafted face is\ndisplaced along that face's outward normal by its height above the neutral\nplane times tan(angle) — so a drafted planar face stays planar and its new\nplane is exact. Each corner it shares with a neighbour is relocated to the\nintersection of the planes meeting there, drafted faces contributing their\nnew planes, so the neighbours are re-trimmed against the taper instead of\nbeing left behind.\n\nFaces the draft does not move now travel as `FaceSpec::Existing`, which\ncarries the surface, the curved edges and every inner wire through\nverbatim. A face the draft does move gets a replacement outer wire and\nstill copies its inner wires. Anything that cannot be built exactly is\nrefused with `OperationsError::Unsupported` naming why: a drafted face\nthat carries an inner wire, a drafted face on the parting plane, a corner\nthat also lies on a curved face or on fewer than three distinct planes, a\nwire that would have to be rebuilt from chords but carries a curved edge,\na corner that would leave its own face's plane or travel implausibly far.\n\nEvery result is gated on strict `validate_solid` plus a positive-volume\ncheck before it is returned; a result that fails either is reported as a\nrefusal rather than handed back.\n\nAdds `OperationsError::Unsupported { operation, reason }` so a refusal is\ndistinguishable from bad arguments without matching on message text.\n\n\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T04:37:33-05:00",
+          "tree_id": "58130d2ce29539dc0ff394d0a7234c5f125acad3",
+          "url": "https://github.com/esaueng/brepkit/commit/1f52d5e3e3b40df24b62a099c694352039b8a621"
+        },
+        "date": 1785577191226,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 835013,
+            "range": "± 3761",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 922134,
+            "range": "± 1590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12865,
+            "range": "± 14",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 685652,
+            "range": "± 25611",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21825272,
+            "range": "± 81019",
             "unit": "ns/iter"
           }
         ]
