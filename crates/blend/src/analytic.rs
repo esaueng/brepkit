@@ -735,10 +735,11 @@ pub fn plane_cylinder_fillet(
     //    the plate's own boundary and its thickness, which the rim assembler
     //    checks against the actual face.
     //
-    //    Inward (major = `r_c − r`): the ball has to fit inside the cylinder,
-    //    which is exactly `r < r_c`. That is the ONLY bound — the ball's centre
-    //    circle has radius `r_c − r`, so at `r = r_c` it collapses onto the
-    //    axis and there is no ball left to roll.
+    //    Inward and CONVEX (major = `r_c − r`: a bare disc cap's own rim): the
+    //    ball has to fit inside the cylinder, which is exactly `r < r_c`. That
+    //    is the ONLY bound — the ball's centre circle has radius `r_c − r`, so
+    //    at `r = r_c` it collapses onto the axis and there is no ball left to
+    //    roll.
     //
     //    The old bound here was `r ≤ r_c/2`, on the grounds that `r > r_c/2`
     //    makes the carrier torus a horn (`R = r`) or spindle (`R < r`) — which
@@ -760,6 +761,16 @@ pub fn plane_cylinder_fillet(
     //    a cap whose radius is under the vertex tolerance is not a face, and
     //    emitting one produces a body that passes every topological check and
     //    tessellates into degenerate triangles.
+    //
+    //    Inward and CONCAVE (the flat bottom of a blind hole) shares all of
+    //    that geometry, and the argument above applies to it unchanged — but it
+    //    KEEPS the `r_c/2` bound, because the rim assembly is independently
+    //    wrong for it and the old bound is the only thing limiting how far the
+    //    wrongness reaches. An r = 3 blind hole rounded at r = 1 loses 7.93 of
+    //    volume where a concave blend must ADD 3.74, and the result passes the
+    //    closed-shell, Euler and blend-volume-budget checks. That defect
+    //    predates this bound and wants its own lane; widening here would only
+    //    hand it more radii to be wrong at.
     if radius <= tol_lin {
         return Ok(None);
     }
@@ -767,8 +778,16 @@ pub fn plane_cylinder_fillet(
         let tol = brepkit_math::tolerance::Tolerance::new();
         tol.linear.max(tol.relative * r_c)
     };
-    if radius >= if inward { r_c - cap_floor } else { r_c } {
-        if !inward {
+    let inward_convex = inward && convex;
+    let max_radius = if inward_convex {
+        r_c - cap_floor
+    } else if inward {
+        r_c * 0.5
+    } else {
+        r_c
+    };
+    if radius >= max_radius {
+        if !inward_convex {
             return Ok(None);
         }
         // No engine below can fit a ball that does not fit, so this is a
