@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785592469040,
+  "lastUpdate": 1785607281383,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3239,6 +3239,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22191113,
             "range": "± 138413",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6fea2279b7e114e2c82ab95c2579b008705420f1",
+          "message": "fix(operations): face provenance changed answer with the modelling unit, and most operations had none (#51)\n\nA body's face provenance depended on the unit it was modelled in, and the two\nbuckets that matter most — \"this face survived as that one\" and \"this face is\ngone\" — could swap places with nothing reporting a problem. OpenZCAD stores user\nface picks against this map, so a wrong answer relocates a saved selection onto\ndifferent geometry. Its identity scheme is deliberately fail-closed; this map\nwas the one place that failed open.\n\nbuild_evolution_by_geometry gated candidates on centroid_dist_sq_max = 100.0, an\nabsolute number in whatever units the caller modelled in, and UnitSystem\nincludes metres. Two 10-cubes overlapping by 4, fused: at 1x the map is right;\nat 1000x nothing matched and four faces that SURVIVE the fuse were reported\ndeleted; at 0.001x the budget swallowed the body and the two walls the fuse\nCONSUMES were reported as modified into the far outer end caps of the other\nbody, with deleted empty so nothing signalled it. The budget is now a fraction\nof the diagonal of the box containing the faces' own centroids, making the score\ndimensionless. 1x answers are unchanged.\n\nscore_tol accepted every near-tie as an origin of the same output. That is right\nfor two coplanar halves of one wall and wrong otherwise. Multiple candidates are\nnow accepted only when they are pieces of one surface; otherwise the output goes\nto a new `unresolved` bucket naming the candidates, and no modified entry is\nwritten. This caught a live case: a box-edge fillet's blend face sits on neither\nof the planes the rounded edge separated, and was recorded as a modified version\nof BOTH — so a selection stored against either silently acquired a face the user\nnever picked.\n\nOnly booleans produced a map at all. The blend builders already held exact\nprovenance and discarded it — face_replacements is the input-to-trimmed-face\nmap, original_faces minus touched_faces is what was left alone, and every stripe\nnames the two base faces its band was built between. Patterns correspond by\nconstruction, and geometric matching could not tell congruent instances apart\neven in principle. Both now report construction-derived records, checked against\nthe result shell rather than trusted: a result face the record does not name is\nreported unresolved, so a record that drifts from its assembler produces a\nrefusal rather than a confident half-answer.\n\nEvolutionMap::origin is construction or geometry, so a consumer can tell fact\nfrom inference before binding a persistent reference. Offset, shell, draft,\nsplit, defeature and the direct edits still produce none, and fillet_by_feature\ndoes not compose its steps' records — each is stated rather than papered over.\n\nThe stability matrix row stays Beta with its scope widened, not promoted. The\nevidence supports exact for three operation families and fail-closed elsewhere;\nit does not support stable, which would imply coverage six operations lack.",
+          "timestamp": "2026-08-01T12:58:34-05:00",
+          "tree_id": "05581f016caaa5c8b5b4332994958933ec550606",
+          "url": "https://github.com/esaueng/brepkit/commit/6fea2279b7e114e2c82ab95c2579b008705420f1"
+        },
+        "date": 1785607280652,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 836265,
+            "range": "± 2673",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 927450,
+            "range": "± 2703",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12676,
+            "range": "± 61",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 690689,
+            "range": "± 1863",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21914770,
+            "range": "± 25901",
             "unit": "ns/iter"
           }
         ]
