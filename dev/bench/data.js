@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785615185616,
+  "lastUpdate": 1785615331756,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3509,6 +3509,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22191216,
             "range": "± 95490",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bd37ed455afae902c17f5fef4e50d76bfdc94383",
+          "message": "A boss crossing a wall lost its cylinder; a tangent one lost the whole operand (#55)\n\nA cylindrical face crossing or touching a planar face of the other operand\nmade the boolean silently wrong. Every result was a well-formed solid\nvalidate_solid accepts, just not the right one -- and two of the three\nfailures produce NO approximation at all, since a dropped operand and an\nignored cut are simply less geometry.\n\nOn a 60x40x8 plate with an r=10 h=16 boss, at exact tangency `fuseAll`\nreturned 6 planes -- the plate alone, the boss dropped entirely, -11.57% --\nand `cut` returned the same 6 planes with the cut ignored, +15.06%. Every\ncrossing depth from -1e-7 to past the full radius came back faceted, with\nthe cylinder gone. All crossing depths are now analytic and exact to better\nthan 1e-9 relative.\n\nThree symptoms, two causes, and neither is where the shape of the failure\nsuggests. It is NOT the intersection: plane_cylinder_parallel_lines computes\nthe section correctly. The failures are downstream in how the band is split.\n\n- A section crossing the face seam measured its own complement.\n  uv_endpoints_from_pcurve projected the far endpoint through project_point,\n  which normalises u into [0, 2pi), while the pcurve was fitted through\n  unwrapped samples. The major arc came back as a 3.459 rad sweep the wrong\n  way instead of 2.824 rad the right way.\n- The band arrangement assumed the seam sits on kept material. A crossing\n  boss buries its seam meridian and keeps the sliver, so the notch was taken\n  out of the complementary sector and the buried strip stayed in the result.\n  The side is now read off the floor/ceiling ring arcs, because they ARE the\n  cut.\n- Tangency is a different animal and the acceptance gate could not see it:\n  the union has a pinch vertex the splitter does not build, so the boss wall\n  was excised as a slit and its cap dropped as an orphan shell. The gate now\n  also checks that a result accounts for its operands.\n\nVerified by sweeping the boss across the wall rather than placing it once --\n8 depths for the analytic assertions, 13 for the bounded ones, spanning\nseven orders of magnitude of overlap -- against a closed form composed from\nthe construction's own dimensions, plus the conservation identity\nvol(A u B) - vol(A - B) = vol(B), which is exactly what a dropped operand\nbreaks. Analytic survival is asserted by cylinder count, because\nwatertight-with-the-right-volume passes for a faceted body too.\n\nFound and deliberately not fixed: exact tangency still falls back to the\napproximate path at 0.02% (now fail-safe rather than silently returning an\noperand); a sliver-crossing fuse also falls back; and merge_duplicate_edges\ngroups edges by quantised endpoint pair alone, so the two complementary arcs\nof one circle are treated as the same edge. A midpoint discriminant fixes\nthat and regresses a drill straddling a wall, because a Circle edge stored\nwith reversed vertices denotes the complementary arc under\ndomain_with_endpoints' CCW convention -- arc identity has to stop depending\non that convention first.\n\nAlso exposed: face_integrator derives a face's parameter window from the\nouter wire's vertices and its seam unwrap always takes the step under half a\nperiod, so a quadric sector wider than pi reads as its own complement -- a\n240 degree tab reads 4.3% light through both mass_properties and any\nanalytic-routed solid_volume. Attempted and reverted rather than\nhalf-landed, since the error merely relocates into build_face_uv and\nface_polygon shares the blind spot.",
+          "timestamp": "2026-08-01T15:10:33-05:00",
+          "tree_id": "9b8d7f1938d33be7b98fc3a2ed8c7638917faf82",
+          "url": "https://github.com/esaueng/brepkit/commit/bd37ed455afae902c17f5fef4e50d76bfdc94383"
+        },
+        "date": 1785615330746,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 845413,
+            "range": "± 3907",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 943648,
+            "range": "± 3859",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12933,
+            "range": "± 583",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 690907,
+            "range": "± 16042",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22703557,
+            "range": "± 239043",
             "unit": "ns/iter"
           }
         ]
