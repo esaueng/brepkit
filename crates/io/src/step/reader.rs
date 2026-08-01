@@ -45,7 +45,14 @@ pub fn read_step_with_limits(
 ) -> Result<Vec<SolidId>, IoError> {
     ensure_input_size(input.len(), limits)?;
     let entities = parse_step_entities(input, limits)?;
-    let units = resolve_unit_scale(&entities)?;
+    // Solid B-Reps are the only thing this reader builds, so they are also
+    // the only consumers of the length factor. A file with none of them
+    // never reads a length-valued value, which is why the missing-unit
+    // refusal below is conditioned on their presence.
+    let has_solids = entities.values().any(is_solid_brep);
+    let Some(units) = resolve_unit_scale(&entities, has_solids)? else {
+        return Ok(Vec::new());
+    };
     let mut builder = StepBuilder::new(topo, &entities, units);
     builder.build_all_solids()
 }
@@ -423,13 +430,24 @@ fn unit_si_factor(
 /// `GEOMETRIC_REPRESENTATION_CONTEXT` and
 /// `GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT`; both shapes are handled.
 ///
+/// `require_length` must be set when the caller is about to read
+/// length-valued geometry. With it set, a file that declares no usable
+/// `LENGTH_UNIT` is refused; with it clear, such a file yields `Ok(None)`,
+/// meaning "no length factor, and none needed". A missing factor is never
+/// defaulted, so no caller can be handed a guess.
+///
 /// # Errors
 ///
-/// Returns a typed [`IoError::ParseError`] when the file declares no length
-/// unit, when a declared unit cannot be interpreted, or when two contexts
-/// disagree. Guessing a length unit would silently scale the whole model, so
-/// an unreadable declaration is refused rather than defaulted.
-fn resolve_unit_scale(entities: &HashMap<u64, StepEntity>) -> Result<UnitScale, IoError> {
+/// Returns a typed [`IoError::ParseError`] when `require_length` is set and
+/// the file declares no length unit, when a declared unit cannot be
+/// interpreted, or when two contexts disagree. Guessing a length unit would
+/// silently scale the whole model, so an unreadable declaration is refused
+/// rather than defaulted — a 25.4x or 1000x error in a part looks entirely
+/// plausible right up until it is machined.
+fn resolve_unit_scale(
+    entities: &HashMap<u64, StepEntity>,
+    require_length: bool,
+) -> Result<Option<UnitScale>, IoError> {
     const MARKER: &str = "GLOBAL_UNIT_ASSIGNED_CONTEXT";
 
     let mut context_ids: Vec<u64> = entities
@@ -497,18 +515,29 @@ fn resolve_unit_scale(entities: &HashMap<u64, StepEntity>) -> Result<UnitScale, 
         }
     }
 
-    let length = length.ok_or_else(|| IoError::ParseError {
-        reason: "STEP file declares no LENGTH_UNIT in a GLOBAL_UNIT_ASSIGNED_CONTEXT; \
-                 the model's length unit is unknown"
-            .to_string(),
-    })?;
+    let Some(length) = length else {
+        if require_length {
+            return Err(IoError::ParseError {
+                reason: "STEP file declares no LENGTH_UNIT in a \
+                         GLOBAL_UNIT_ASSIGNED_CONTEXT; the model's length unit is \
+                         unknown"
+                    .to_string(),
+            });
+        }
+        // Nothing length-valued will be read, so there is no factor to
+        // resolve and nothing that could be silently misscaled. Header-only
+        // and metadata-only files (product structure, colours, an assembly
+        // manifest with no B-Rep) are well formed and must not be rejected
+        // for omitting a unit they never use.
+        return Ok(None);
+    };
 
-    Ok(UnitScale {
+    Ok(Some(UnitScale {
         length,
         // A file that declares no PLANE_ANGLE_UNIT leaves angle measures in
         // the SI base, which is the radian — the only reading available.
         angle: angle.unwrap_or(1.0),
-    })
+    }))
 }
 
 /// Compare two unit conversion factors for practical equality.
@@ -2086,10 +2115,17 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         )
     }
 
+    /// Resolve units the way an import that is about to read geometry does:
+    /// the length unit is mandatory, so a scale always comes back.
+    fn required_unit_scale(entities: &HashMap<u64, StepEntity>) -> Result<UnitScale, IoError> {
+        Ok(resolve_unit_scale(entities, true)?
+            .expect("a required length unit always resolves to a scale"))
+    }
+
     /// Resolve one curve entity through the real parse + dispatch path.
     fn curve_geometry(body: &str, curve_id: u64) -> Result<EdgeCurve, IoError> {
         let entities = parse_step_entities(&step_file(body), ImportLimits::default())?;
-        let units = resolve_unit_scale(&entities)?;
+        let units = required_unit_scale(&entities)?;
         let mut topo = Topology::new();
         let builder = StepBuilder::new(&mut topo, &entities, units);
         builder.build_curve_geometry(curve_id)
@@ -2098,7 +2134,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     /// Resolve one surface entity through the real parse + dispatch path.
     fn surface_geometry(body: &str, surface_id: u64) -> Result<FaceSurface, IoError> {
         let entities = parse_step_entities(&step_file(body), ImportLimits::default())?;
-        let units = resolve_unit_scale(&entities)?;
+        let units = required_unit_scale(&entities)?;
         let mut topo = Topology::new();
         let builder = StepBuilder::new(&mut topo, &entities, units);
         builder.build_surface(surface_id)
@@ -2506,7 +2542,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
 #6 = ( CONVERSION_BASED_UNIT('DEGREE',#5) NAMED_UNIT(#4) PLANE_ANGLE_UNIT() );\n\
 #7 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#3,#6));";
         let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
-        let scale = resolve_unit_scale(&entities).unwrap();
+        let scale = required_unit_scale(&entities).unwrap();
         assert!((scale.length - 25.4).abs() < 1e-12, "{scale:?}");
         assert!(
             (scale.angle - 1.745_329_251_994_33E-2).abs() < 1e-15,
@@ -2528,7 +2564,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
                  #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));"
             );
             let entities = parse_step_entities(&step_file(&body), ImportLimits::default()).unwrap();
-            let scale = resolve_unit_scale(&entities).unwrap();
+            let scale = required_unit_scale(&entities).unwrap();
             assert!(
                 (scale.length - expected_mm).abs() <= 1e-9 * expected_mm,
                 "{prefix} should scale to {expected_mm} mm, got {}",
@@ -2546,9 +2582,88 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         let body = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
                     #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT(());";
         let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
-        let err = resolve_unit_scale(&entities).unwrap_err();
+        let err = required_unit_scale(&entities).unwrap_err();
         assert!(
             err.to_string().contains("declares no LENGTH_UNIT"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// A file that carries geometry but declares no length unit is refused,
+    /// end to end through the public entry point.
+    ///
+    /// The alternative — assuming millimetres — would import a metre-authored
+    /// part 1000x too small and every downstream measurement, boolean and
+    /// toolpath would look entirely reasonable. There is no in-band signal
+    /// that would let a caller distinguish that from a correct import, so the
+    /// only safe answer is a typed refusal.
+    #[test]
+    fn geometry_without_a_declared_length_unit_is_refused() {
+        let mut topo = Topology::new();
+        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let step_str = writer::write_step(&topo, &[solid]).unwrap();
+
+        // Strip the unit declarations the writer emits, leaving the B-Rep.
+        let stripped: String = step_str
+            .lines()
+            .filter(|l| !l.contains("_UNIT(") && !l.contains("GLOBAL_UNIT_ASSIGNED_CONTEXT"))
+            .fold(String::new(), |mut acc, l| {
+                let _ = writeln!(acc, "{l}");
+                acc
+            });
+        assert!(stripped.contains("MANIFOLD_SOLID_BREP("));
+
+        let mut read_topo = Topology::new();
+        let err = read_step(&stripped, &mut read_topo).unwrap_err();
+        assert!(
+            matches!(err, IoError::ParseError { .. }),
+            "expected a typed parse error, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("declares no LENGTH_UNIT"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// A file with no unit declaration *and* no solid B-Rep imports cleanly
+    /// as zero solids rather than being refused.
+    ///
+    /// Product-structure-only and metadata-only STEP files are well formed
+    /// and common (OpenZCAD ships one as a fixture). Nothing in such a file
+    /// is length-valued, so there is no factor to apply and no way for a
+    /// missing declaration to produce a wrong answer — the refusal above
+    /// protects a quantity that is not present here.
+    #[test]
+    fn metadata_only_file_without_units_imports_as_no_solids() {
+        let step_str = "ISO-10303-21;\nHEADER;\n\
+             FILE_DESCRIPTION(('OpenZCAD sample'),'2;1');\n\
+             FILE_NAME('simple-assembly.step','2026-04-12T00:00:00',(''),(''),'','','');\n\
+             FILE_SCHEMA(('AUTOMOTIVE_DESIGN_CC2'));\nENDSEC;\nDATA;\n\
+             #10 = PRODUCT('Simple Block','Simple Block','',(#20));\n\
+             #20 = PRODUCT_CONTEXT('',#30,'mechanical');\n\
+             #30 = APPLICATION_CONTEXT('configuration controlled 3d designs');\n\
+             #40 = COLOUR_RGB('SampleColor',0.9,0.6,0.2);\n\
+             ENDSEC;\nEND-ISO-10303-21;\n";
+
+        let mut topo = Topology::new();
+        let solids = read_step(step_str, &mut topo).unwrap();
+        assert!(
+            solids.is_empty(),
+            "a file with no B-Rep should import as no solids"
+        );
+    }
+
+    /// The same relaxation must not extend to a declaration that is present
+    /// but broken: that is positive evidence of a malformed file, and it is
+    /// still refused even with no geometry to scale.
+    #[test]
+    fn broken_unit_declaration_is_refused_even_without_geometry() {
+        let body = "#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.FURLONG.,.METRE.) );\n\
+                    #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let err = resolve_unit_scale(&entities, false).unwrap_err();
+        assert!(
+            err.to_string().contains("unrecognised prefix"),
             "unexpected error: {err}"
         );
     }
@@ -2561,7 +2676,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
 #3 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));\n\
 #4 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#2));";
         let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
-        let err = resolve_unit_scale(&entities).unwrap_err();
+        let err = required_unit_scale(&entities).unwrap_err();
         assert!(
             err.to_string().contains("conflicting length units"),
             "unexpected error: {err}"
@@ -2573,7 +2688,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         let body = "#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.FURLONG.,.METRE.) );\n\
                     #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
         let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
-        let err = resolve_unit_scale(&entities).unwrap_err();
+        let err = required_unit_scale(&entities).unwrap_err();
         assert!(
             err.to_string().contains("unrecognised prefix"),
             "unexpected error: {err}"
@@ -2585,7 +2700,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         let body = "#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT($,.GRAM.) );\n\
                     #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
         let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
-        let err = resolve_unit_scale(&entities).unwrap_err();
+        let err = required_unit_scale(&entities).unwrap_err();
         assert!(
             err.to_string().contains("expected `.METRE.`"),
             "unexpected error: {err}"
@@ -2599,7 +2714,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
 #2 = LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(2.),#1);\n\
 #3 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
         let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
-        let err = resolve_unit_scale(&entities).unwrap_err();
+        let err = required_unit_scale(&entities).unwrap_err();
         assert!(
             err.to_string().contains("cyclic unit reference"),
             "unexpected error: {err}"
