@@ -203,6 +203,14 @@ fn parse_entity_id(s: &str) -> Option<u64> {
 
 // ── Building ────────────────────────────────────────────────────────
 
+/// Maximum number of curve-to-curve indirections (`SURFACE_CURVE`,
+/// `TRIMMED_CURVE`, …) followed before the file is rejected as cyclic.
+///
+/// Real files nest at most two levels; the bound exists so a malformed or
+/// hostile file terminates with a typed error rather than overflowing the
+/// stack (which, in the wasm build, aborts the module).
+const MAX_CURVE_INDIRECTION: u32 = 32;
+
 /// Reconstructs topology from parsed STEP entities.
 struct StepBuilder<'a> {
     topo: &'a mut Topology,
@@ -494,13 +502,47 @@ impl<'a> StepBuilder<'a> {
     /// Build the curve geometry for an edge from a curve entity reference.
     ///
     /// Dispatches on the entity type: LINE, CIRCLE, ELLIPSE,
-    /// `B_SPLINE_CURVE_WITH_KNOTS`.
+    /// `B_SPLINE_CURVE_WITH_KNOTS`, and the `SURFACE_CURVE` family
+    /// (`SURFACE_CURVE`, `SEAM_CURVE`, `INTERSECTION_CURVE`) which wrap a
+    /// 3-D curve alongside its parametric (pcurve) representations.
     fn build_curve_geometry(&self, curve_ref: u64) -> Result<EdgeCurve, IoError> {
+        self.build_curve_geometry_at(curve_ref, 0)
+    }
+
+    /// Build curve geometry, tracking how many wrapper entities have been
+    /// unwrapped so a cyclic reference chain terminates with a typed error
+    /// instead of overflowing the stack.
+    fn build_curve_geometry_at(&self, curve_ref: u64, depth: u32) -> Result<EdgeCurve, IoError> {
+        if depth > MAX_CURVE_INDIRECTION {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "curve reference chain at #{curve_ref} exceeded \
+                     {MAX_CURVE_INDIRECTION} levels (cyclic curve reference?)"
+                ),
+            });
+        }
         let entity = self.get_entity(curve_ref)?;
         let entity_type = entity.entity_type.clone();
         let attrs = entity.attrs.clone();
 
         match entity_type.as_str() {
+            // SURFACE_CURVE('name', #curve_3d, (#pcurve_or_surface, ...), .PCURVE_S1.)
+            // SEAM_CURVE and INTERSECTION_CURVE are subtypes with the same
+            // attribute layout. The first reference is the 3-D curve; the
+            // pcurve list is a redundant parametric representation that this
+            // reader does not model, so it is not consulted.
+            "SURFACE_CURVE" | "SEAM_CURVE" | "INTERSECTION_CURVE" => {
+                let basis =
+                    parse_refs(&attrs)
+                        .first()
+                        .copied()
+                        .ok_or_else(|| IoError::ParseError {
+                            reason: format!(
+                                "{entity_type} #{curve_ref} missing its 3-D curve reference"
+                            ),
+                        })?;
+                self.build_curve_geometry_at(basis, depth + 1)
+            }
             "LINE" => Ok(EdgeCurve::Line),
             "CIRCLE" => {
                 let refs = parse_refs(&attrs);
@@ -1126,7 +1168,9 @@ fn parse_bspline_curve_attrs(attrs: &str) -> Option<(usize, Vec<u64>, Vec<u32>, 
 
 #[cfg(test)]
 mod tests {
-    #![allow(clippy::unwrap_used, clippy::expect_used)]
+    #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
+
+    use std::fmt::Write as _;
 
     use brepkit_topology::Topology;
     use brepkit_topology::test_utils::make_unit_cube_non_manifold;
@@ -1598,6 +1642,204 @@ mod tests {
         assert!((weights[1] - 0.5).abs() < 1e-10);
         assert!((weights[2] - 0.5).abs() < 1e-10);
         assert!((weights[3] - 1.0).abs() < 1e-10);
+    }
+
+    // ── SURFACE_CURVE family ───────────────────────────────────────
+
+    /// Wrap DATA-section statements in a minimal well-formed STEP file.
+    fn step_file(body: &str) -> String {
+        format!(
+            "ISO-10303-21;\nHEADER;\n\
+             FILE_DESCRIPTION((''),'2;1');\n\
+             FILE_NAME('t','2024-01-01T00:00:00',(''),(''),'','','');\n\
+             FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));\nENDSEC;\nDATA;\n\
+             {body}\nENDSEC;\nEND-ISO-10303-21;\n"
+        )
+    }
+
+    /// Resolve one curve entity through the real parse + dispatch path.
+    fn curve_geometry(body: &str, curve_id: u64) -> Result<EdgeCurve, IoError> {
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default())?;
+        let mut topo = Topology::new();
+        let builder = StepBuilder::new(&mut topo, &entities);
+        builder.build_curve_geometry(curve_id)
+    }
+
+    /// An OCCT-style surface + pcurve tail, referenced by the wrapper's
+    /// `pcurve_or_surface` list. Entity ids 90+.
+    const OCCT_PCURVE_TAIL: &str = "\
+#90 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+#91 = DIRECTION('',(0.,0.,1.));\n\
+#92 = DIRECTION('',(1.,0.,0.));\n\
+#93 = AXIS2_PLACEMENT_3D('',#90,#91,#92);\n\
+#94 = PLANE('',#93);\n";
+
+    #[test]
+    fn surface_curve_resolves_to_wrapped_line() {
+        let body = format!(
+            "#1 = CARTESIAN_POINT('',(1.,2.,3.));\n\
+             #2 = DIRECTION('',(1.,0.,0.));\n\
+             #3 = VECTOR('',#2,1.);\n\
+             #4 = LINE('',#1,#3);\n\
+             #5 = SURFACE_CURVE('',#4,(#94),.PCURVE_S1.);\n{OCCT_PCURVE_TAIL}"
+        );
+        let curve = curve_geometry(&body, 5).unwrap();
+        assert!(matches!(curve, EdgeCurve::Line), "got {curve:?}");
+    }
+
+    #[test]
+    fn surface_curve_resolves_to_wrapped_circle() {
+        let body = format!(
+            "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+             #2 = DIRECTION('',(0.,0.,1.));\n\
+             #3 = DIRECTION('',(1.,0.,0.));\n\
+             #4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+             #5 = CIRCLE('',#4,2.5);\n\
+             #6 = SURFACE_CURVE('',#5,(#94),.PCURVE_S1.);\n{OCCT_PCURVE_TAIL}"
+        );
+        let curve = curve_geometry(&body, 6).unwrap();
+        let EdgeCurve::Circle(circle) = curve else {
+            panic!("expected a circle, got {curve:?}");
+        };
+        assert!((circle.radius() - 2.5).abs() < 1e-12);
+    }
+
+    #[test]
+    fn surface_curve_resolves_to_wrapped_bspline() {
+        let body = format!(
+            "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+             #2 = CARTESIAN_POINT('',(1.,1.,0.));\n\
+             #3 = CARTESIAN_POINT('',(2.,1.,0.));\n\
+             #4 = CARTESIAN_POINT('',(3.,0.,0.));\n\
+             #5 = B_SPLINE_CURVE_WITH_KNOTS('',3,(#1,#2,#3,#4),\
+             .UNSPECIFIED.,.F.,.F.,(4,4),(0.,1.),.UNSPECIFIED.);\n\
+             #6 = SURFACE_CURVE('',#5,(#94),.PCURVE_S1.);\n{OCCT_PCURVE_TAIL}"
+        );
+        let curve = curve_geometry(&body, 6).unwrap();
+        let EdgeCurve::NurbsCurve(nurbs) = curve else {
+            panic!("expected a NURBS curve, got {curve:?}");
+        };
+        assert_eq!(nurbs.degree(), 3);
+        assert_eq!(nurbs.control_points().len(), 4);
+    }
+
+    #[test]
+    fn seam_and_intersection_curves_resolve_like_surface_curve() {
+        for wrapper in ["SEAM_CURVE", "INTERSECTION_CURVE"] {
+            let body = format!(
+                "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                 #2 = DIRECTION('',(0.,0.,1.));\n\
+                 #3 = DIRECTION('',(1.,0.,0.));\n\
+                 #4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+                 #5 = CIRCLE('',#4,4.);\n\
+                 #6 = {wrapper}('',#5,(#94),.PCURVE_S1.);\n{OCCT_PCURVE_TAIL}"
+            );
+            let curve = curve_geometry(&body, 6).unwrap();
+            assert!(
+                matches!(curve, EdgeCurve::Circle(_)),
+                "{wrapper} should resolve to its 3-D circle, got {curve:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn surface_curve_without_basis_reference_is_rejected() {
+        let body = "#1 = SURFACE_CURVE('',$,(),.PCURVE_S1.);";
+        let err = curve_geometry(body, 1).unwrap_err();
+        assert!(
+            err.to_string().contains("missing its 3-D curve reference"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn cyclic_surface_curve_chain_is_rejected_not_overflowed() {
+        let body = "#1 = SURFACE_CURVE('',#2,(),.PCURVE_S1.);\n\
+                    #2 = SURFACE_CURVE('',#1,(),.PCURVE_S1.);";
+        let err = curve_geometry(body, 1).unwrap_err();
+        assert!(
+            err.to_string().contains("cyclic curve reference"),
+            "unexpected error: {err}"
+        );
+    }
+
+    /// Rewrite every `EDGE_CURVE` so its curve reference goes through a
+    /// `SURFACE_CURVE` wrapper, the way OpenCascade writes edges on curved
+    /// faces. The resulting file must still import identically.
+    fn wrap_edge_curves_in_surface_curves(step: &str) -> String {
+        let mut next_id = step
+            .lines()
+            .filter_map(|l| l.trim().strip_prefix('#'))
+            .filter_map(|l| l.split_whitespace().next())
+            .filter_map(|s| s.trim_end_matches('=').parse::<u64>().ok())
+            .max()
+            .expect("file has entities")
+            + 1;
+
+        let mut wrappers = String::new();
+        let mut out = String::new();
+        for line in step.lines() {
+            if let Some(head) = line.find("= EDGE_CURVE(") {
+                let attrs = &line[head + "= EDGE_CURVE(".len()..];
+                let parts: Vec<&str> = attrs.split(',').collect();
+                assert_eq!(parts.len(), 5, "unexpected EDGE_CURVE layout: {line}");
+                let curve_ref = parts[3].trim();
+                let wrapper_id = next_id;
+                next_id += 1;
+                let _ = writeln!(
+                    wrappers,
+                    "#{wrapper_id} = SURFACE_CURVE('',{curve_ref},(),.PCURVE_S1.);"
+                );
+                let _ = writeln!(
+                    out,
+                    "{}= EDGE_CURVE({}, {}, {}, #{wrapper_id},{}",
+                    &line[..head],
+                    parts[0].trim(),
+                    parts[1].trim(),
+                    parts[2].trim(),
+                    parts[4]
+                );
+            } else if line.starts_with("ENDSEC;") && !wrappers.is_empty() {
+                out.push_str(&wrappers);
+                wrappers.clear();
+                let _ = writeln!(out, "{line}");
+            } else {
+                let _ = writeln!(out, "{line}");
+            }
+        }
+        out
+    }
+
+    #[test]
+    fn cylinder_with_surface_curve_wrapped_edges_imports() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_cylinder(&mut write_topo, 1.0, 2.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+
+        let wrapped = wrap_edge_curves_in_surface_curves(&step_str);
+        assert!(wrapped.contains("SURFACE_CURVE("));
+
+        let mut read_topo = Topology::new();
+        let solids = read_step(&wrapped, &mut read_topo).unwrap();
+        assert_eq!(solids.len(), 1);
+
+        let read_solid = read_topo.solid(solids[0]).unwrap();
+        let shell = read_topo.shell(read_solid.outer_shell()).unwrap();
+        let has_circle = shell.faces().iter().any(|&fid| {
+            let face = read_topo.face(fid).unwrap();
+            let wire = read_topo.wire(face.outer_wire()).unwrap();
+            wire.edges().iter().any(|he| {
+                matches!(
+                    read_topo.edge(he.edge()).unwrap().curve(),
+                    EdgeCurve::Circle(_)
+                )
+            })
+        });
+        assert!(
+            has_circle,
+            "circles behind SURFACE_CURVE wrappers must survive import"
+        );
     }
 
     #[test]
