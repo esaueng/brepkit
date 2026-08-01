@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785565242824,
+  "lastUpdate": 1785566417342,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2591,6 +2591,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21634518,
             "range": "± 25095",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "95d38c2a531baa33b5f51e6aac0625d1acfee7c1",
+          "message": "feat(blend): fillet drilled plates — corner chains, perimeters, and hole rims (#38)\n\n* feat(boolean): let a face spec carry an existing face verbatim\n\nEvery `FaceSpec` variant describes a wire as a list of vertex positions,\nso `assemble_solid_mixed` can only mint straight edges between\nconsecutive positions. That vocabulary cannot express a loop whose whole\nboundary is a single closed curve: a drilled hole's rim is ONE circle\nedge with `start == end`, i.e. one position. The assembler dropped every\nloop shorter than three positions outright, which silently filled the\nhole back in and left its bore wall with a free edge.\n\nAdd `FaceSpec::Existing`, which names a source face instead of\ndescribing it. The assembler deep-copies that face's surface,\norientation, and inner wires, preserving every edge's exact curve, and\noptionally replaces the outer wire with a rebuilt polygon. Copies are\nmemoised per source edge and registered in the same vertex/edge dedup\nmaps as the positional specs, so a copied bore wall and a copied cap\nhole meet at one shared rim rather than two coincident ones, and a\nneighbouring rebuilt face picks up the copied edge instead of minting a\nduplicate line between the same two vertices.\n\nCopied faces are processed first and contribute their vertex positions\nto the spatial-hash resolution, so they land in the same cells as the\nrebuilt faces they must share vertices with.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* feat(fillet): blend corner chains and perimeters on holed caps\n\n`fillet_v2`'s planar fast path already closes multi-edge corner patches,\nwhich is why a plain 80x60x6 box fillets every top edge and every corner\npair. The same box with four holes drilled through it failed every case\nbut one isolated straight edge: the rebuild described each trimmed cap\npositionally, so the assembler dropped the hole rims (one closed circle\nedge each, a single position), the cap came back solid, its bore wall\nkept a rim it no longer shared, and the shell was left open. The walking\nbuilder it fell back to then refused the multi-stripe vertex.\n\nClassify the faces the positional vocabulary cannot describe -- those\ncarrying inner loops or closed edges -- and emit them as\n`FaceSpec::Existing`. A face the blend never reaches is copied whole; a\ntrimmed cap keeps its rebuilt outer wire but carries every inner loop\nthrough as topology, so each hole rim stays the very edge its bore wall\nis bounded by.\n\nGuard the setback rather than letting it run into a hole. A cap wire\nthat crosses its own inner loop still passes the closed-shell and Euler\nchecks, so it would ship as a self-intersecting body that looks valid.\n`reject_blend_into_hole` measures each straight target edge against the\ninner loops of its planar neighbours and, when one sits within the\nblend size, reports `RadiusTooLarge` with the clearance as the\nachievable maximum -- the cause genuinely is the radius, since the same\nedge blends fine below it. The fast path also now runs the same volume\nvalidation as the walking path, which it needs more now that it rebuilds\nholed caps.\n\nRegression test on the reported part (80x60x6 plate, four 4.5 mm holes):\na corner pair at R2 and R0.5, the full top perimeter, a second fillet on\nan already-filleted plate, and a radius that reaches a hole failing\n`radius-too-large` with the input left untouched. Each result is checked\nfor a closed shell, zero free and non-manifold edges in both the B-rep\nand the tessellation, surviving holes, exact circular rims at the\noriginal radius, and material loss matching the undrilled plate's.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(blend): place a hole rim's fillet on the side the material is on\n\n`plane_cylinder_fillet` read the bore face's `reversed` flag alone as\n\"concave\" and used it to decide both where the rolling ball sits along\nthe axis and which way the plate contact runs. Those are two independent\nfacts, and conflating them left one configuration wrong.\n\nThe flag says which side of the CYLINDER the material is on. What\ndecides the radial direction is whether the PLANE reaches past the\ncylinder: a bounded disc cap stops at `r_c`, so the contact must land\ninside it at `r_c - r`; a plate the cylinder passes through extends\nbeyond, so the contact lands outside at `r_c + r`. The contact circle\nhas to lie on the plane face — nothing else can decide it.\n\nTaken together they also give the edge's convexity, which is what\nplaces the ball along the axis: the two agree exactly when the fillet\nremoves material, so the ball rolls inside the solid at `+n_inward`,\nand disagree when it fills a concave corner from the void.\n\n  material inside | plane bounded | case                          | convex\n  ----------------+---------------+-------------------------------+-------\n  yes             | yes           | cylinder's own end cap        | yes\n  yes             | no            | post standing on a plate      | no\n  no              | yes           | flat bottom of a blind hole   | no\n  no              | no            | rim of a hole THROUGH a plate | yes\n\nThe last row is the one that was wrong: a drilled hole's rim rounded\ninward at `r_c - r` with the ball below the plate, handing the trimmer a\nstripe describing geometry that is not there. The other three are\nunchanged, bit for bit.\n\nAlso records the matching gap in `plane_cylinder_chamfer`, which reads\nthe plane's raw surface normal and so picks the wrong material side on a\n`reversed` face such as a counterbore's seat. Correcting it needs the\nradial sign fixed with it, so it is documented rather than half-done;\nthe rim assembler now refuses the result instead of building it.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* feat(blend): fillet and chamfer closed rims that are holes in a cap\n\nThe rim assemblers only accepted a rim forming the cap's OUTER wire — a\nbounded disc, like a primitive cylinder's end face. A drilled hole's rim\nis an INNER wire, so every hole-rim fillet was declined and fell through\nto the trim path, which cannot cut a closed contact circle that crosses\nno boundary edge, and reported `TrimmingFailure`.\n\nAccept either loop. Whichever one is exactly the rim becomes the plate\ncontact; the rest of the cap — outer wire, other bolt holes — is carried\nthrough verbatim. On a disc cap the boundary still shrinks to `r_c - r`;\non a hole rim the loop grows to `r_c + r`, which is the case that was\nmissing. The chamfer builder already had this port for its bore mouths\nand gains the guards below.\n\nTwo ways a rim blend can report success while running off the geometry,\nboth of which leave a closed shell, no free or non-manifold edges, and a\nwatertight tessellation, because every one of those checks is\ntopological:\n\n  * the moved contact reaches another loop of the same cap. Measured\n    exactly now rather than at nine points per edge — a nine-point\n    sample of a straight plate edge can miss its nearest approach by\n    more than the clearance being tested. Straight edges are solved in\n    closed form (the radial distance along a segment is convex), whole\n    perpendicular circles use `|d +- rho|`, and anything else is sampled\n    and widened by half the sample spacing, which bounds the true\n    extremum because radial distance is 1-Lipschitz.\n\n  * the setback runs deeper than the wall is long. An R9 fillet on a\n    6 mm plate's hole put the contact 3 mm below the underside and was\n    emitted without complaint. The check applies only where the contact\n    moves INTO the wall; a concave rim band extends the wall instead — a\n    cone's base rim flaring into a foot — which has no such bound. It is\n    re-measured at assembly time as well, so two rims on one bore cannot\n    each take more than what the other left.\n\nBoth refuse with `RadiusTooLarge` carrying the achievable maximum, and\nthe dispatch propagates that instead of falling back: no engine below\ncan fit a blend that does not fit.\n\nRegression tests on the reported part: the top rim at R0.5/R1/R2, both\nrims of one bore together, the same rim chamfered, and a counterbore\nmouth blended both ways — each checked for a closed shell, zero free and\nnon-manifold edges in the B-rep and the tessellation, exactly one exact\ntorus or cone band, and material loss matching the closed-form\ntorus-segment and frustum subtraction to 0.25 %. Plus the four typed\nrefusals: too deep for the bore, two rims sharing one bore, and a fillet\nand a chamfer reaching the plate's boundary.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* docs(blend): record what actually blocks the walking vertex blend\n\nThe fail-fast's comment named the end state — stripes not set back,\ncorner faces minting their own edges — but not the order things break\nin, which made the work look like it starts at the corner solver. It\ndoes not: disabling the guard on a two-edge box corner fails in\n`trimmer` before any corner code runs, because one base face is cut by\nboth stripes and the second cut is refused.\n\nList all four blockers in the order they bite, and note that the planar\nfast path already closes these corners, so what the guard still blocks\nis corner chains on curved or imported geometry that path declines.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* docs(operations): stop a public doc comment linking a private item\n\n`cargo doc -D warnings` rejects an intra-doc link from public\ndocumentation to a private function, so `FaceSpec::Existing`'s pointer at\n`assemble_solid_mixed` failed the Documentation job. Name it in prose\ninstead — the explanation does not depend on the link resolving.\n\n* test(wasm): pin what the blend work fixed, not what it used to break\n\n`try_fillet_failure_reports_the_walking_engine_diagnosis` asserted that a\ncorner chain and a hole rim on a drilled plate both fail typed. Phases 1a\nand 2 make both of them succeed, so the test was pinning a defect that no\nlonger exists and failed with `Ok(Id(3))` where it demanded an error.\n\nThe contract it exists for — a typed diagnosis rather than the silent\nno-op, with the input rolled back untouched — still needs a case that\ngenuinely cannot work, so it now uses a radius half again the plate's own\nthickness, which cannot be seated at all.\n\nThe two obsolete negative assertions become positive ones: the corner\nchain and the hole rim must now blend, and both results must be\nwatertight. That keeps the coverage at the wasm boundary instead of\ndeleting it.\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T01:37:51-05:00",
+          "tree_id": "0b049ce65fa5303ee46d15da8efead67fa4dcb5d",
+          "url": "https://github.com/esaueng/brepkit/commit/95d38c2a531baa33b5f51e6aac0625d1acfee7c1"
+        },
+        "date": 1785566416690,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 858490,
+            "range": "± 18131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 955855,
+            "range": "± 3885",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14200,
+            "range": "± 125",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 679480,
+            "range": "± 1150",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22970486,
+            "range": "± 174318",
             "unit": "ns/iter"
           }
         ]
