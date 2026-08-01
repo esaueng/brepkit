@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785566417342,
+  "lastUpdate": 1785574250285,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2645,6 +2645,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22970486,
             "range": "± 174318",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e5db4397d7d4610fe0a5202288d461bab4267d2c",
+          "message": "fix: two operations that returned wrong-but-plausible solids (#39)\n\n* fix(operations): defeature must heal the gap it opens or refuse\n\n`defeature`'s doc comment promised it \"heals the resulting gaps by\nextending adjacent faces\". It did not. It collected each KEPT face's outer\npolygon plus its plane and handed the set to `boolean::assemble_solid` — a\nplane-set reassembly that cannot represent a concave body, drops every\ninner wire, and simply leaves a hole where the removed faces were. On\nchamfer, pocket, boss, L-notch and plate-face selections it returned a\nsolid that `validate_solid` flags with two errors (broken Euler\ncharacteristic plus boundary edges), and on a plate with two bores,\nfilling one silently deleted the other. It is reachable from the wasm\nsurface as `defeature(solid, faceHandles)`.\n\nImplement the heal it advertises, and refuse precisely where no exact heal\nexists. Which of the two strategies applies is read off the wound — the\nedges that separated a removed face from a kept one:\n\n- Cap: every wound edge lies on an inner wire of a kept face, wound in its\n  entirety. The patch is a blind cavity, a protrusion or a through-hole\n  wall whose openings are holes in kept faces, so deleting those inner\n  wires closes the shell. Done as surgery on a deep copy: no vertex moves,\n  so analytic surfaces, curved edges and unrelated holes survive exactly.\n- Extend: the wound crosses the outer wires of kept faces. Every vertex\n  shared between a removed face and a kept one is relocated to the corner\n  of the local plane arrangement where the grown faces meet — the unique\n  point on three of the patch's adjacent kept planes that still lies on\n  every kept plane already passing through the vertex. The search starts\n  at the patch faces touching the vertex and widens through the patch only\n  while the corner is undetermined, so the nearest enclosing corner wins.\n  This restores the sharp edge behind a chamfer and the corner behind a\n  corner cut.\n\nAmbiguity is a refusal, not a guess, and the result is checked before it\nis returned: `validate_solid` must report zero errors and the shell must\nenclose positive volume, otherwise the refusal is reported instead. A\nrelocated corner that would pull a face off its own plane, a wound across\na curved kept face, a cavity shell, a non-edge-manifold input and a\nselection naming a face from another solid are all rejected by name.\n\nRefusals now carry a new `OperationsError::Unsupported { operation,\nreason }` so callers can tell \"no exact construction for this\" from \"bad\narguments\" without matching on message text. Two configurations that\ngenuinely have no face-extension heal — removing a whole plate face, and a\ngroove running right through a block, which needs coplanar faces merged\nrather than extended — are pinned as refusals so they cannot regress into\nplausible-looking output.\n\n`boolean::assemble_solid` had no other caller and is removed with it.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(algo): sample a disc's interior at its centre, not beside its rim\n\nFilling a through-hole is `body ∪ cylinder(bore)`. On plate-like bodies\nthe GFA boolean declined that configuration and fell back to a co-refined\nmesh: ~100–180 planar faces and ~1e-4 relative volume error — small enough\nthat a volume gate will not catch it, large enough to be wrong. Measured\non a 30x30x10 plate with a through bore it degenerated at bore radii 2, 3,\n5, 6 and 8, and survived only at 4.\n\nThe cause is `sample_face_interior`. A planar face contributes one\nboundary VERTEX per edge, so a disc bounded by a single closed circular\nedge — exactly what a plug cylinder's caps are — yields a one-point\n\"polygon\". The containment ladder that normally drives the sample deep\ninto the face needs three points, so it was skipped entirely and the\nfunction fell through to its generic path: one inward offset from the\nlongest boundary edge, landing about diag*1e-4 inside the disc's own rim.\n\nFor a plug dropped into a bore of its own radius that rim is coincident\nwith the bore wall over its whole area, so the sample sat ON the shared\nwall, where the ray cast that classifies the face is a coin flip. It came\nout differently for the two caps — one Outside, one Inside — the top cap\nwas dropped from the selection, and the resulting open shell failed the\nacceptance gate and went to mesh. Which radii survived was luck, which is\nwhy r=4 alone worked.\n\nPolygonise the closed boundary curve and take a properly interior point of\nthe resulting ring instead; for a disc that is its centre. The change is\nconfined to planar faces whose boundary cannot otherwise be polygonised\n(fewer than three vertices, no inner wires), and is a strict improvement\nthere: the previous path had no polygon to verify against at all.\n\nThe plug fuse is now exact at every radius in the matrix — the plate's six\nplanes plus the plug's two caps, exact volume, all-planar, and unifying\nback to a plain six-face box, which is what the adapter's `fillThroughHole`\ndoes after the fuse. The mesh fallback stays in place as the safety valve\nfor other cases; it is simply no longer reached here.\n\nThe existing disc test allowed anything below r = 1 - 1e-9, which the old\nnear-rim sample satisfied while sitting close enough to the boundary to\nmisclassify. Tighten it to require a robustly interior sample, and add a\nscale-invariance case.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T03:48:18-05:00",
+          "tree_id": "c319dc74994992335bbe6f43cc4e54a1087d72cc",
+          "url": "https://github.com/esaueng/brepkit/commit/e5db4397d7d4610fe0a5202288d461bab4267d2c"
+        },
+        "date": 1785574249345,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 836950,
+            "range": "± 7104",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 924869,
+            "range": "± 25791",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13213,
+            "range": "± 222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 691601,
+            "range": "± 1323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21917988,
+            "range": "± 28484",
             "unit": "ns/iter"
           }
         ]
