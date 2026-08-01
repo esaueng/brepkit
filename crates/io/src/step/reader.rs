@@ -45,7 +45,8 @@ pub fn read_step_with_limits(
 ) -> Result<Vec<SolidId>, IoError> {
     ensure_input_size(input.len(), limits)?;
     let entities = parse_step_entities(input, limits)?;
-    let mut builder = StepBuilder::new(topo, &entities);
+    let units = resolve_unit_scale(&entities)?;
+    let mut builder = StepBuilder::new(topo, &entities, units);
     builder.build_all_solids()
 }
 
@@ -201,6 +202,320 @@ fn parse_entity_id(s: &str) -> Option<u64> {
     trimmed.strip_prefix('#')?.parse().ok()
 }
 
+// ── Units ───────────────────────────────────────────────────────────
+
+/// Conversion factors from the file's declared units to brepkit's working
+/// units.
+///
+/// brepkit works in **millimetres** and **radians**: the writer declares
+/// `SI_UNIT(.MILLI.,.METRE.)` for length and `SI_UNIT($,.RADIAN.)` for plane
+/// angle (`writer::StepWriteContext::write_geometric_context`), and the
+/// default vertex/uncertainty tolerance of `1e-7` is a millimetre quantity.
+/// Everything read out of a STEP file is converted into those units once, at
+/// parse time, so no downstream code has to know what the file declared.
+#[derive(Debug, Clone, Copy, PartialEq)]
+struct UnitScale {
+    /// Multiply a length-valued quantity from the file by this to get
+    /// millimetres.
+    length: f64,
+    /// Multiply a plane-angle-valued quantity from the file by this to get
+    /// radians.
+    angle: f64,
+}
+
+/// Maximum depth of `CONVERSION_BASED_UNIT` → `MEASURE_WITH_UNIT` → unit
+/// indirection followed before the file is rejected as cyclic.
+const MAX_UNIT_INDIRECTION: u32 = 8;
+
+/// Which physical quantity a `NAMED_UNIT` measures, as far as this reader
+/// cares.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum UnitKind {
+    /// A `LENGTH_UNIT`.
+    Length,
+    /// A `PLANE_ANGLE_UNIT`.
+    PlaneAngle,
+    /// Anything else (solid angle, mass, …) — not used by geometry here.
+    Other,
+}
+
+/// Render an entity as `TYPE(attrs` so a marker search behaves the same for
+/// simple instances (`#5 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1))`) and for
+/// complex/composite ones (`#5 = ( GEOMETRIC_REPRESENTATION_CONTEXT(3)
+/// GLOBAL_UNIT_ASSIGNED_CONTEXT((#1)) … )`, whose parsed `entity_type` is
+/// empty because the statement opens straight into a parenthesis).
+fn entity_text(entity: &StepEntity) -> String {
+    if entity.entity_type.is_empty() {
+        entity.attrs.clone()
+    } else {
+        format!("{}({}", entity.entity_type, entity.attrs)
+    }
+}
+
+/// Return the contents of the balanced parenthesis group that immediately
+/// follows `marker`, without the outer parentheses.
+///
+/// Quoted STEP strings are skipped so a `'('` inside a name cannot unbalance
+/// the scan. Occurrences of `marker` that are not followed by `(` (for
+/// example `LENGTH_UNIT` matched inside `LENGTH_UNIT()` is fine, but a
+/// marker appearing inside a longer identifier is not) are skipped.
+fn balanced_group_after<'a>(text: &'a str, marker: &str) -> Option<&'a str> {
+    let bytes = text.as_bytes();
+    let mut from = 0usize;
+    while let Some(rel) = text[from..].find(marker) {
+        let after = from + rel + marker.len();
+        let open = text[after..]
+            .find(|c: char| !c.is_whitespace())
+            .map(|o| after + o);
+        match open {
+            Some(open) if bytes[open] == b'(' => {
+                let mut depth = 0i32;
+                let mut in_string = false;
+                for (i, &b) in bytes.iter().enumerate().skip(open) {
+                    match b {
+                        b'\'' => in_string = !in_string,
+                        b'(' if !in_string => depth += 1,
+                        b')' if !in_string => {
+                            depth -= 1;
+                            if depth == 0 {
+                                return Some(&text[open + 1..i]);
+                            }
+                        }
+                        _ => {}
+                    }
+                }
+                return None;
+            }
+            _ => from = after,
+        }
+    }
+    None
+}
+
+/// Classify a `NAMED_UNIT` instance from its textual form.
+fn unit_kind(text: &str) -> UnitKind {
+    if text.contains("LENGTH_UNIT") {
+        UnitKind::Length
+    } else if text.contains("PLANE_ANGLE_UNIT") {
+        // SOLID_ANGLE_UNIT deliberately does not match: it does not contain
+        // the "PLANE_" prefix.
+        UnitKind::PlaneAngle
+    } else {
+        UnitKind::Other
+    }
+}
+
+/// Multiplier for an SI prefix token as written in `SI_UNIT(<prefix>, …)`.
+///
+/// `$` (and the rarely used `*`) mean "no prefix".
+fn si_prefix_factor(token: &str) -> Option<f64> {
+    Some(match token.trim() {
+        "$" | "*" | "" => 1.0,
+        ".EXA." => 1e18,
+        ".PETA." => 1e15,
+        ".TERA." => 1e12,
+        ".GIGA." => 1e9,
+        ".MEGA." => 1e6,
+        ".KILO." => 1e3,
+        ".HECTO." => 1e2,
+        ".DECA." => 1e1,
+        ".DECI." => 1e-1,
+        ".CENTI." => 1e-2,
+        ".MILLI." => 1e-3,
+        ".MICRO." => 1e-6,
+        ".NANO." => 1e-9,
+        ".PICO." => 1e-12,
+        ".FEMTO." => 1e-15,
+        ".ATTO." => 1e-18,
+        _ => return None,
+    })
+}
+
+/// Resolve the factor that converts a value expressed in unit `#unit_ref`
+/// into that unit's SI base, together with the name of that base
+/// (`.METRE.`, `.RADIAN.`, …).
+///
+/// Handles the two shapes real writers emit:
+/// - `SI_UNIT(<prefix>, <name>)`, possibly inside a complex instance
+///   alongside `LENGTH_UNIT()` / `NAMED_UNIT(*)`;
+/// - `CONVERSION_BASED_UNIT('INCH', #m)` where `#m` is a
+///   `LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(25.4), #si)`.
+fn unit_si_factor(
+    entities: &HashMap<u64, StepEntity>,
+    unit_ref: u64,
+    depth: u32,
+) -> Result<(f64, String), IoError> {
+    if depth > MAX_UNIT_INDIRECTION {
+        return Err(IoError::ParseError {
+            reason: format!(
+                "unit definition at #{unit_ref} nests deeper than \
+                 {MAX_UNIT_INDIRECTION} levels (cyclic unit reference?)"
+            ),
+        });
+    }
+    let entity = entities.get(&unit_ref).ok_or_else(|| IoError::ParseError {
+        reason: format!("unit entity #{unit_ref} not found"),
+    })?;
+    let text = entity_text(entity);
+
+    if let Some(group) = balanced_group_after(&text, "CONVERSION_BASED_UNIT") {
+        // CONVERSION_BASED_UNIT(<name>, #measure)
+        let measure_ref =
+            parse_refs(group)
+                .first()
+                .copied()
+                .ok_or_else(|| IoError::ParseError {
+                    reason: format!(
+                        "CONVERSION_BASED_UNIT #{unit_ref} has no conversion factor reference"
+                    ),
+                })?;
+        let measure = entities
+            .get(&measure_ref)
+            .ok_or_else(|| IoError::ParseError {
+                reason: format!("conversion factor entity #{measure_ref} not found"),
+            })?;
+        let measure_attrs = measure.attrs.clone();
+        let value = parse_floats(&measure_attrs)
+            .first()
+            .copied()
+            .ok_or_else(|| IoError::ParseError {
+                reason: format!("MEASURE_WITH_UNIT #{measure_ref} has no numeric value"),
+            })?;
+        let base_ref =
+            parse_refs(&measure_attrs)
+                .first()
+                .copied()
+                .ok_or_else(|| IoError::ParseError {
+                    reason: format!("MEASURE_WITH_UNIT #{measure_ref} has no unit reference"),
+                })?;
+        let (base_factor, base_name) = unit_si_factor(entities, base_ref, depth + 1)?;
+        return Ok((value * base_factor, base_name));
+    }
+
+    if let Some(group) = balanced_group_after(&text, "SI_UNIT") {
+        let mut parts = group.split(',');
+        let prefix = parts.next().unwrap_or("").trim();
+        let name = parts.next().unwrap_or("").trim();
+        let factor = si_prefix_factor(prefix).ok_or_else(|| IoError::ParseError {
+            reason: format!("SI_UNIT #{unit_ref} has unrecognised prefix `{prefix}`"),
+        })?;
+        if name.is_empty() {
+            return Err(IoError::ParseError {
+                reason: format!("SI_UNIT #{unit_ref} has no unit name"),
+            });
+        }
+        return Ok((factor, name.to_string()));
+    }
+
+    Err(IoError::ParseError {
+        reason: format!(
+            "unit #{unit_ref} is neither an SI_UNIT nor a CONVERSION_BASED_UNIT \
+             and cannot be interpreted"
+        ),
+    })
+}
+
+/// Resolve the file's length and plane-angle units from its
+/// `GLOBAL_UNIT_ASSIGNED_CONTEXT`.
+///
+/// The context appears either as a standalone entity or — far more commonly —
+/// as one component of a complex instance that also carries
+/// `GEOMETRIC_REPRESENTATION_CONTEXT` and
+/// `GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT`; both shapes are handled.
+///
+/// # Errors
+///
+/// Returns a typed [`IoError::ParseError`] when the file declares no length
+/// unit, when a declared unit cannot be interpreted, or when two contexts
+/// disagree. Guessing a length unit would silently scale the whole model, so
+/// an unreadable declaration is refused rather than defaulted.
+fn resolve_unit_scale(entities: &HashMap<u64, StepEntity>) -> Result<UnitScale, IoError> {
+    const MARKER: &str = "GLOBAL_UNIT_ASSIGNED_CONTEXT";
+
+    let mut context_ids: Vec<u64> = entities
+        .iter()
+        .filter(|(_, e)| e.entity_type == MARKER || e.attrs.contains(MARKER))
+        .map(|(&id, _)| id)
+        .collect();
+    context_ids.sort_unstable();
+
+    let mut length: Option<f64> = None;
+    let mut angle: Option<f64> = None;
+
+    for ctx_id in context_ids {
+        let entity = entities.get(&ctx_id).ok_or_else(|| IoError::ParseError {
+            reason: format!("entity #{ctx_id} not found"),
+        })?;
+        let text = entity_text(entity);
+        let group = balanced_group_after(&text, MARKER).ok_or_else(|| IoError::ParseError {
+            reason: format!("{MARKER} #{ctx_id} has no unit list"),
+        })?;
+
+        for unit_ref in parse_refs(group) {
+            let unit_entity = entities.get(&unit_ref).ok_or_else(|| IoError::ParseError {
+                reason: format!("unit entity #{unit_ref} not found"),
+            })?;
+            let kind = unit_kind(&entity_text(unit_entity));
+            if kind == UnitKind::Other {
+                continue;
+            }
+            let (factor, base) = unit_si_factor(entities, unit_ref, 0)?;
+            let (expected_base, to_working, slot, label) = match kind {
+                // SI base for length is the metre; brepkit works in mm.
+                UnitKind::Length => (".METRE.", factor * 1e3, &mut length, "length"),
+                UnitKind::PlaneAngle => (".RADIAN.", factor, &mut angle, "plane angle"),
+                UnitKind::Other => unreachable!("filtered above"),
+            };
+            if base != expected_base {
+                return Err(IoError::ParseError {
+                    reason: format!(
+                        "{label} unit #{unit_ref} resolves to base `{base}`, expected \
+                         `{expected_base}`"
+                    ),
+                });
+            }
+            if !to_working.is_finite() || to_working <= 0.0 {
+                return Err(IoError::ParseError {
+                    reason: format!(
+                        "{label} unit #{unit_ref} has a non-positive conversion factor \
+                         {to_working}"
+                    ),
+                });
+            }
+            match *slot {
+                None => *slot = Some(to_working),
+                Some(existing) if !approx_same_factor(existing, to_working) => {
+                    return Err(IoError::ParseError {
+                        reason: format!(
+                            "STEP file declares conflicting {label} units \
+                             ({existing} vs {to_working}); refusing to guess which applies"
+                        ),
+                    });
+                }
+                Some(_) => {}
+            }
+        }
+    }
+
+    let length = length.ok_or_else(|| IoError::ParseError {
+        reason: "STEP file declares no LENGTH_UNIT in a GLOBAL_UNIT_ASSIGNED_CONTEXT; \
+                 the model's length unit is unknown"
+            .to_string(),
+    })?;
+
+    Ok(UnitScale {
+        length,
+        // A file that declares no PLANE_ANGLE_UNIT leaves angle measures in
+        // the SI base, which is the radian — the only reading available.
+        angle: angle.unwrap_or(1.0),
+    })
+}
+
+/// Compare two unit conversion factors for practical equality.
+fn approx_same_factor(a: f64, b: f64) -> bool {
+    (a - b).abs() <= 1e-12 * a.abs().max(b.abs()).max(1.0)
+}
+
 // ── Building ────────────────────────────────────────────────────────
 
 /// Maximum number of curve-to-curve indirections (`SURFACE_CURVE`,
@@ -215,15 +530,23 @@ const MAX_CURVE_INDIRECTION: u32 = 32;
 struct StepBuilder<'a> {
     topo: &'a mut Topology,
     entities: &'a HashMap<u64, StepEntity>,
+    /// Conversion from the file's declared units into millimetres/radians,
+    /// applied to every length- and angle-valued quantity as it is read.
+    units: UnitScale,
     vertex_cache: HashMap<u64, brepkit_topology::vertex::VertexId>,
     edge_cache: HashMap<u64, brepkit_topology::edge::EdgeId>,
 }
 
 impl<'a> StepBuilder<'a> {
-    fn new(topo: &'a mut Topology, entities: &'a HashMap<u64, StepEntity>) -> Self {
+    fn new(
+        topo: &'a mut Topology,
+        entities: &'a HashMap<u64, StepEntity>,
+        units: UnitScale,
+    ) -> Self {
         Self {
             topo,
             entities,
+            units,
             vertex_cache: HashMap::new(),
             edge_cache: HashMap::new(),
         }
@@ -362,6 +685,7 @@ impl<'a> StepBuilder<'a> {
                 let radius = floats.first().copied().ok_or_else(|| IoError::ParseError {
                     reason: format!("CYLINDRICAL_SURFACE #{surface_ref} missing radius"),
                 })?;
+                let radius = radius * self.units.length;
                 let (origin, axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
                 let cyl = brepkit_math::surfaces::CylindricalSurface::new(origin, axis, radius)
                     .map_err(|e| IoError::ParseError {
@@ -376,10 +700,12 @@ impl<'a> StepBuilder<'a> {
                     reason: format!("CONICAL_SURFACE #{surface_ref} missing axis"),
                 })?;
                 // STEP: CONICAL_SURFACE('', #axis, base_radius, half_angle)
-                // half_angle is in radians in STEP AP203.
+                // The half angle is a plane-angle measure, so it is stated in
+                // whatever PLANE_ANGLE_UNIT the file declared (radians for
+                // most writers, degrees for some).
                 let half_angle = floats.last().copied().ok_or_else(|| IoError::ParseError {
                     reason: format!("CONICAL_SURFACE #{surface_ref} missing half_angle"),
-                })?;
+                })? * self.units.angle;
                 let (apex, axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
                 let cone = brepkit_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
                     .map_err(|e| IoError::ParseError {
@@ -396,6 +722,7 @@ impl<'a> StepBuilder<'a> {
                 let radius = floats.first().copied().ok_or_else(|| IoError::ParseError {
                     reason: format!("SPHERICAL_SURFACE #{surface_ref} missing radius"),
                 })?;
+                let radius = radius * self.units.length;
                 let (center, _axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
                 let sphere = brepkit_math::surfaces::SphericalSurface::new(center, radius)
                     .map_err(|e| IoError::ParseError {
@@ -415,6 +742,8 @@ impl<'a> StepBuilder<'a> {
                 let minor_r = floats.get(1).copied().ok_or_else(|| IoError::ParseError {
                     reason: format!("TOROIDAL_SURFACE #{surface_ref} missing minor_radius"),
                 })?;
+                let major_r = major_r * self.units.length;
+                let minor_r = minor_r * self.units.length;
                 let (center, axis, ref_dir) = self.build_axis2_placement(axis_ref)?;
                 let torus = brepkit_math::surfaces::ToroidalSurface::with_axis_and_ref_dir(
                     center, major_r, minor_r, axis, ref_dir,
@@ -552,7 +881,7 @@ impl<'a> StepBuilder<'a> {
                 })?;
                 let radius = floats.first().copied().ok_or_else(|| IoError::ParseError {
                     reason: format!("CIRCLE #{curve_ref} missing radius"),
-                })?;
+                })? * self.units.length;
                 let (center, normal, _u_axis) = self.build_axis2_placement(axis_ref)?;
                 let circle =
                     brepkit_math::curves::Circle3D::new(center, normal, radius).map_err(|e| {
@@ -574,11 +903,15 @@ impl<'a> StepBuilder<'a> {
                     });
                 }
                 let (center, normal, _u_axis) = self.build_axis2_placement(axis_ref)?;
-                let ellipse =
-                    brepkit_math::curves::Ellipse3D::new(center, normal, floats[0], floats[1])
-                        .map_err(|e| IoError::ParseError {
-                            reason: format!("ELLIPSE #{curve_ref}: {e}"),
-                        })?;
+                let ellipse = brepkit_math::curves::Ellipse3D::new(
+                    center,
+                    normal,
+                    floats[0] * self.units.length,
+                    floats[1] * self.units.length,
+                )
+                .map_err(|e| IoError::ParseError {
+                    reason: format!("ELLIPSE #{curve_ref}: {e}"),
+                })?;
                 Ok(EdgeCurve::Ellipse(ellipse))
             }
             "B_SPLINE_CURVE_WITH_KNOTS" => self.build_bspline_curve(curve_ref, &attrs, false),
@@ -705,7 +1038,8 @@ impl<'a> StepBuilder<'a> {
                 ),
             });
         }
-        Ok(Point3::new(coords[0], coords[1], coords[2]))
+        let s = self.units.length;
+        Ok(Point3::new(coords[0] * s, coords[1] * s, coords[2] * s))
     }
 
     fn build_direction(&self, dir_ref: u64) -> Result<Vec3, IoError> {
@@ -1646,23 +1980,51 @@ mod tests {
 
     // ── SURFACE_CURVE family ───────────────────────────────────────
 
-    /// Wrap DATA-section statements in a minimal well-formed STEP file.
+    /// A millimetre/radian unit context using entity ids 9001-9005, so test
+    /// bodies are free to use small ids.
+    const MM_UNIT_CONTEXT: &str = "\
+#9001 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n\
+#9002 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );\n\
+#9003 = ( NAMED_UNIT(*) SI_UNIT($,.STERADIAN.) SOLID_ANGLE_UNIT() );\n\
+#9004 = UNCERTAINTY_MEASURE_WITH_UNIT(LENGTH_MEASURE(1.E-07),#9001,'d','c');\n\
+#9005 = ( GEOMETRIC_REPRESENTATION_CONTEXT(3) \
+GLOBAL_UNCERTAINTY_ASSIGNED_CONTEXT((#9004)) \
+GLOBAL_UNIT_ASSIGNED_CONTEXT((#9001,#9002,#9003)) \
+REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n";
+
+    /// Wrap DATA-section statements in a minimal well-formed STEP file,
+    /// appending a millimetre unit context unless `body` brings its own.
     fn step_file(body: &str) -> String {
+        let units = if body.contains("GLOBAL_UNIT_ASSIGNED_CONTEXT") {
+            ""
+        } else {
+            MM_UNIT_CONTEXT
+        };
         format!(
             "ISO-10303-21;\nHEADER;\n\
              FILE_DESCRIPTION((''),'2;1');\n\
              FILE_NAME('t','2024-01-01T00:00:00',(''),(''),'','','');\n\
              FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));\nENDSEC;\nDATA;\n\
-             {body}\nENDSEC;\nEND-ISO-10303-21;\n"
+             {body}\n{units}ENDSEC;\nEND-ISO-10303-21;\n"
         )
     }
 
     /// Resolve one curve entity through the real parse + dispatch path.
     fn curve_geometry(body: &str, curve_id: u64) -> Result<EdgeCurve, IoError> {
         let entities = parse_step_entities(&step_file(body), ImportLimits::default())?;
+        let units = resolve_unit_scale(&entities)?;
         let mut topo = Topology::new();
-        let builder = StepBuilder::new(&mut topo, &entities);
+        let builder = StepBuilder::new(&mut topo, &entities, units);
         builder.build_curve_geometry(curve_id)
+    }
+
+    /// Resolve one surface entity through the real parse + dispatch path.
+    fn surface_geometry(body: &str, surface_id: u64) -> Result<FaceSurface, IoError> {
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default())?;
+        let units = resolve_unit_scale(&entities)?;
+        let mut topo = Topology::new();
+        let builder = StepBuilder::new(&mut topo, &entities, units);
+        builder.build_surface(surface_id)
     }
 
     /// An OCCT-style surface + pcurve tail, referenced by the wrapper's
@@ -1839,6 +2201,376 @@ mod tests {
         assert!(
             has_circle,
             "circles behind SURFACE_CURVE wrappers must survive import"
+        );
+    }
+
+    // ── Units ──────────────────────────────────────────────────────
+
+    /// Insert extra DATA-section statements just before the closing ENDSEC.
+    fn append_entities(step: &str, extra: &str) -> String {
+        let idx = step.rfind("ENDSEC;").expect("DATA section ENDSEC");
+        format!("{}{}{}", &step[..idx], extra, &step[idx..])
+    }
+
+    /// Restate the writer's millimetre length unit as a CONVERSION_BASED_UNIT
+    /// inch, the way an inch-authored file from a real CAD system declares it.
+    fn declare_length_unit_inch(step: &str) -> String {
+        const MM: &str = "( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) )";
+        assert!(
+            step.contains(MM),
+            "writer no longer emits the expected mm unit"
+        );
+        let swapped = step.replace(
+            MM,
+            "( CONVERSION_BASED_UNIT('INCH',#90002) LENGTH_UNIT() NAMED_UNIT(#90001) )",
+        );
+        append_entities(
+            &swapped,
+            "#90001 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n\
+             #90002 = LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(25.4),#90001);\n",
+        )
+    }
+
+    /// Restate the writer's millimetre length unit as plain metres.
+    fn declare_length_unit_metre(step: &str) -> String {
+        const MM: &str = "SI_UNIT(.MILLI.,.METRE.)";
+        assert!(
+            step.contains(MM),
+            "writer no longer emits the expected mm unit"
+        );
+        step.replace(MM, "SI_UNIT($,.METRE.)")
+    }
+
+    /// Restate the writer's radian plane-angle unit as degrees, and convert
+    /// every CONICAL_SURFACE semi-angle in the file to match.
+    fn declare_angle_unit_degrees(step: &str) -> String {
+        const RAD: &str = "( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) )";
+        assert!(
+            step.contains(RAD),
+            "writer no longer emits the expected radian unit"
+        );
+        let swapped = step.replace(
+            RAD,
+            "( CONVERSION_BASED_UNIT('DEGREE',#90012) NAMED_UNIT(#90011) PLANE_ANGLE_UNIT() )",
+        );
+        let swapped = append_entities(
+            &swapped,
+            "#90011 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );\n\
+             #90012 = PLANE_ANGLE_MEASURE_WITH_UNIT\
+             (PLANE_ANGLE_MEASURE(1.745329251994330E-02),#90011);\n",
+        );
+
+        let mut out = String::new();
+        let mut rewrote = 0usize;
+        for line in swapped.lines() {
+            if line.contains("= CONICAL_SURFACE(") {
+                let (head, tail) = line.split_at(line.rfind(',').expect("angle attribute"));
+                let radians: f64 = tail
+                    .trim_start_matches(',')
+                    .trim()
+                    .trim_end_matches(");")
+                    .parse()
+                    .expect("semi-angle literal");
+                let _ = writeln!(out, "{head}, {});", radians.to_degrees());
+                rewrote += 1;
+            } else {
+                let _ = writeln!(out, "{line}");
+            }
+        }
+        assert!(rewrote > 0, "fixture has no CONICAL_SURFACE to convert");
+        out
+    }
+
+    /// Axis-aligned extent of a solid's vertices.
+    fn solid_extent(topo: &Topology, sid: SolidId) -> ([f64; 3], [f64; 3]) {
+        let mut lo = [f64::INFINITY; 3];
+        let mut hi = [f64::NEG_INFINITY; 3];
+        let shell = topo.shell(topo.solid(sid).unwrap().outer_shell()).unwrap();
+        for &fid in shell.faces() {
+            let face = topo.face(fid).unwrap();
+            let mut wires = vec![face.outer_wire()];
+            wires.extend_from_slice(face.inner_wires());
+            for wid in wires {
+                for oriented in topo.wire(wid).unwrap().edges() {
+                    let edge = topo.edge(oriented.edge()).unwrap();
+                    for vid in [edge.start(), edge.end()] {
+                        let p = topo.vertex(vid).unwrap().point();
+                        for (axis, value) in [p.x(), p.y(), p.z()].into_iter().enumerate() {
+                            lo[axis] = lo[axis].min(value);
+                            hi[axis] = hi[axis].max(value);
+                        }
+                    }
+                }
+            }
+        }
+        (lo, hi)
+    }
+
+    /// Every cone half-angle in a solid, in the order the faces appear.
+    fn cone_half_angles(topo: &Topology, sid: SolidId) -> Vec<f64> {
+        let shell = topo.shell(topo.solid(sid).unwrap().outer_shell()).unwrap();
+        shell
+            .faces()
+            .iter()
+            .filter_map(|&fid| match topo.face(fid).unwrap().surface() {
+                FaceSurface::Cone(cone) => Some(cone.half_angle()),
+                _ => None,
+            })
+            .collect()
+    }
+
+    #[test]
+    fn inch_declared_cube_imports_as_millimetres() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+
+        let inches = declare_length_unit_inch(&step_str);
+        let mut read_topo = Topology::new();
+        let solids = read_step(&inches, &mut read_topo).unwrap();
+        assert_eq!(solids.len(), 1);
+
+        let (lo, hi) = solid_extent(&read_topo, solids[0]);
+        for axis in 0..3 {
+            let side = hi[axis] - lo[axis];
+            assert!(
+                (side - 25.4).abs() < 1e-9,
+                "a 1-inch cube must import as 25.4 mm, axis {axis} measured {side}"
+            );
+        }
+    }
+
+    #[test]
+    fn metre_declared_cube_imports_as_millimetres() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 2.0, 3.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+
+        let metres = declare_length_unit_metre(&step_str);
+        let mut read_topo = Topology::new();
+        let solids = read_step(&metres, &mut read_topo).unwrap();
+
+        let (lo, hi) = solid_extent(&read_topo, solids[0]);
+        for (axis, expected) in [1000.0, 2000.0, 3000.0].into_iter().enumerate() {
+            let side = hi[axis] - lo[axis];
+            assert!(
+                (side - expected).abs() < 1e-6,
+                "metre-declared box axis {axis} should be {expected} mm, measured {side}"
+            );
+        }
+    }
+
+    #[test]
+    fn millimetre_declared_file_is_unscaled() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 4.0, 5.0, 6.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+
+        let mut read_topo = Topology::new();
+        let solids = read_step(&step_str, &mut read_topo).unwrap();
+        let (lo, hi) = solid_extent(&read_topo, solids[0]);
+        for (axis, expected) in [4.0, 5.0, 6.0].into_iter().enumerate() {
+            assert!((hi[axis] - lo[axis] - expected).abs() < 1e-9, "axis {axis}");
+        }
+    }
+
+    #[test]
+    fn degree_declared_cone_matches_the_radian_declared_file() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_cone(&mut write_topo, 1.0, 0.0, 2.0).unwrap();
+        let radian_step = writer::write_step(&write_topo, &[solid]).unwrap();
+        let degree_step = declare_angle_unit_degrees(&radian_step);
+        assert!(
+            degree_step.contains("CONVERSION_BASED_UNIT('DEGREE'"),
+            "fixture should declare degrees"
+        );
+
+        let mut radian_topo = Topology::new();
+        let radian_solids = read_step(&radian_step, &mut radian_topo).unwrap();
+        let mut degree_topo = Topology::new();
+        let degree_solids = read_step(&degree_step, &mut degree_topo).unwrap();
+
+        let radian_angles = cone_half_angles(&radian_topo, radian_solids[0]);
+        let degree_angles = cone_half_angles(&degree_topo, degree_solids[0]);
+        assert!(!radian_angles.is_empty(), "fixture should have a cone face");
+        assert_eq!(radian_angles.len(), degree_angles.len());
+        for (r, d) in radian_angles.iter().zip(degree_angles.iter()) {
+            assert!(
+                (r - d).abs() < 1e-12,
+                "degree-declared semi-angle {d} should equal the radian one {r}"
+            );
+        }
+
+        let radian_volume =
+            brepkit_operations::measure::solid_volume(&radian_topo, radian_solids[0], 0.01)
+                .unwrap();
+        let degree_volume =
+            brepkit_operations::measure::solid_volume(&degree_topo, degree_solids[0], 0.01)
+                .unwrap();
+        assert!(
+            (radian_volume - degree_volume).abs() < 1e-9 * radian_volume.abs().max(1.0),
+            "degree- and radian-declared cones should be the same solid: \
+             {degree_volume} vs {radian_volume}"
+        );
+    }
+
+    #[test]
+    fn resolve_unit_scale_reads_inch_and_degrees() {
+        let body = "\
+#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n\
+#2 = LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(25.4),#1);\n\
+#3 = ( CONVERSION_BASED_UNIT('INCH',#2) LENGTH_UNIT() NAMED_UNIT(#1) );\n\
+#4 = ( NAMED_UNIT(*) PLANE_ANGLE_UNIT() SI_UNIT($,.RADIAN.) );\n\
+#5 = PLANE_ANGLE_MEASURE_WITH_UNIT(PLANE_ANGLE_MEASURE(1.745329251994330E-02),#4);\n\
+#6 = ( CONVERSION_BASED_UNIT('DEGREE',#5) NAMED_UNIT(#4) PLANE_ANGLE_UNIT() );\n\
+#7 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#3,#6));";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let scale = resolve_unit_scale(&entities).unwrap();
+        assert!((scale.length - 25.4).abs() < 1e-12, "{scale:?}");
+        assert!(
+            (scale.angle - 1.745_329_251_994_33E-2).abs() < 1e-15,
+            "{scale:?}"
+        );
+    }
+
+    #[test]
+    fn resolve_unit_scale_reads_si_prefixes() {
+        for (prefix, expected_mm) in [
+            (".MILLI.", 1.0),
+            (".CENTI.", 10.0),
+            ("$", 1000.0),
+            (".KILO.", 1e6),
+            (".MICRO.", 1e-3),
+        ] {
+            let body = format!(
+                "#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT({prefix},.METRE.) );\n\
+                 #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));"
+            );
+            let entities = parse_step_entities(&step_file(&body), ImportLimits::default()).unwrap();
+            let scale = resolve_unit_scale(&entities).unwrap();
+            assert!(
+                (scale.length - expected_mm).abs() <= 1e-9 * expected_mm,
+                "{prefix} should scale to {expected_mm} mm, got {}",
+                scale.length
+            );
+            assert!(
+                (scale.angle - 1.0).abs() < 1e-15,
+                "undeclared angle is radians"
+            );
+        }
+    }
+
+    #[test]
+    fn file_without_a_length_unit_is_refused() {
+        let body = "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+                    #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT(());";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let err = resolve_unit_scale(&entities).unwrap_err();
+        assert!(
+            err.to_string().contains("declares no LENGTH_UNIT"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn conflicting_length_units_are_refused() {
+        let body = "\
+#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n\
+#2 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.CENTI.,.METRE.) );\n\
+#3 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));\n\
+#4 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#2));";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let err = resolve_unit_scale(&entities).unwrap_err();
+        assert!(
+            err.to_string().contains("conflicting length units"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn unrecognised_si_prefix_is_refused_not_defaulted() {
+        let body = "#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.FURLONG.,.METRE.) );\n\
+                    #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let err = resolve_unit_scale(&entities).unwrap_err();
+        assert!(
+            err.to_string().contains("unrecognised prefix"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn length_unit_on_a_non_metre_base_is_refused() {
+        let body = "#1 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT($,.GRAM.) );\n\
+                    #2 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let err = resolve_unit_scale(&entities).unwrap_err();
+        assert!(
+            err.to_string().contains("expected `.METRE.`"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn cyclic_conversion_based_unit_is_refused_not_overflowed() {
+        let body = "\
+#1 = ( CONVERSION_BASED_UNIT('A',#2) LENGTH_UNIT() NAMED_UNIT(*) );\n\
+#2 = LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(2.),#1);\n\
+#3 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#1));";
+        let entities = parse_step_entities(&step_file(body), ImportLimits::default()).unwrap();
+        let err = resolve_unit_scale(&entities).unwrap_err();
+        assert!(
+            err.to_string().contains("cyclic unit reference"),
+            "unexpected error: {err}"
+        );
+    }
+
+    #[test]
+    fn inch_declared_circle_radius_is_scaled() {
+        let body = "\
+#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+#2 = DIRECTION('',(0.,0.,1.));\n\
+#3 = DIRECTION('',(1.,0.,0.));\n\
+#4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+#5 = CIRCLE('',#4,2.);\n\
+#6 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n\
+#7 = LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(25.4),#6);\n\
+#8 = ( CONVERSION_BASED_UNIT('INCH',#7) LENGTH_UNIT() NAMED_UNIT(#6) );\n\
+#9 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#8));";
+        let EdgeCurve::Circle(circle) = curve_geometry(body, 5).unwrap() else {
+            panic!("expected a circle");
+        };
+        assert!(
+            (circle.radius() - 50.8).abs() < 1e-12,
+            "{}",
+            circle.radius()
+        );
+    }
+
+    #[test]
+    fn inch_declared_cylinder_radius_is_scaled() {
+        let body = "\
+#1 = CARTESIAN_POINT('',(1.,0.,0.));\n\
+#2 = DIRECTION('',(0.,0.,1.));\n\
+#3 = DIRECTION('',(1.,0.,0.));\n\
+#4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+#5 = CYLINDRICAL_SURFACE('',#4,2.);\n\
+#6 = ( LENGTH_UNIT() NAMED_UNIT(*) SI_UNIT(.MILLI.,.METRE.) );\n\
+#7 = LENGTH_MEASURE_WITH_UNIT(LENGTH_MEASURE(25.4),#6);\n\
+#8 = ( CONVERSION_BASED_UNIT('INCH',#7) LENGTH_UNIT() NAMED_UNIT(#6) );\n\
+#9 = GLOBAL_UNIT_ASSIGNED_CONTEXT((#8));";
+        let FaceSurface::Cylinder(cyl) = surface_geometry(body, 5).unwrap() else {
+            panic!("expected a cylinder");
+        };
+        assert!((cyl.radius() - 50.8).abs() < 1e-12, "{}", cyl.radius());
+        assert!(
+            (cyl.origin().x() - 25.4).abs() < 1e-12,
+            "the placement origin must be scaled too, got {}",
+            cyl.origin().x()
         );
     }
 
