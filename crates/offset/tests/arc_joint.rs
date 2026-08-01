@@ -9,7 +9,7 @@
 //! joint. A mitred `2×2×2` box offset by `0.5` is the `3×3×3` box, 27.0; the
 //! rounded one is 25.2359..., 7% smaller. Each volume assertion names the
 //! mitred figure so a fallback cannot pass unnoticed.
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use std::f64::consts::PI;
 
@@ -70,10 +70,19 @@ fn mitred_box_volume(a: f64, b: f64, c: f64, d: f64) -> f64 {
 }
 
 /// Volume by per-face divergence-theorem quadrature on the analytic surfaces.
+///
+/// The sign is kept, not taken away. The construction's own
+/// `check_oriented_manifold` proves the joint faces agree with each other,
+/// which a skin turned entirely inside out would satisfy just as well; only the
+/// sign of the boundary integral says they agree with the outside.
 fn measured_volume(topo: &Topology, solid: SolidId) -> f64 {
-    solid_volume(topo, solid, &PropertiesOptions::default())
-        .unwrap()
-        .abs()
+    let volume = solid_volume(topo, solid, &PropertiesOptions::default()).unwrap();
+    assert!(
+        volume > 0.0,
+        "the rounded skin measures {volume:.10}; a negative boundary integral means every \
+         face of it is oriented inward"
+    );
+    volume
 }
 
 /// How close a measurement of a rounded body can get to its closed form.
