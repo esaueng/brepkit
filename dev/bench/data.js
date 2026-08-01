@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785615331756,
+  "lastUpdate": 1785615895999,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3563,6 +3563,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22703557,
             "range": "± 239043",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8cd7131e04961d12238a6bc23b8eb25e3e43aaad",
+          "message": "Attribute a blend band to both faces its rounded edge separated (#56)\n\nThe geometric face matcher read every unresolvable tie as an ambiguity to\nrefuse. A rolling-ball blend band is tangent to both faces its rounded edge\nseparated and equidistant from both, with its normal on their bisector, so\nit scores identically against both BY CONSTRUCTION. That tie is not a coin\ntoss to break -- it is the signature of a face built from both -- and the\nmatcher was dropping the band into `unresolved` instead of naming it.\n\nA tie now counts as ambiguity only when the output could actually BE one of\nthe tied inputs, decided on orientation alone. Parallel to some candidate\nmeans it might be that candidate re-trimmed or moved, so it is still\nrefused. Parallel to none means it cannot be any of them however\npositioned, so it is new geometry built between them and every tied\ncandidate is recorded as its source. No `modified` entry is added by the new\nbranches, so the mis-binding hazard #51 closed stays closed, and #51's scale\nfix is untouched.\n\n`generated` is the right model and was never a contract change: the walking\nbuilder has always recorded `created: (band, [base_a, base_b])`, the\ncylinder-rim fillet already returned `generated`, and the WASM binding\nalready documented that blend faces appear there. The two engines behind one\noperation were disagreeing; this makes the inference reach the record's\nanswer. A box edge filleted at r=1 now gives `generated: {\"0\":[6],\"2\":[6]}`\nwith `unresolved: {}` and `origin: \"geometry\"`.\n\nThe gap was not fillet-only -- `chamfer` on a box edge had the same defect\nfrom the same cause. Booleans, patterns, and both cylinder-rim cases were\nalready correct.\n\nVerified at 1x, 1000x and 0.001x with identical maps, and against a\nhand-derived closed form (990 + 2.5*pi = 997.853981634 vs measured\n997.853932741) rather than any integrator-versus-integrator comparison. New\nset-equality suite in tests/regress_evolution_completeness.rs covers both\ndirections and pins the WASM binding's route, which drives its own engine\ncascade, to the same answer as the in-process API.\n\nOne caveat recorded with the tests: `modifiedSources u deleted ==\nfaces(sources)` holds now but is not true by design -- an input that only\nlost an `unresolved` tie is deliberately in neither bucket. It holds here\nbecause the fix eliminated the unresolved cases, so the suite asserts it\ntogether with `unresolved` being empty.",
+          "timestamp": "2026-08-01T15:22:25-05:00",
+          "tree_id": "f5de2c1c9cd43c278bceadd5cba6d64427d4f548",
+          "url": "https://github.com/esaueng/brepkit/commit/8cd7131e04961d12238a6bc23b8eb25e3e43aaad"
+        },
+        "date": 1785615894737,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 837172,
+            "range": "± 2686",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 930928,
+            "range": "± 1861",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13614,
+            "range": "± 82",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 697861,
+            "range": "± 1450",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21915479,
+            "range": "± 79065",
             "unit": "ns/iter"
           }
         ]
