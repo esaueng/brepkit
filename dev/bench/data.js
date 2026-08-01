@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785615895999,
+  "lastUpdate": 1785616046749,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3617,6 +3617,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21915479,
             "range": "± 79065",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "6e61ca5f5f6d6ba86a488a2d73755dc7a2f576d3",
+          "message": "Add EdgeCurve::Hyperbola and EdgeCurve::Parabola (#57)\n\nStage 1 of the Types lane: the two remaining conics become first-class edge\ncurves, with evaluation, derivatives, arc length, projection, recognition,\nadaptive sampling, elementary conversion and STEP read/write. 53 files\nacross 10 crates.\n\nCorrecting the premise this was filed under: it does NOT unblock\n`convert_to_elementary`. That function already recognized both conics and\nthen fell through to leaving the edge as its exact rational-Bezier NURBS, so\nthe gap was a benign no-op -- no geometry was being lost, only the analytic\ntype. A completeness gap, not a correctness bug.\n\nVerified against hand-derived closed forms, never against route agreement:\n\n- Parabolic arc length vs sqrt(5)/2 + asinh(2)/4 = 1.4789428575445975,\n  relative error < 1e-14.\n- Hyperbolic arc length, which has no elementary antiderivative, against an\n  independently implemented 200k-interval Simpson rule, < 1e-9 at every\n  scale.\n- Parabolic prism volume vs Archimedes' quadrature of the parabola,\n  V = 4/3 w^2 h: 1.5e-16 to 8.7e-16 over model scales 1e-4 to 1e4.\n- Topology at every scale: closed 2-manifold, zero free edges, zero\n  non-manifold edges, V - E + F = 2.\n- STEP round trip carries every sampled point to within 1e-9.\n\nTwo scale defects came out of it. Fixed: both conic recognizers compared a\nraw discriminant carrying L^-4 against the LINEAR tolerance, so the same\nhyperbola was recognized at 1x and 10x and rejected at 100x and 1000x. It\nfails closed, but it would have made these new variants unreachable for many\nmodels.\n\nFound and deliberately not fixed, because it FAILS OPEN and the blast radius\nis workspace-wide: `face_integrator::patch_count` tiles a quadrature axis by\ncomparing a raw parameter span against the absolute constant PI/4. That is\ndimensionless only for an angular parameter; a NURBS surface's u/v are knot\nvalues carrying length. The prism's ruled wall jumps 530x in area error\n(8.5e-7 to 4.5e-4) exactly as its span crosses PI/4, returning a wrong area\nwith no error. The area assertion is stated as an upper bound so it still\nholds once that is fixed.\n\nAlso fixed a behaviour gap the tests caught: `operations::boolean` fell back\nto a mesh boolean on ANY GFA failure, so a typed `UnsupportedCurve` refusal\nnever reached the caller and a conic-edged solid came back silently\ntessellated, looking like a success. That refusal now propagates; other GFA\nfailures still take the mesh route.\n\nLeft for stage 2, with nothing here depending on them:\nFaceSurface::{SurfaceOfExtrusion, SurfaceOfRevolution, OffsetSurface} and\nthe Plane UV parameterization. Also noted without fixing: the ellipse arm of\n`convert_to_elementary` discards the recognizer's u_axis and claims the\nresult is the same ellipse set, which is false for a non-circular ellipse --\na rotated ellipse, failing open, in the same class the new with_axes\nconstructors prevent.",
+          "timestamp": "2026-08-01T15:22:58-05:00",
+          "tree_id": "cb7e325034a73e14194054cab341314b195c2f4c",
+          "url": "https://github.com/esaueng/brepkit/commit/6e61ca5f5f6d6ba86a488a2d73755dc7a2f576d3"
+        },
+        "date": 1785616045823,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 839355,
+            "range": "± 14856",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 933098,
+            "range": "± 5211",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12918,
+            "range": "± 519",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 689807,
+            "range": "± 1777",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21989439,
+            "range": "± 690734",
             "unit": "ns/iter"
           }
         ]
