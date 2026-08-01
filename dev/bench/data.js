@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785553399816,
+  "lastUpdate": 1785560804810,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2483,6 +2483,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 23069443,
             "range": "± 40910",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5a12eaa1cb4a5635ed30509831c75b93b8923f70",
+          "message": "feat(wasm): export several solids into one STEP file (#36)\n\n`write_step` has always taken a slice of solids, but the wasm binding only\never handed it one. Consumers that needed a multi-body STEP had to export\neach solid separately and splice the files together downstream — OpenZCAD\npulls in a whole second kernel (OpenCascade, 22 MB of wasm) purely to do\nthat splice.\n\nAdd `exportStepMulti(solids)` alongside `exportStep`, so the bodies become\nseparate `MANIFOLD_SOLID_BREP` items of one\n`ADVANCED_BREP_SHAPE_REPRESENTATION` and a reader recovers exactly the\nbodies that went in.\n\nAlso fix the representation's item list, which was emitted with a trailing\ncomma — `(#10, #20,)`. ISO-10303-21 lists have no trailing comma, so strict\nreaders were entitled to reject every file this writer produced. It went\nunnoticed because the only reader exercising it was our own, which is\nlenient here.\n\n\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T00:04:17-05:00",
+          "tree_id": "0bd40afb7b38ba58cb6ca4de78aed218fe777fd4",
+          "url": "https://github.com/esaueng/brepkit/commit/5a12eaa1cb4a5635ed30509831c75b93b8923f70"
+        },
+        "date": 1785560803938,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 839561,
+            "range": "± 2663",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 924067,
+            "range": "± 2733",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14406,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 692836,
+            "range": "± 3072",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22034417,
+            "range": "± 90471",
             "unit": "ns/iter"
           }
         ]
