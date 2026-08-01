@@ -524,7 +524,7 @@ mod tests {
             (1usize, n, Point3::new(3.0, 4.0, 0.0)),
         ];
         assert!((characteristic_length(&faces, &[]) - 5.0).abs() < 1e-12);
-        assert_eq!(characteristic_length(&[], &[]), 0.0);
+        assert!(characteristic_length(&[], &[]).abs() < f64::EPSILON);
     }
 
     #[test]

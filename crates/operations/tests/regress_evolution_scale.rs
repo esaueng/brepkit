@@ -6,7 +6,7 @@
 //! every scale — and a wrong answer moves a user's saved face selection onto a
 //! different face rather than dropping it.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use brepkit_math::vec::Point3;
 use brepkit_operations::boolean::{self, BooleanOp, collect_face_signatures};
@@ -101,15 +101,18 @@ fn fuse_of_two_boxes_maps_what_the_construction_says() {
     let mut topo = Topology::new();
     let a = make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
     let b = make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
-    transform_solid(&mut topo, b, &brepkit_math::mat::Mat4::translation(6.0, 0.0, 0.0)).unwrap();
+    transform_solid(
+        &mut topo,
+        b,
+        &brepkit_math::mat::Mat4::translation(6.0, 0.0, 0.0),
+    )
+    .unwrap();
 
     let mut inputs = collect_face_signatures(&topo, a).unwrap();
     inputs.extend(collect_face_signatures(&topo, b).unwrap());
     let result = boolean::boolean(&mut topo, BooleanOp::Fuse, a, b).unwrap();
-    let evo = build_evolution_by_geometry(
-        &inputs,
-        &collect_face_signatures(&topo, result).unwrap(),
-    );
+    let evo =
+        build_evolution_by_geometry(&inputs, &collect_face_signatures(&topo, result).unwrap());
 
     // Name each face by the plane it lies in, so the assertions can be written
     // in geometry rather than in arena indices.
@@ -184,7 +187,10 @@ fn fuse_of_two_boxes_maps_what_the_construction_says() {
         "a consumed wall must not also be reported as surviving"
     );
 
-    assert!(evo.generated.is_empty(), "a fuse of two boxes invents no face");
+    assert!(
+        evo.generated.is_empty(),
+        "a fuse of two boxes invents no face"
+    );
     assert!(evo.is_complete(), "unresolved: {:?}", evo.unresolved);
 }
 
