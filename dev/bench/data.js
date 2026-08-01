@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785589923131,
+  "lastUpdate": 1785592469040,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3185,6 +3185,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17864778,
             "range": "± 36360",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a33d5570b811a4ccda7e5329b61244626c69522a",
+          "message": "fix(check): a hole in a curved face was material, and a bore wall measured nothing (#49)\n\nA cross-drilled shaft measured as though it had never been drilled. An r=3\nbore clean through an r=3, h=30 shaft read 848.230016 — pi r^2 h to the last\ndigit — against a true 704.230016, 20.4% high. Two defects did it, and the\n144 mm3 splits exactly in half.\n\nInner wires were never subtracted from a curved face: face_uv_bounds took its\nbounds from the outer wire alone and the containment test trimmed against that\nsame outer boundary, so the two rims the bore opens stayed material — 8r^2 of\nwall at (1/3) r area, 72 mm3.\n\nA quadric face bounded by ONE closed edge contributed exactly zero: each lobe\nof the bore wall is such a face, and face_uv_bounds reads boundary vertices,\nof which a closed edge has one. The bounds collapsed, the analytic domain was\nsubstituted, and a cylinder's is unbounded in v — every abscissa came out\nnon-finite and every one was rejected. The other 72 mm3.\n\nHoles are now removed in the same UV domain the quadrature runs over. A hole\nclosing in u is a patch and rejects what it encloses; one wrapping the periodic\naxis bounds a band, and rejects what an odd number of such loops lie above,\nwhich is why parity is the right rule for rims that come in pairs. A wrapping\nhole that instead caps the wall clips the v range rather than masking — it was\nbeing counted both ways, so a wall bounded by two closed rings rejected the\nstrip they bound and measured zero. The quadrature splits at every loop vertex\nin u and every loop crossing in v, so each outline falls ON an interval\nboundary and subtracts exactly for the polyline it is; masking alone left the\nlobes 0.16% short with the error moving with Gauss order. Residual is now\n4.7e-5, purely the rim ellipses' chord error. A torus stays deferred: doubly\nperiodic, so a wrapping hole has neither an above nor a far end to clip.\n\nsolid_volume has no duplicate integrator — it calls integrate_face. Its defect\nwas a guard deferring any holed cylinder or cone wall to tessellation precisely\nbecause the integrator ignored holes. Removed.\n\nBlast radius is exactly the bodies that were wrong. Zero existing tests moved.\nOf 17 shapes censused, only the cross-drilled shaft (848.230016 -> 704.263121)\nand a perpendicular cylinder fuse (mass_properties 1130.973355 -> 987.006460)\nmove materially; a coaxial fuse moves one ulp. Box, cylinder, cone, sphere,\ntorus, concentric bore, filleted box, coaxial tube, drilled sphere and\nbox/plane-trimmed quadric walls are bit-identical.\n\nCorrects two figures #46 documented on integrate_face. The r=3-through-r=10\nshaft named there never reached this path: unequal radii meet in a quartic the\nboolean has no analytic edge for, so it returns 110 planar faces and is measured\nby tessellation. Only an equal-radius cross-drill, whose cylinders meet in plane\nellipses, stays analytic. And 565.487 was pi r^2 2R, the bore unclipped by the\nwall it passes through; the real intersection is 559.051287, the true volume\n8865.726674, and the error 6.31% rather than 6.38%.",
+          "timestamp": "2026-08-01T08:52:03-05:00",
+          "tree_id": "f87e299d22f6b56dd7d47a1624a50fee3f3c1127",
+          "url": "https://github.com/esaueng/brepkit/commit/a33d5570b811a4ccda7e5329b61244626c69522a"
+        },
+        "date": 1785592468650,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 834198,
+            "range": "± 2672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 922858,
+            "range": "± 2783",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12683,
+            "range": "± 246",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 687678,
+            "range": "± 1959",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22191113,
+            "range": "± 138413",
             "unit": "ns/iter"
           }
         ]
