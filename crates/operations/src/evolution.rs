@@ -14,6 +14,23 @@
 //! [`EvolutionMap::unresolved`], not bound to the best of several poor
 //! candidates. [`EvolutionMap::origin`] tells the consumer whether it is
 //! looking at construction-derived fact or a geometric inference.
+//!
+//! # Refusing is not free either
+//!
+//! Silence about a face is its own failure. A result face in no bucket cannot be
+//! told from a face that is not in the result, so a consumer neither rebinds it
+//! nor knows to fail closed on it — and unlike a wrong answer, nothing about the
+//! result looks unusual. Refusal is therefore reserved for questions that are
+//! genuinely unanswerable, not spent on ties that only look like one.
+//!
+//! The distinction that does the work is between the two claims. `modified` says
+//! an output face *is* an input face carried forward, and that is the claim a
+//! stored selection rides on, so it is never made on a guess. `generated` says
+//! an output face is new and names what it was built from; it cannot move a
+//! selection anywhere, so it can name several sources at once. A blend band ties
+//! between the two faces its rounded edge separated because it was built from
+//! both — an unanswerable question under the first claim, and a plain fact under
+//! the second.
 
 use std::collections::{BTreeMap, HashMap, HashSet};
 
@@ -629,7 +646,12 @@ mod tests {
             Some(&vec![100]),
             "the right face is the other"
         );
-        assert_eq!(evo.generated.len(), 2, "and only those two: {:?}", evo.generated);
+        assert_eq!(
+            evo.generated.len(),
+            2,
+            "and only those two: {:?}",
+            evo.generated
+        );
         assert!(evo.is_complete(), "the band is placed, not refused");
     }
 
