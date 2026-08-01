@@ -601,12 +601,11 @@ fn build_vertex_spheres(
         // whole boundary sample row onto u = 0 and unwrap into a spiral.
         let mut center_dir = Vec3::new(0.0, 0.0, 0.0);
         for &face_index in &patch_faces {
-            center_dir = center_dir
-                + *normals
-                    .get(&face_index)
-                    .ok_or_else(|| OffsetError::AssemblyFailed {
-                        reason: format!("face {face_index} has no recorded outward normal"),
-                    })?;
+            center_dir += *normals
+                .get(&face_index)
+                .ok_or_else(|| OffsetError::AssemblyFailed {
+                    reason: format!("face {face_index} has no recorded outward normal"),
+                })?;
         }
         let center_dir = center_dir.normalize()?;
         let polar = pick_perpendicular(center_dir)?;
