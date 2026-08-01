@@ -7,7 +7,8 @@
 //!
 //! # Pipeline
 //!
-//! The offset algorithm follows a 9-phase pipeline:
+//! [`JointType::Intersection`], the default, extends adjacent offset faces
+//! until they meet, through an 8-phase pipeline:
 //!
 //! 1. **Analyse** — classify edges as convex/concave/tangent, derive vertex
 //!    classes.
@@ -18,14 +19,23 @@
 //! 4. **Intersect 2D** — intersect offset PCurves in parameter space to find
 //!    edge split points.
 //! 5. **Split edges** — split original edges at intersection parameters.
-//! 6. **Arc joints** — optionally insert rolling-ball arc fillets at convex
-//!    edges.
-//! 7. **Build loops** — assemble trimmed edges into closed wire loops for each
+//! 6. **Build loops** — assemble trimmed edges into closed wire loops for each
 //!    offset face.
-//! 8. **Assemble** — build the final shell and solid from offset faces and
+//! 7. **Assemble** — build the final shell and solid from offset faces and
 //!    wire loops.
-//! 9. **Self-intersection removal** — detect and excise global
+//! 8. **Self-intersection removal** — detect and excise global
 //!    self-intersections if enabled.
+//!
+//! # Joints
+//!
+//! [`JointType::Arc`] instead leaves each face at its own translated boundary
+//! and fills the gaps with the surface a rolling ball sweeps — a cylindrical
+//! patch along every convex edge and a spherical one at every convex vertex.
+//! For a convex polyhedron that is exactly the Minkowski sum with a ball. It
+//! is a different construction rather than a post-pass on the one above, so it
+//! runs after phase 1 and returns. Anything outside that class — a curved
+//! face, a concave or tangent edge, a face with a hole, a cavity, an excluded
+//! face, or an inward distance — is refused rather than quietly mitred.
 //!
 //! # Cavities
 //!
@@ -123,6 +133,16 @@ pub fn thick_solid(
 
     analyse::analyse_edges(topo, solid, &mut data)?;
 
+    if data.options.joint == JointType::Arc {
+        // A rounded offset is not the mitred one with fillets bolted on: its
+        // faces stop at their own translated boundary instead of being
+        // extended until they meet, so it is built whole rather than patched
+        // into the phases below.
+        let result = arc_joint::build_arc_offset(topo, solid, distance, &data)?;
+        validate_offset_result(topo, result)?;
+        return Ok(result);
+    }
+
     offset::build_offset_faces(topo, solid, &mut data)?;
 
     inter3d::intersect_faces_3d(topo, solid, &mut data)?;
@@ -130,10 +150,6 @@ pub fn thick_solid(
     inter2d::intersect_pcurves_2d(topo, solid, &mut data)?;
 
     // Edge splitting (phase 5) is integrated into inter2d for now.
-
-    if data.options.joint == JointType::Arc {
-        arc_joint::build_arc_joints(topo, &mut data)?;
-    }
 
     loops::build_wire_loops(topo, &mut data)?;
 
