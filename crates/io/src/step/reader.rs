@@ -816,13 +816,20 @@ impl<'a> StepBuilder<'a> {
                 let axis_ref = refs.first().copied().ok_or_else(|| IoError::ParseError {
                     reason: format!("CONICAL_SURFACE #{surface_ref} missing axis"),
                 })?;
-                // STEP: CONICAL_SURFACE('', #axis, base_radius, half_angle)
-                // The half angle is a plane-angle measure, so it is stated in
+                // STEP: CONICAL_SURFACE('', #axis, base_radius, semi_angle)
+                // The semi angle is a plane-angle measure, so it is stated in
                 // whatever PLANE_ANGLE_UNIT the file declared (radians for
                 // most writers, degrees for some).
-                let half_angle = floats.last().copied().ok_or_else(|| IoError::ParseError {
-                    reason: format!("CONICAL_SURFACE #{surface_ref} missing half_angle"),
+                //
+                // ISO 10303-42 measures `semi_angle` from the AXIS. brepkit's
+                // `ConicalSurface::half_angle` is measured from the radial
+                // plane. They are complements and coincide only at 45 degrees,
+                // so this conversion is what makes a foreign cone import at
+                // the angle its author actually meant.
+                let semi_angle = floats.last().copied().ok_or_else(|| IoError::ParseError {
+                    reason: format!("CONICAL_SURFACE #{surface_ref} missing semi_angle"),
                 })? * self.units.angle;
+                let half_angle = std::f64::consts::FRAC_PI_2 - semi_angle;
                 let (apex, axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
                 let cone = brepkit_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
                     .map_err(|e| IoError::ParseError {
