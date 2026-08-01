@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785609630564,
+  "lastUpdate": 1785610908420,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3401,6 +3401,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22489973,
             "range": "± 77650",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "22ee7827a9167a4c269ee70a9b31804e0505c52f",
+          "message": "Offset: cavity shells and Minkowski arc joints (#53)\n\n`offset_solid` refused any solid with inner shells; two sites read only the\nouter shell. Both now carry the source's shell partition through. A 6-cube\nwith a concentric 2-cube void offsets outward 0.5 to 7^3 - 1^3 = 342 and\ninward 0.5 to 5^3 - 3^3 = 98, exact to 1e-9.\n\n`arc_joint.rs` was a 19-line stub. It now builds true Minkowski joints for\nconvex polyhedra; everything else refuses with its own reason. Box (+) ball\ngives 6 planes, 12 cylinders and 8 spheres with V-E+F = 24-48+26 = 2, and\n2x2x2 at d=0.5 measures 25.2359600939 against a closed form of\n25.2359877560. The mitred fallback reads 27.0 -- 7% high.\n\nAlso fixes a scale-dependent 1e-20 in loops.rs that carried the fourth power\nof model units and killed every corner of a micron-scale body.\n\nTwo measurement corrections came out of this work:\n\n- `wire_polygon_sampled` laid a closed circle edge down as a polyline but\n  contributed only one endpoint for an open arc, so a rolling-ball corner\n  patch measured 0.29289322 against pi/2*r^2 = 0.39269908 -- 25% low -- and\n  the whole rounded 2x2x2 body 2.0% low, through both `solid_volume` and\n  `mass_properties`. Fixed in `build_face_uv`; `wire_polygon_sampled` is\n  byte-identical for its other callers. Note the shape of this: because both\n  routes share `integrate_face`, their agreement could never have caught it.\n\n- That fix exposed a fixture bug in #49's regression. `uv_rect_wire` built\n  both constant-v arcs about +z, so under `EdgeCurve::Circle`'s CCW\n  convention the return arc declared the major arc -- 4.283 rad where the\n  test names 2.0. Corrected to -z; both expected values are unchanged closed\n  forms.",
+          "timestamp": "2026-08-01T13:59:16-05:00",
+          "tree_id": "0acea6ad56b9e197cb87edfa63296154ae29b6b4",
+          "url": "https://github.com/esaueng/brepkit/commit/22ee7827a9167a4c269ee70a9b31804e0505c52f"
+        },
+        "date": 1785610907811,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 858440,
+            "range": "± 7460",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 958119,
+            "range": "± 34850",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14176,
+            "range": "± 168",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 693287,
+            "range": "± 1374",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22987602,
+            "range": "± 148559",
             "unit": "ns/iter"
           }
         ]
