@@ -652,23 +652,27 @@ fn plane_plane_chamfer(
 ///   - an OUTWARD plate contact (`major = r_c + r`) with a radius at or
 ///     past `r_c`.
 ///
-/// An INWARD plate contact (`major = r_c - r`: a bare disc cap's rim, or
-/// the flat bottom of a blind hole) is bounded by `r < r_c` — the radius
-/// at which the rolling ball stops fitting inside the cylinder. Note that
-/// this is NOT `r_c/2`: past half the radius the carrier torus is a horn
-/// or a self-intersecting spindle, but the quarter-tube band cut from it
-/// never reaches the self-intersecting lobe. A radius at or past that
-/// bound, and the vertex-tolerance sliver below it where the remaining cap
-/// face would be smaller than a vertex, is refused as
-/// [`BlendError::RadiusTooLarge`] rather than declined — no engine below
-/// can fit a ball that does not fit, and a caller handed a bare partial
-/// result cannot tell an impossible radius from an internal failure.
+/// An INWARD, CONVEX plate contact (`major = r_c - r`: a bare disc cap's
+/// own rim) is bounded by `r < r_c` — the radius at which the rolling ball
+/// stops fitting inside the cylinder. Note that this is NOT `r_c/2`: past
+/// half the radius the carrier torus is a horn or a self-intersecting
+/// spindle, but the quarter-tube band cut from it never reaches the
+/// self-intersecting lobe. A radius at or past that bound, and the
+/// vertex-tolerance sliver below it where the remaining cap face would be
+/// smaller than a vertex, is refused as [`BlendError::RadiusTooLarge`]
+/// rather than declined — no engine below can fit a ball that does not fit,
+/// and a caller handed a bare partial result cannot tell an impossible
+/// radius from an internal failure.
+///
+/// An inward, CONCAVE contact (the flat bottom of a blind hole) keeps the
+/// older `r_c/2` bound and still returns `None` past it; see the note at
+/// the bound itself.
 ///
 /// # Errors
 ///
 /// Returns `BlendError` if topology lookups fail, or
-/// [`BlendError::RadiusTooLarge`] for an inward contact whose radius is at
-/// or past the cylinder radius.
+/// [`BlendError::RadiusTooLarge`] for an inward convex contact whose radius
+/// is at or past the cylinder radius.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn plane_cylinder_fillet(
     n_p_inward: Vec3,
