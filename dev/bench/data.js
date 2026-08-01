@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785587264193,
+  "lastUpdate": 1785589923131,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3131,6 +3131,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21887559,
             "range": "± 72363",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "04e369285810bab4b752e4081c049e4f0b86f78a",
+          "message": "fix(operations): shell dropped the holes it hollowed and left the result open (#48)\n\nshell was not latent. An 80x60x6 plate with one bore hollowed to a 1 mm wall\nlost 3 of its 4 hole mouths and came back Euler-invalid (V-E+F = 7, must be 3)\nwith 72 open mesh edges. Opening its side made it invent 11% metal — 11641.792\nagainst a closed form of 10484.566. A plain cylinder hollowed into a cup, with\nno holes at all, read 1133.391 against an analytic 1425.931, 20% low, through\nan unrelated defect: face_polygon left rim circles unclosed.\n\nFour strands: inner wires dropped when a face was rebuilt, reversed hardcoded\nfalse, radius - thickness applied regardless of face sense (a hollowed R4 bore\ncame back R3 with its wall facing the wrong way, instead of R5), and the\nunclosed rim circles.\n\nThe four outer-skin sites are fixed by deletion — the whole rebuild is replaced\nby FaceSpec::Existing from #45, which copies surface, orientation, curved edges\nand inner wires verbatim. Of the six inner-skin sites, only the planar and\nspherical ones are reachable with holes: probed directly, the boolean engine\nnever leaves an inner wire on a cylinder, cone, torus or NURBS face. An axial\ndrill through a cone holes its two planar caps and leaves the flank whole; a\nradial drill through a cylinder wall does not cut it at all. No plumbing was\ninvented for the unreachable sites — the face's holes are computed once and\nhanded to whichever arm the surface selects, so no vec![] special case remains\nto become a fresh defect later.\n\nPlate shell now 10716.566371 = (80x60x6 - pi 4^2 6) - (78x58x4 - pi 5^2 4);\ncup now 1425.931206 = pi 10^2 16 - pi 8.8^2 14.8. Nine of the ten new tests\nfail against pre-fix sources; the tenth is a plain box, which was already right.\n\nshell_rim_determinism's pinned 1133.39 was documented in its own comment as a\nwrong number and is replaced by the analytic one.\n\nStill unfixed and wanting its own lane: measure::solid_volume reads a hollowed\ndrilled sphere as 1130.599 against 1441.103, because its analytic per-face path\nintegrates a sphere over the parameter box its outer wire spans and ignores the\nwire inside it. That is the same pair of defects #46 documented on\nintegrate_face, still present in solid_volume.",
+          "timestamp": "2026-08-01T08:10:00-05:00",
+          "tree_id": "fbf9cc552e5f0d45549c3b61f0fed51dddbd5eb5",
+          "url": "https://github.com/esaueng/brepkit/commit/04e369285810bab4b752e4081c049e4f0b86f78a"
+        },
+        "date": 1785589922710,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 666860,
+            "range": "± 2030",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 745268,
+            "range": "± 1933",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11251,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 537254,
+            "range": "± 656",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17864778,
+            "range": "± 36360",
             "unit": "ns/iter"
           }
         ]
