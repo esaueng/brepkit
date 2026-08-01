@@ -117,15 +117,14 @@ pub enum OperationsError {
         reason: String,
     },
 
-    /// The inputs are well formed but this configuration has no exact
-    /// construction in the current implementation.
+    /// The input is well-formed but the operation has no exact construction
+    /// for this configuration.
     ///
-    /// A refusal, not a failure: the operation declined rather than return a
-    /// result it could not build correctly. Callers can tell "not implemented
-    /// for this shape" apart from "your arguments are wrong"
-    /// ([`InvalidInput`]) without matching on message text. Retrying with the
-    /// same inputs will not help; the caller must either change the model or
-    /// accept an explicitly approximate route.
+    /// Returned in place of an approximate, degraded or invalid result, so
+    /// callers can distinguish "this cannot be built exactly" from "these
+    /// arguments are wrong" ([`InvalidInput`]) without matching on message
+    /// text. Retrying with the same inputs will not help; the caller must
+    /// either change the model or accept an explicitly approximate route.
     ///
     /// [`InvalidInput`]: Self::InvalidInput
     #[error("{operation}: unsupported configuration: {reason}")]
