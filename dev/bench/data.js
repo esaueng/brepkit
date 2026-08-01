@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785587126356,
+  "lastUpdate": 1785587264193,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3077,6 +3077,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21774493,
             "range": "± 139299",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c8557ed37c296e5fe9101af1623ed259efb15186",
+          "message": "fix(blend): a bore rim in the selection refused a corner it never touched (#47)\n\nAn 80x60x6 plate with an R2.25 bore filleted its four top perimeter edges at\nR2, and filleted the bore's rim at R2, but naming both at once was refused —\nat a plate corner 7.75 mm from the bore that shares nothing with it.\n\nThe rim never enters that corner's computation. What reached the corner was\nthe engine choice. blend_ops::fillet_v2 picked one engine for the whole\nselection on an all-or-nothing test, and the two engines are complementary\nrather than ranked: only the planar rolling-ball rebuild closes a vertex blend\nwhere two rounded edges meet at a corner, and only the walking builder\nassembles a closed rim. One circle failing is_planar_line_blend sent the four\nstraight edges to the walking builder too, whose first act is a guard refusing\nany vertex where two chains meet. Those same four corners are refused by that\nbuilder with no rim in the selection at all.\n\nThe vertex id in the message was never meaningful — it is whichever corner a\nHashMap iteration reaches first, Id(18) in one run and Id(16) in another.\n\nEdges more than 2*size apart and not on one tangent-continuous ridgeline round\ninto surfaces that cannot meet, so such a selection is several independent\nfeatures and each can go to the engine that fits its shape. The partition is\nconsulted only after one engine has refused the whole selection, so every case\nthat works today takes exactly the route it takes today.\n\n#44's contract is untouched: a feature that genuinely cannot be built still\nfails the whole call and names the edge, now more precisely — two bores 6 mm\napart report RadiusTooLarge on the rim rather than dying on a corner 27 mm\naway, and the input is left byte-identical.\n\nCombined result is watertight and matches its closed form\n27712 + 207.625pi + 8.5pi^2 = 28448.164812110841, converging from below as a\nholed body integrated off its inscribed mesh must.\n\nbrepkit-blend is unchanged; the entire defect was in the dispatcher.",
+          "timestamp": "2026-08-01T07:23:59-05:00",
+          "tree_id": "7fd6abe19cb83dd0aa09ab5ffad5496dee10d2f6",
+          "url": "https://github.com/esaueng/brepkit/commit/c8557ed37c296e5fe9101af1623ed259efb15186"
+        },
+        "date": 1785587263845,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 832509,
+            "range": "± 3802",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 924394,
+            "range": "± 3966",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12715,
+            "range": "± 120",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 693229,
+            "range": "± 5541",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21887559,
+            "range": "± 72363",
             "unit": "ns/iter"
           }
         ]
