@@ -16,6 +16,15 @@
 //! perfectly readable, so entity support is decided per entity: anything
 //! genuinely unhandled fails with [`IoError::UnsupportedEntity`] naming it.
 //! The writer continues to emit AP203.
+//!
+//! # Units
+//!
+//! brepkit works in millimetres and radians. The file's declared
+//! `GLOBAL_UNIT_ASSIGNED_CONTEXT` is resolved once and applied to every
+//! length- and angle-valued quantity at parse time, so nothing downstream
+//! needs to know what the file said. A file that carries geometry but no
+//! usable `LENGTH_UNIT` is refused rather than assumed to be millimetres:
+//! see [`resolve_unit_scale`].
 
 use std::collections::HashMap;
 
