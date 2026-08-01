@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785578987038,
+  "lastUpdate": 1785581878424,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -2861,6 +2861,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 23145729,
             "range": "± 707546",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "abe6da5328bf810e74eb2df83ba502c3cb7da2f6",
+          "message": "fix(operations): chamfer must keep the holes and close the shell (#43)\n\n`chamfer` rebuilt every face of the solid from a list of outer-wire vertex\npositions and handed the assembler `inner_wires: vec![]` for all of them.\nAny face carrying an inner wire — a through bore's mouth, a pocket opening\n— came back solid: the bore walls kept their rims but nothing referenced\nthem, and the chamfered body silently gained the material the holes had\nremoved. Chamfering the top perimeter of an 80x60x6 plate with four 8 mm\nbores returned a plate with no bores, 256 free edges, and MORE volume than\nit started with (27594 -> 28779). Nothing caught it, because chamfer\nreturned whatever the assembler produced: it had no result gate at all.\n\nThe same rebuild passed curved faces through as a straight-chord polygon\nwith `reversed: false` hardcoded. A bore wall — which a boolean cut always\nleaves reversed — came back facing into the metal and faceted from a\ncylinder into a 64-gon, and the reversed planar walls of a milled pocket\ncame back inside out. Two defects on one line.\n\nOnly the faces the bevel actually cuts back are rebuilt now. A face the\nchamfer does not move — every curved face, and every planar face none of\nwhose corners the bevel disturbs — travels as `FaceSpec::Existing`,\nkeeping its exact surface, its curved edges, its orientation and all of\nits inner wires. A face the chamfer does move gets a replacement outer\nwire and still copies its inner wires. The bevel strips and corner patches\nstay as they were: newly minted geometry that cannot carry a hole.\n\nOrientation is now respected throughout. A face's outer wire winds CCW\nabout its stored surface normal whether or not the face is reversed, so\nthe in-plane corner construction keeps using that normal, while the bevel\nstrip and the corner patch are faced using the outward normal — averaging\nstored normals pointed a pocket's bevels into its own cavity.\n\nAnything that cannot be built exactly is refused with\n`OperationsError::Unsupported { operation: \"chamfer\", .. }` naming why: a\ntarget edge on a curved face or on a hole's rim, a corner of a bevelled\nedge that also lies on a curved face or a hole's rim, a boundary that must\nbe rebuilt but carries a curved edge, a corner that would leave its own\nface's plane, a bevel that cuts into or lands on a hole in the face it\ntrims, and a corner whose faces face in opposing directions.\n\nEvery result is gated on strict `validate_solid`, a positive finite\nvolume, and a volume strictly smaller than the input's — a chamfer removes\nmaterial. The arithmetic is checked against closed form: a d-chamfer of a\nw x d_p box's whole top perimeter removes exactly `(w + d_p) d^2 - 4d^3/3`,\nand a single bevelled edge of length L removes `d1*d2*L/2`.\n\n\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-01T05:55:38-05:00",
+          "tree_id": "e170fb50d72d81d0cbbce3b97e89b67d06184d80",
+          "url": "https://github.com/esaueng/brepkit/commit/abe6da5328bf810e74eb2df83ba502c3cb7da2f6"
+        },
+        "date": 1785581877420,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 833566,
+            "range": "± 17216",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 919696,
+            "range": "± 3196",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12729,
+            "range": "± 94",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 682656,
+            "range": "± 2712",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21986433,
+            "range": "± 89540",
             "unit": "ns/iter"
           }
         ]
