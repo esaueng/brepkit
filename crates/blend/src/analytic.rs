@@ -649,13 +649,26 @@ fn plane_plane_chamfer(
 /// doesn't cover:
 ///   - the cylinder axis isn't parallel to the plane normal,
 ///   - the spine geometry is too short or degenerate,
-///   - the fillet radius exceeds the cylinder radius (would invert
-///     `r_c - r` for the concave case or geometrically nest the convex
-///     fillet inside the cylinder).
+///   - an OUTWARD plate contact (`major = r_c + r`) with a radius at or
+///     past `r_c`.
+///
+/// An INWARD plate contact (`major = r_c - r`: a bare disc cap's rim, or
+/// the flat bottom of a blind hole) is bounded by `r < r_c` — the radius
+/// at which the rolling ball stops fitting inside the cylinder. Note that
+/// this is NOT `r_c/2`: past half the radius the carrier torus is a horn
+/// or a self-intersecting spindle, but the quarter-tube band cut from it
+/// never reaches the self-intersecting lobe. A radius at or past that
+/// bound, and the vertex-tolerance sliver below it where the remaining cap
+/// face would be smaller than a vertex, is refused as
+/// [`BlendError::RadiusTooLarge`] rather than declined — no engine below
+/// can fit a ball that does not fit, and a caller handed a bare partial
+/// result cannot tell an impossible radius from an internal failure.
 ///
 /// # Errors
 ///
-/// Returns `BlendError` if topology lookups fail.
+/// Returns `BlendError` if topology lookups fail, or
+/// [`BlendError::RadiusTooLarge`] for an inward contact whose radius is at
+/// or past the cylinder radius.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn plane_cylinder_fillet(
     n_p_inward: Vec3,
@@ -739,19 +752,29 @@ pub fn plane_cylinder_fillet(
     //    at most at the single limit point `R = 0`, `|v| = π/2`. Refusing
     //    `r > r_c/2` refused sound geometry: a rim rounded to more than half the
     //    radius is an ordinary shape (at the limit, a hemispherical end).
+    //
+    //    The bound is open at both ends. At `r = r_c` the plate contact circle
+    //    collapses onto the axis: the cap face disappears and the end becomes a
+    //    hemisphere, which is a different topology than the band-plus-cap this
+    //    assembles. The last sliver below it is refused for the same reason —
+    //    a cap whose radius is under the vertex tolerance is not a face, and
+    //    emitting one produces a body that passes every topological check and
+    //    tessellates into degenerate triangles.
     if radius <= tol_lin {
         return Ok(None);
     }
-    if radius >= r_c {
+    let cap_floor = {
+        let tol = brepkit_math::tolerance::Tolerance::new();
+        tol.linear.max(tol.relative * r_c)
+    };
+    if radius >= if inward { r_c - cap_floor } else { r_c } {
         if !inward {
             return Ok(None);
         }
-        // Past this the rolling ball does not fit in the cylinder at all, so no
-        // engine below can do better. Name it rather than let the walker fail
-        // and the caller read a bare partial result. At `r = r_c` exactly the
-        // plate contact circle shrinks to a point and the cap face vanishes;
-        // that limit is a different topology (a spherical end) than the band
-        // this assembles, so the bound is open.
+        // No engine below can fit a ball that does not fit, so this is a
+        // verdict on the radius rather than on this path. Name it, instead of
+        // declining to the walker and letting the caller read a bare partial
+        // result that reads exactly like an internal failure.
         let Some(&edge) = spine.edges().first() else {
             return Ok(None);
         };
