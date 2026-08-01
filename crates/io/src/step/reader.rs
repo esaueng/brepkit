@@ -23,8 +23,10 @@
 //! `GLOBAL_UNIT_ASSIGNED_CONTEXT` is resolved once and applied to every
 //! length- and angle-valued quantity at parse time, so nothing downstream
 //! needs to know what the file said. A file that carries geometry but no
-//! usable `LENGTH_UNIT` is refused rather than assumed to be millimetres:
-//! see [`resolve_unit_scale`].
+//! usable `LENGTH_UNIT` is refused rather than assumed to be millimetres —
+//! guessing would silently rescale an entire model. A file with nothing
+//! length-valued in it (some are `PRODUCT`/`COLOUR_RGB` only) still imports,
+//! as zero solids.
 
 use std::collections::HashMap;
 
