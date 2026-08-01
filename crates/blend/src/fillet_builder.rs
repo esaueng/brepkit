@@ -141,14 +141,34 @@ impl<'a> FilletBuilder<'a> {
         }
 
         // Two or more chains touching the same vertex need a vertex blend
-        // there. The corner solver computes exact geometry for that, but this
-        // builder cannot yet assemble it watertight: stripes run to the
-        // vertex un-set-back and the corner faces mint their own boundary
-        // edges, so the shell has free edges by construction and every
-        // downstream validation rejects it. Fail fast with a typed error
+        // there. The corner solver computes exact geometry for that
+        // (`corner::compute_corners` already returns patches), but this builder
+        // cannot yet assemble it watertight. Fail fast with a typed error
         // before any stripe work so callers (`try_fillet`, `fillet_v2`) fall
         // through to an engine that closes corners, instead of paying for a
         // doomed build plus rollback.
+        //
+        // Removing this guard does not currently reach the corner code at all.
+        // Measured on a two-edge box corner with the guard disabled, the
+        // blockers are, in the order they bite:
+        //
+        //  1. `trimmer` cannot cut one base face twice. Both stripes trim the
+        //     shared cap and the second cut fails outright with
+        //     `TrimmingFailure`, so nothing downstream ever runs.
+        //  2. Stripes are not set back at the shared vertex — each runs to the
+        //     vertex plane, leaving no tangency circle for a patch to meet.
+        //  3. Corner patches mint their own boundary edges instead of reusing
+        //     those set-back boundaries, so stripe-to-corner adjacency would be
+        //     coincidental rather than topological.
+        //  4. The trimmer does not let a base face consume the corner patch's
+        //     arc boundary when its wire is rewritten.
+        //
+        // Until all four are addressed the shell has free edges by
+        // construction. The planar fast path in `fillet_rolling_ball` closes
+        // these corners today — which is why a plain box and a drilled plate
+        // both fillet corner chains and whole perimeters — so what this guard
+        // still blocks is corner chains on curved or imported geometry the fast
+        // path declines.
         {
             let mut chains_at_vertex: HashMap<usize, (brepkit_topology::vertex::VertexId, usize)> =
                 HashMap::new();
