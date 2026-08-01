@@ -436,6 +436,68 @@ fn boolean_lineage_is_complete_at_every_modelling_unit() {
     }
 }
 
+// ── The route the WASM binding takes ───────────────────────────────
+
+/// `filletWithEvolution` does not call [`blend_ops::fillet_with_evolution`]. It
+/// drives the engine cascade itself and hands whatever record came back to
+/// [`blend_ops::evolution_from_blend_origins`], so it could in principle report
+/// something different from the in-process API for the same body. It must not,
+/// and this pins the two together on the exact reproduction the defect was
+/// reported against — a 10-cube with one edge rounded at radius 1.
+///
+/// [`blend_ops::evolution_from_blend_origins`]: brepkit_operations::blend_ops::evolution_from_blend_origins
+#[test]
+fn the_binding_route_reports_the_same_map_as_the_in_process_api() {
+    // The binding's sequence: snapshot the input faces BEFORE the blend (a
+    // successful blend trims them in place), run the engine, then turn whatever
+    // record it kept into a map.
+    let mut topo = Topology::new();
+    let cube = primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    let edges = solid_edges(&topo, cube).unwrap();
+    let before = faces_of(&topo, cube);
+
+    let input_signatures = boolean::collect_face_signatures(&topo, cube).unwrap();
+    let result = blend_ops::fillet_v2(&mut topo, cube, &[edges[0]], 1.0).expect("fillet");
+    let via_binding = blend_ops::evolution_from_blend_origins(
+        &topo,
+        result.solid,
+        result.face_origins.as_ref(),
+        &input_signatures,
+    )
+    .expect("evolution from blend origins");
+
+    let after = faces_of(&topo, result.solid);
+    assert_lineage_accounts_for_everything("binding route", &via_binding, &before, &after);
+
+    // Same body, same edge, through the in-process API.
+    let mut topo2 = Topology::new();
+    let cube2 = primitives::make_box(&mut topo2, 10.0, 10.0, 10.0).unwrap();
+    let edges2 = solid_edges(&topo2, cube2).unwrap();
+    let (_, direct) =
+        blend_ops::fillet_with_evolution(&mut topo2, cube2, &[edges2[0]], 1.0).expect("fillet");
+
+    assert_eq!(
+        via_binding.to_json(),
+        direct.to_json(),
+        "the binding and the in-process API disagree about the same fillet"
+    );
+
+    // And the answer itself, spelled out — this is the JSON a caller receives,
+    // and it is the exact output the defect was reported against.
+    //
+    // The face indices are the arena's, so a change in allocation order will
+    // move them. If that happens the fix is to renumber this string, never to
+    // relax it: the shape is the point — six survivors one-to-one, face 6
+    // generated from 0 and 2, nothing deleted and nothing refused.
+    assert_eq!(
+        direct.to_json(),
+        "{\"modified\":{\"0\":[7],\"1\":[8],\"2\":[9],\"3\":[10],\"4\":[11],\"5\":[12]},\
+         \"generated\":{\"0\":[6],\"2\":[6]},\"deleted\":[],\
+         \"unresolved\":{},\"origin\":\"geometry\"}",
+        "the reported map for the box-edge fillet changed"
+    );
+}
+
 // ── Patterns ───────────────────────────────────────────────────────
 
 /// A pattern is the third family that produces a history, and the only one
