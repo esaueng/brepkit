@@ -282,7 +282,6 @@ pub fn build_evolution_by_geometry(
 /// A non-finite or negative `characteristic_length` is treated as zero, which
 /// makes the matcher demand exact coincidence rather than match everything.
 #[must_use]
-#[allow(clippy::missing_panics_doc)] // the unwrap below is guarded by is_empty
 pub fn build_evolution_by_geometry_with_scale(
     input_faces: &[FaceSignature],
     output_faces: &[FaceSignature],
