@@ -553,12 +553,15 @@ impl<'a> StepBuilder<'a> {
     }
 
     fn build_all_solids(&mut self) -> Result<Vec<SolidId>, IoError> {
-        let brep_ids: Vec<u64> = self
+        let mut brep_ids: Vec<u64> = self
             .entities
             .iter()
-            .filter(|(_, e)| e.entity_type == "MANIFOLD_SOLID_BREP")
+            .filter(|(_, e)| is_solid_brep(e))
             .map(|(&id, _)| id)
             .collect();
+        // Entities live in a HashMap, so sort to make the order in which
+        // solids come back match the order they appear in the file.
+        brep_ids.sort_unstable();
 
         let mut solid_ids = Vec::new();
         for brep_id in brep_ids {
@@ -568,26 +571,76 @@ impl<'a> StepBuilder<'a> {
         Ok(solid_ids)
     }
 
+    /// Build one solid from a `MANIFOLD_SOLID_BREP` or its `BREP_WITH_VOIDS`
+    /// subtype.
+    ///
+    /// `BREP_WITH_VOIDS('name', #outer, (#void, ...))` carries the cavities
+    /// as `ORIENTED_CLOSED_SHELL`s after the outer shell; they become the
+    /// solid's inner shells. Dropping them, as this reader used to, turns a
+    /// hollow part into a filled one with no diagnostic.
     fn build_solid(&mut self, brep_id: u64) -> Result<SolidId, IoError> {
-        let attrs = self.get_entity(brep_id)?.attrs.clone();
+        let entity = self.get_entity(brep_id)?;
+        let with_voids =
+            entity.entity_type == "BREP_WITH_VOIDS" || entity.attrs.contains("BREP_WITH_VOIDS");
+        let attrs = entity.attrs.clone();
         let refs = parse_refs(&attrs);
-        // MANIFOLD_SOLID_BREP('name', #shell) — shell is the only #ref.
-        let shell_ref = refs.first().copied().ok_or_else(|| IoError::ParseError {
-            reason: format!("MANIFOLD_SOLID_BREP #{brep_id} missing shell reference"),
-        })?;
 
-        let shell_id = self.build_shell(shell_ref)?;
-        let solid_id = self.topo.add_solid(Solid::new(shell_id, Vec::new()));
+        let mut refs = refs.into_iter();
+        let shell_ref = refs.next().ok_or_else(|| IoError::ParseError {
+            reason: format!("solid B-Rep #{brep_id} missing its outer shell reference"),
+        })?;
+        let shell_id = self.build_shell(shell_ref, false)?;
+
+        let mut inner_shells = Vec::new();
+        if with_voids {
+            for void_ref in refs {
+                inner_shells.push(self.build_shell(void_ref, false)?);
+            }
+            if inner_shells.is_empty() {
+                return Err(IoError::ParseError {
+                    reason: format!("BREP_WITH_VOIDS #{brep_id} declares no void shells"),
+                });
+            }
+        }
+
+        let solid_id = self.topo.add_solid(Solid::new(shell_id, inner_shells));
         Ok(solid_id)
     }
 
-    fn build_shell(&mut self, shell_ref: u64) -> Result<brepkit_topology::shell::ShellId, IoError> {
-        let attrs = self.get_entity(shell_ref)?.attrs.clone();
+    /// Build a shell from a `CLOSED_SHELL`, an `OPEN_SHELL`, or an
+    /// `ORIENTED_CLOSED_SHELL` wrapper.
+    ///
+    /// `flip` inverts the sense of every face in the shell. It carries the
+    /// `ORIENTED_CLOSED_SHELL` orientation flag, which void shells use
+    /// (always `.F.` per ISO 10303-42) so their normals end up pointing away
+    /// from the solid's material — the same convention brepkit's inner
+    /// shells use.
+    fn build_shell(
+        &mut self,
+        shell_ref: u64,
+        flip: bool,
+    ) -> Result<brepkit_topology::shell::ShellId, IoError> {
+        let entity = self.get_entity(shell_ref)?;
+        if entity.entity_type == "ORIENTED_CLOSED_SHELL" {
+            let attrs = entity.attrs.clone();
+            let reversed = orientation_is_reversed(&attrs);
+            let base = parse_refs(&attrs)
+                .first()
+                .copied()
+                .ok_or_else(|| IoError::ParseError {
+                    reason: format!(
+                        "ORIENTED_CLOSED_SHELL #{shell_ref} missing its closed shell reference"
+                    ),
+                })?;
+            return self.build_shell(base, flip != reversed);
+        }
+
+        let attrs = entity.attrs.clone();
         let face_refs = parse_list_refs(&attrs);
 
         let mut face_ids = Vec::new();
         for face_ref in face_refs {
-            let face_id = self.build_face(face_ref)?;
+            let face_id = self.build_face(face_ref, flip)?;
             face_ids.push(face_id);
         }
 
@@ -599,11 +652,17 @@ impl<'a> StepBuilder<'a> {
     }
 
     #[allow(clippy::too_many_lines)]
-    fn build_face(&mut self, face_ref: u64) -> Result<brepkit_topology::face::FaceId, IoError> {
+    fn build_face(
+        &mut self,
+        face_ref: u64,
+        flip: bool,
+    ) -> Result<brepkit_topology::face::FaceId, IoError> {
         let attrs = self.get_entity(face_ref)?.attrs.clone();
-        // Check for reversed face orientation (.F. flag at end of ADVANCED_FACE).
+        // Check for reversed face orientation (.F. flag at end of ADVANCED_FACE),
+        // then apply the enclosing shell's orientation on top of it.
         let orient_tail = attrs.trim_end_matches(')').trim();
-        let face_reversed = orient_tail.ends_with(".F.") || orient_tail.ends_with(".FALSE.");
+        let face_reversed =
+            (orient_tail.ends_with(".F.") || orient_tail.ends_with(".FALSE.")) != flip;
         let all_refs = parse_refs(&attrs);
         let list_refs = parse_list_refs(&attrs);
 
@@ -1078,6 +1137,24 @@ impl<'a> StepBuilder<'a> {
 }
 
 // ── Attribute parsing helpers ───────────────────────────────────────
+
+/// True when a parsed entity is a solid B-Rep root this reader should build.
+///
+/// `BREP_WITH_VOIDS` is a subtype of `MANIFOLD_SOLID_BREP`, so it names
+/// itself rather than its supertype; the complex-instance form spells both
+/// out and parses with an empty entity type.
+fn is_solid_brep(entity: &StepEntity) -> bool {
+    matches!(
+        entity.entity_type.as_str(),
+        "MANIFOLD_SOLID_BREP" | "BREP_WITH_VOIDS"
+    ) || (entity.entity_type.is_empty() && entity.attrs.contains("MANIFOLD_SOLID_BREP"))
+}
+
+/// Read the trailing `.T.` / `.F.` orientation flag of an oriented entity.
+fn orientation_is_reversed(attrs: &str) -> bool {
+    let tail = attrs.trim_end_matches(')').trim();
+    tail.ends_with(".F.") || tail.ends_with(".FALSE.")
+}
 
 /// Extract all `#NNN` references from an attribute string.
 fn parse_refs(attrs: &str) -> Vec<u64> {
@@ -2572,6 +2649,141 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
             "the placement origin must be scaled too, got {}",
             cyl.origin().x()
         );
+    }
+
+    // ── Voids ──────────────────────────────────────────────────────
+
+    /// A 3x3x3 box with a fully interior 1x1x1 cavity: one outer shell, one
+    /// inner shell, volume 27 - 1 = 26.
+    fn make_hollow_cube(topo: &mut Topology) -> SolidId {
+        let outer = brepkit_operations::primitives::make_box(topo, 3.0, 3.0, 3.0).unwrap();
+        let void = brepkit_operations::primitives::make_box(topo, 1.0, 1.0, 1.0).unwrap();
+        brepkit_operations::transform::transform_solid(
+            topo,
+            void,
+            &brepkit_math::mat::Mat4::translation(1.0, 1.0, 1.0),
+        )
+        .unwrap();
+        let hollow = brepkit_operations::boolean::boolean(
+            topo,
+            brepkit_operations::boolean::BooleanOp::Cut,
+            outer,
+            void,
+        )
+        .unwrap();
+        assert_eq!(
+            topo.solid(hollow).unwrap().inner_shells().len(),
+            1,
+            "fixture should be a solid with one cavity"
+        );
+        hollow
+    }
+
+    #[test]
+    fn hollow_cube_round_trips_with_its_void() {
+        let mut write_topo = Topology::new();
+        let hollow = make_hollow_cube(&mut write_topo);
+        let source_volume =
+            brepkit_operations::measure::solid_volume(&write_topo, hollow, 0.01).unwrap();
+        assert!(
+            (source_volume - 26.0).abs() < 1e-6,
+            "hollow cube should measure 27 - 1 = 26, got {source_volume}"
+        );
+
+        let step_str = writer::write_step(&write_topo, &[hollow]).unwrap();
+        assert!(
+            step_str.contains("BREP_WITH_VOIDS("),
+            "a solid with cavities must export as BREP_WITH_VOIDS"
+        );
+        assert!(step_str.contains("ORIENTED_CLOSED_SHELL("));
+
+        let mut read_topo = Topology::new();
+        let solids = read_step(&step_str, &mut read_topo).unwrap();
+        assert_eq!(solids.len(), 1);
+
+        let read_solid = read_topo.solid(solids[0]).unwrap();
+        assert_eq!(
+            read_solid.inner_shells().len(),
+            1,
+            "the cavity must survive the round trip"
+        );
+
+        let read_volume =
+            brepkit_operations::measure::solid_volume(&read_topo, solids[0], 0.01).unwrap();
+        assert!(
+            (read_volume - source_volume).abs() < 1e-6,
+            "re-imported volume {read_volume} should match {source_volume}"
+        );
+    }
+
+    #[test]
+    fn solid_without_voids_still_exports_as_manifold_solid_brep() {
+        let mut topo = Topology::new();
+        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let step_str = writer::write_step(&topo, &[solid]).unwrap();
+        assert!(step_str.contains("MANIFOLD_SOLID_BREP("));
+        assert!(!step_str.contains("BREP_WITH_VOIDS("));
+    }
+
+    #[test]
+    fn oriented_closed_shell_flag_flips_face_sense() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+
+        // Re-root the same CLOSED_SHELL through an ORIENTED_CLOSED_SHELL with
+        // orientation .F. — every face must come back with its sense flipped.
+        let closed_shell_id: u64 = step_str
+            .lines()
+            .find_map(|l| {
+                l.contains("= CLOSED_SHELL(")
+                    .then(|| l.trim().trim_start_matches('#').split(' ').next())
+                    .flatten()
+            })
+            .and_then(|id| id.parse().ok())
+            .expect("writer emits a CLOSED_SHELL");
+
+        let mut senses = Vec::new();
+        for (orientation, expect_flip) in [(".T.", false), (".F.", true)] {
+            let idx = step_str.rfind("ENDSEC;").unwrap();
+            let rerooted = format!(
+                "{}#90001 = ORIENTED_CLOSED_SHELL('',*,#{closed_shell_id},{orientation});\n\
+                 #90002 = MANIFOLD_SOLID_BREP('',#90001);\n{}",
+                &step_str[..idx],
+                &step_str[idx..]
+            );
+            // Drop the original MANIFOLD_SOLID_BREP so only the re-rooted one builds.
+            let mut kept = String::new();
+            for line in rerooted
+                .lines()
+                .filter(|l| !l.contains("= MANIFOLD_SOLID_BREP(") || l.contains("#90001"))
+            {
+                let _ = writeln!(kept, "{line}");
+            }
+            let rerooted = kept;
+
+            let mut read_topo = Topology::new();
+            let solids = read_step(&rerooted, &mut read_topo).unwrap();
+            assert_eq!(solids.len(), 1, "orientation {orientation}");
+            let shell = read_topo
+                .shell(read_topo.solid(solids[0]).unwrap().outer_shell())
+                .unwrap();
+            let reversed: Vec<bool> = shell
+                .faces()
+                .iter()
+                .map(|&fid| read_topo.face(fid).unwrap().is_reversed())
+                .collect();
+            assert!(!reversed.is_empty());
+            senses.push((expect_flip, reversed));
+        }
+
+        let (_, forward) = &senses[0];
+        let (_, flipped) = &senses[1];
+        assert_eq!(forward.len(), flipped.len());
+        for (f, r) in forward.iter().zip(flipped.iter()) {
+            assert_ne!(f, r, "ORIENTED_CLOSED_SHELL .F. must invert each face");
+        }
     }
 
     #[test]
