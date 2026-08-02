@@ -36,7 +36,7 @@
 //! # Residual approximation
 //!
 //! Every positional test runs on a *chorded outline*: curved edges are
-//! sampled at [`CLOSED_CURVE_SAMPLES`] / [`OPEN_CURVE_SAMPLES`] parameters
+//! sampled at `CLOSED_CURVE_SAMPLES` / `OPEN_CURVE_SAMPLES` parameters
 //! and the polygon through those points is what is tested. A curved edge
 //! whose excursion outside the outer wire falls entirely between two
 //! consecutive samples is therefore not detected. One bezier per edge, which
