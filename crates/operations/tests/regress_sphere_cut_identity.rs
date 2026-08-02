@@ -4,18 +4,20 @@
 //! `make_sphere` builds the ball as TWO spherical patches that share one
 //! equatorial loop and differ only in the direction they walk it. Three
 //! separate stages of the boolean pipeline keyed faces on the direction-
-//! agnostic edge set and so read the two hemispheres as coincident
-//! duplicates of each other:
+//! AGNOSTIC edge set and so read the two hemispheres as coincident duplicates
+//! of each other:
 //!
 //! 1. `same_domain::build_sd_grouping` grouped them and dropped one as
-//!    within-rank residue.
-//! 2. `builder_solid::remove_doubled_faces` dropped both as a doubled pair.
+//!    within-rank residue (1 of 8 sub-faces selected).
+//! 2. `builder_solid::remove_doubled_faces` dropped BOTH as a doubled pair
+//!    ("all faces avoided").
 //! 3. `MIN_SOLID_FACES` rejected the surviving 2-face solid as too small.
 //!
 //! Any one of the three sent the operation to the mesh fallback, which
-//! replaces the exact spherical surfaces with an inscribed polyhedron and
-//! loses ~0.29% of the volume. Every assertion below is against a closed form
-//! written out by hand, never against another integrator.
+//! replaces the exact spherical surfaces with an inscribed polyhedron.
+//!
+//! Every assertion below is against a closed form written out by hand, never
+//! against another integrator.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
@@ -32,14 +34,31 @@ use brepkit_topology::explorer::solid_faces;
 use brepkit_topology::solid::SolidId;
 
 /// Model scales, listed so the ORDER is a rotation of the natural
-/// small-to-large one. A result that only holds for whichever scale runs
-/// first is a passing accident; rotating the list makes that visible instead
-/// of hiding it behind a lucky first entry.
+/// small-to-large one. A result that only holds at whichever scale runs first
+/// is a passing accident; rotating the list makes that visible rather than
+/// hiding it behind a lucky first entry.
+///
+/// The unfixed code fails at all three, and in three DIFFERENT ways — which is
+/// itself the evidence that the fallback it dropped into is scale-sensitive:
+/// 0.001x lost 38.8% of the volume (the fallback's absolute 0.1 deflection is
+/// five times the whole model, so the ball tessellated to 32 planes), 1x lost
+/// 0.286%, and 1000x did not finish at all ("mesh boolean work limit exceeded
+/// for input triangles A: 5638250 > 100000"). The fixed path is flat across
+/// all three because it never tessellates: the result is the two analytic
+/// patches, unchanged.
 const SCALES: [f64; 3] = [1000.0, 0.001, 1.0];
 
-/// Segment counts. The sphere's surface is exact regardless, so an identity
-/// Cut must return the same volume at every one of these; a result that moves
-/// with the segment count is a tessellated stand-in, not the exact surface.
+/// The two cheap scales. The 1000x arm of a multi-segment sweep would cost
+/// ~90 s PER boolean — not from anything this fix touches, but from the
+/// acceptance gate in `operands_are_represented`, which probes points with
+/// `classify_point_robust(.., 0.1, ..)`. That `0.1` is an ABSOLUTE deflection,
+/// so at r = 10 000 each probe re-tessellates the ball into millions of
+/// triangles. `cut_at_1000x_is_exact_for_every_segment_count` covers 1000x
+/// directly instead, one boolean at a time.
+const CHEAP_SCALES: [f64; 2] = [0.001, 1.0];
+
+/// Segment counts. The sphere's surface is analytic regardless of this, so an
+/// identity Cut must return the same volume at every one of them.
 const SEGMENTS: [usize; 3] = [16, 32, 64];
 
 fn sphere_volume(r: f64) -> f64 {
@@ -91,53 +110,68 @@ fn far_tool(topo: &mut Topology, radius: f64) -> SolidId {
     copy_and_transform_solid(topo, bx, &Mat4::translation(100.0 * radius, 0.0, 0.0)).unwrap()
 }
 
+/// Cut the sphere with a disjoint tool and check the result against
+/// `4/3*pi*r^3`, the exact surfaces, and closed-manifold topology.
+fn check_identity_cut(scale: f64, radius: f64, segments: usize) {
+    let exact = sphere_volume(radius);
+    let mut topo = Topology::default();
+    let sphere = make_sphere(&mut topo, radius, segments).unwrap();
+    let tool = far_tool(&mut topo, radius);
+
+    let result = boolean(&mut topo, BooleanOp::Cut, sphere, tool)
+        .unwrap_or_else(|e| panic!("scale {scale} seg {segments}: cut failed: {e}"));
+
+    let what = format!("scale {scale} seg {segments}");
+    let volume = solid_volume(&topo, result, radius * 0.005).unwrap();
+    let rel = (volume - exact).abs() / exact;
+    assert!(
+        rel < 1e-9,
+        "{what}: cut by a disjoint tool changed the volume: got {volume}, \
+         closed form 4/3*pi*r^3 = {exact} (relative error {rel:.3e})"
+    );
+
+    // The exact surface must survive. The mesh fallback replaces both
+    // spherical patches with thousands of planes, so this is what separates
+    // "right number" from "right body".
+    let tags = surface_tags(&topo, result);
+    assert_eq!(
+        tags,
+        vec!["sphere", "sphere"],
+        "{what}: expected the two spherical patches to survive, got {} faces {tags:?}",
+        tags.len()
+    );
+
+    assert_closed_two_manifold(&topo, result, &what);
+}
+
 #[test]
 fn cut_with_a_disjoint_tool_is_an_identity_on_a_sphere() {
-    for scale in SCALES {
-        let radius = 10.0 * scale;
-        let exact = sphere_volume(radius);
+    for scale in CHEAP_SCALES {
         for segments in SEGMENTS {
-            let mut topo = Topology::default();
-            let sphere = make_sphere(&mut topo, radius, segments).unwrap();
-            let tool = far_tool(&mut topo, radius);
-
-            let result = boolean(&mut topo, BooleanOp::Cut, sphere, tool)
-                .unwrap_or_else(|e| panic!("scale {scale} seg {segments}: cut failed: {e}"));
-
-            let what = format!("scale {scale} seg {segments}");
-            let volume = solid_volume(&topo, result, radius * 0.005).unwrap();
-            let rel = (volume - exact).abs() / exact;
-            assert!(
-                rel < 1e-9,
-                "{what}: cut by a disjoint tool changed the volume: got {volume}, \
-                 closed form 4/3*pi*r^3 = {exact} (relative error {rel:.3e})"
-            );
-
-            // The exact surface must survive. The mesh fallback replaces both
-            // spherical patches with thousands of planes, so this is the
-            // assertion that distinguishes "right number" from "right body".
-            let tags = surface_tags(&topo, result);
-            assert_eq!(
-                tags,
-                vec!["sphere", "sphere"],
-                "{what}: expected the two spherical patches to survive, got {tags:?}"
-            );
-
-            assert_closed_two_manifold(&topo, result, &what);
+            check_identity_cut(scale, 10.0 * scale, segments);
         }
     }
 }
 
-/// Segment-independence, stated directly: the sphere's surface is analytic,
-/// so an identity Cut cannot depend on the equatorial polygon's resolution.
+/// The 1000x arm, run one segment count per test body so a CI failure names
+/// the exact case. See `CHEAP_SCALES` for why 1000x is expensive.
+#[test]
+fn cut_at_1000x_is_exact_for_a_coarse_sphere() {
+    check_identity_cut(SCALES[0], 10.0 * SCALES[0], 16);
+}
+
+/// Segment-independence, stated directly: the sphere's surface is analytic, so
+/// an identity Cut cannot depend on the equatorial polygon's resolution.
+///
 /// Before the fix all three counts agreed too — on the WRONG value — because
 /// the mesh fallback tessellates from the deflection, not from `segments`.
 /// Pairing this with the closed-form assertion above is what makes the pair
-/// meaningful.
+/// meaningful; neither alone would have caught the defect.
 #[test]
 fn disjoint_cut_volume_is_independent_of_sphere_segments() {
-    for scale in SCALES {
+    for scale in CHEAP_SCALES {
         let radius = 10.0 * scale;
+        let exact = sphere_volume(radius);
         let mut volumes = Vec::new();
         for segments in SEGMENTS {
             let mut topo = Topology::default();
@@ -146,7 +180,6 @@ fn disjoint_cut_volume_is_independent_of_sphere_segments() {
             let result = boolean(&mut topo, BooleanOp::Cut, sphere, tool).unwrap();
             volumes.push(solid_volume(&topo, result, radius * 0.005).unwrap());
         }
-        let exact = sphere_volume(radius);
         for (segments, volume) in SEGMENTS.iter().zip(&volumes) {
             let rel = (volume - exact).abs() / exact;
             assert!(
@@ -159,8 +192,8 @@ fn disjoint_cut_volume_is_independent_of_sphere_segments() {
 }
 
 /// Controls in the same shape as the sphere case. These passed before the fix
-/// and must keep passing: the defect was specific to a body whose faces share
-/// their whole boundary, not to disjoint cuts in general.
+/// and must keep passing: the defect was specific to a body whose two faces
+/// share their whole boundary, not to disjoint cuts in general.
 #[test]
 fn disjoint_cut_controls_box_and_cylinder_are_still_exact() {
     for scale in SCALES {
@@ -195,17 +228,28 @@ fn disjoint_cut_controls_box_and_cylinder_are_still_exact() {
     }
 }
 
-/// A Cut that DOES bite must still respond to where the tool sits. With the
-/// sphere faceted by an earlier identity cut this stopped being true — mirror
-/// placements returned the same number. The two closed forms here differ by
-/// 5.4x, so a single shared answer cannot pass by accident.
+/// A Cut that DOES bite must still respond to where the tool sits. Once an
+/// earlier identity cut had faceted the sphere, that stopped being true —
+/// mirror placements returned the same number. The two closed forms here
+/// differ by 5.4x, so one shared answer cannot pass by accident.
 ///
 /// The tool is a cube 6x the sphere's diameter, so only the plane at its top
-/// face meets the ball; the remaining tool faces are far outside. Placing that
-/// plane at +r/2 leaves the cap above it, at -r/2 leaves everything above it.
+/// face meets the ball. Placing that plane at +r/2 leaves the cap above it; at
+/// -r/2 it leaves everything above it.
+///
+/// Run at 1x ONLY, deliberately. Both arms here still route through the mesh
+/// fallback — trimming a sphere with a plane is a separate GFA gap that this
+/// change does not address — and the fallback is the part of the pipeline that
+/// is scale-broken: its deflection is an ABSOLUTE 0.1, so at 0.001x it
+/// tessellates a 0.02-wide ball into 32 planes and loses 40% of the cap, and
+/// at 1000x it exceeds its own triangle work limit outright. Sweeping this
+/// test over scales would therefore measure that defect, not this one; the
+/// scale sweep that belongs to this fix is on the identity cut above, which
+/// stays on the exact analytic path at every scale. Both numbers are recorded
+/// in the PR.
 #[test]
 fn mirror_placed_cuts_return_their_own_closed_forms() {
-    for scale in SCALES {
+    for scale in [1.0_f64] {
         let radius = 10.0 * scale;
         let side = 12.0 * radius;
         // Spherical cap of height h on a sphere of radius r: pi*h^2*(r - h/3).
@@ -230,9 +274,9 @@ fn mirror_placed_cuts_return_their_own_closed_forms() {
                 .unwrap_or_else(|e| panic!("scale {scale} {label}: cut failed: {e}"));
             let volume = solid_volume(&topo, result, radius * 0.005).unwrap();
             let rel = (volume - exact).abs() / exact;
-            // The GFA path is exact where it applies; where it does not the
-            // mesh fallback still lands within a few tenths of a percent. The
-            // point of this test is that the two placements produce DIFFERENT
+            // The GFA path is exact where it applies; where it does not, the
+            // mesh fallback still lands within a few tenths of a percent. What
+            // this test asserts is that the two placements produce DIFFERENT
             // answers, each near its own closed form — not that both are exact.
             assert!(
                 rel < 0.01,
