@@ -12,7 +12,7 @@
 //!
 //! These live in `operations` rather than beside the check because building
 //! the cavity needs a boolean, and `check` sits below `operations`.
-#![allow(clippy::unwrap_used)]
+#![allow(clippy::unwrap_used, clippy::cast_possible_wrap)]
 
 use brepkit_check::validate::{ValidateOptions, validate_solid};
 use brepkit_math::mat::Mat4;
