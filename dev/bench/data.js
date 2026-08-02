@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785697438342,
+  "lastUpdate": 1785698319312,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4211,6 +4211,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 23292435,
             "range": "± 27063",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "537f3c16f114c40462aa96e1a74031ff774cd26f",
+          "message": "A hollow body's Euler characteristic is 2 PER SHELL, not 2 in total (#69)\n\n`check_euler` counts V, E and F over the WHOLE solid — every shell, not just\nthe outer one — and compared that total against a flat 2. Each closed genus-0\nsurface contributes 2 independently, and a body hollowed by a fully enclosed\ncavity carries the cavity as a second shell, so a perfectly correct hollow\nbody scored 4 and was reported as an anomaly. Measured on a 20^3 blank with an\noff-centre 6^3 void: V=16 E=24 F=12, chi = 4 over 2 shells. The expectation is\nnow 2 * shells.\n\nScope correction to the brief: this did NOT call hollow bodies invalid. The\ncheck emits Severity::Warning while is_valid() and error_count() count only\nSeverity::Error, so no body was ever failed by it. The cost was a permanent\ncomplaint on every hollowed body.\n\nAlso documented what the check cannot see. On a B-rep these counts are not the\ntopological invariants: a closed edge is one edge carrying one vertex, and a\nface may hold inner wires. A 20^3 block with a through hole is genus 1 and\nshould give chi = 0, but its counts are V=10 E=15 F=7 and give 2 — it passes\nfor the wrong reason rather than failing for the right one. That is why the\ncheck stays a Warning.\n\nTwo separate defects found on the way and deliberately not fixed here:\nvalidate_solid reports a plain drilled block invalid with an ERROR (\"2 shared\nedges have inconsistent face orientations\") though the body is exact to the\nclosed form and watertight; and a cavity's six faces each raise a spurious\nwinding warning, which is NOT the obvious missing is_reversed() since\ncheck_face_orientation already honours it.\n\nThe regression lives in operations because building a cavity needs a boolean\nand check sits below it. Verified by reverting: the hollow assertion fails\nwithout the fix while both controls pass either way, so the fix widened the\nexpectation rather than disabling the check.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-02T14:16:13-05:00",
+          "tree_id": "a20a7f6d32e05da9f0dff547f770aa37ef27da26",
+          "url": "https://github.com/esaueng/brepkit/commit/537f3c16f114c40462aa96e1a74031ff774cd26f"
+        },
+        "date": 1785698318732,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 863338,
+            "range": "± 1147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 947117,
+            "range": "± 2751",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12890,
+            "range": "± 20",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 871282,
+            "range": "± 1300",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22454170,
+            "range": "± 344440",
             "unit": "ns/iter"
           }
         ]
