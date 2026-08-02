@@ -165,3 +165,167 @@ fn repro_cut_halfspace() {
         }
     }
 }
+
+#[test]
+fn repro_offset2() {
+    let _ = env_logger::builder().is_test(false).try_init();
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    for d in [2.0, 0.001] {
+        let mut topo = Topology::default();
+        let sph = make_sphere(&mut topo, 10.0, 32).unwrap();
+        match offset_solid_v2(&mut topo, sph, d) {
+            Ok(sid) => {
+                let v = solid_volume(&topo, sid, DEFL).unwrap();
+                let m = brepkit_operations::tessellate::tessellate_solid(&topo, sid, 0.01).unwrap();
+                println!(
+                    "offset +{d}: vol={v:.4} exact={:.4} tris={} {}",
+                    4.0 / 3.0 * PI * (10.0 + d).powi(3),
+                    m.indices.len() / 3,
+                    describe(&topo, sid)
+                );
+                for f in solid_faces(&topo, sid).unwrap() {
+                    let face = topo.face(f).unwrap();
+                    let w = topo.wire(face.outer_wire()).unwrap();
+                    println!(
+                        "   face {f:?} {} rev={} outer_edges={} inners={}",
+                        face.surface().type_tag(),
+                        face.is_reversed(),
+                        w.edges().len(),
+                        face.inner_wires().len()
+                    );
+                }
+            }
+            Err(e) => println!("offset +{d}: ERR {e}"),
+        }
+    }
+}
+
+#[test]
+fn repro_offset_faces() {
+    let _ = env_logger::builder().is_test(false).try_init();
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    use brepkit_operations::tessellate::tessellate;
+    let mut topo = Topology::default();
+    let sph = make_sphere(&mut topo, 10.0, 32).unwrap();
+    for f in solid_faces(&topo, sph).unwrap() {
+        let m = tessellate(&topo, f, 0.05).unwrap();
+        let face = topo.face(f).unwrap();
+        let w = topo.wire(face.outer_wire()).unwrap();
+        println!(
+            "ORIG face {f:?} rev={} edges={} fwd={:?} tris={}",
+            face.is_reversed(),
+            w.edges().len(),
+            w.edges().iter().map(|o| o.is_forward()).collect::<Vec<_>>(),
+            m.indices.len() / 3
+        );
+    }
+    let off = offset_solid_v2(&mut topo, sph, 2.0).unwrap();
+    for f in solid_faces(&topo, off).unwrap() {
+        let m = tessellate(&topo, f, 0.05).unwrap();
+        let face = topo.face(f).unwrap();
+        let w = topo.wire(face.outer_wire()).unwrap();
+        println!(
+            "OFFSET face {f:?} rev={} edges={} fwd={:?} tris={}",
+            face.is_reversed(),
+            w.edges().len(),
+            w.edges().iter().map(|o| o.is_forward()).collect::<Vec<_>>(),
+            m.indices.len() / 3
+        );
+        for oe in w.edges().iter().take(3) {
+            let e = topo.edge(oe.edge()).unwrap();
+            let a = topo.vertex(e.start()).unwrap().point();
+            let b = topo.vertex(e.end()).unwrap().point();
+            println!(
+                "    edge {:?} {} ({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3})",
+                oe.edge(), e.curve().type_tag(),
+                a.x(), a.y(), a.z(), b.x(), b.y(), b.z()
+            );
+        }
+    }
+}
+
+fn zrange(m: &brepkit_operations::tessellate::TriangleMesh) -> (f64, f64, f64) {
+    let mut lo = f64::MAX;
+    let mut hi = f64::MIN;
+    for p in &m.positions {
+        lo = lo.min(p.z());
+        hi = hi.max(p.z());
+    }
+    // signed volume of this patch alone (cone to origin) — sign shows winding
+    let mut v = 0.0;
+    for t in m.indices.chunks_exact(3) {
+        let a = m.positions[t[0] as usize];
+        let b = m.positions[t[1] as usize];
+        let c = m.positions[t[2] as usize];
+        v += (a.x() * (b.y() * c.z() - c.y() * b.z()) - b.x() * (a.y() * c.z() - c.y() * a.z())
+            + c.x() * (a.y() * b.z() - b.y() * a.z()))
+            / 6.0;
+    }
+    (lo, hi, v)
+}
+
+#[test]
+fn repro_offset_sides() {
+    let _ = env_logger::builder().is_test(false).try_init();
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    use brepkit_operations::tessellate::tessellate;
+    let mut topo = Topology::default();
+    let sph = make_sphere(&mut topo, 10.0, 32).unwrap();
+    for f in solid_faces(&topo, sph).unwrap() {
+        let m = tessellate(&topo, f, 0.05).unwrap();
+        let (lo, hi, v) = zrange(&m);
+        println!("ORIG {f:?} rev={} z=[{lo:.3},{hi:.3}] signedvol={v:.3}",
+                 topo.face(f).unwrap().is_reversed());
+    }
+    let off = offset_solid_v2(&mut topo, sph, 2.0).unwrap();
+    for f in solid_faces(&topo, off).unwrap() {
+        let m = tessellate(&topo, f, 0.05).unwrap();
+        let (lo, hi, v) = zrange(&m);
+        println!("OFFSET {f:?} rev={} z=[{lo:.3},{hi:.3}] signedvol={v:.3}",
+                 topo.face(f).unwrap().is_reversed());
+    }
+}
+
+#[test]
+fn repro_offset_open_cases() {
+    let _ = env_logger::builder().is_test(false).try_init();
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    // (a) a body that merely CONTAINS a sphere face: half sphere
+    let mut topo = Topology::default();
+    let sph = make_sphere(&mut topo, 10.0, 32).unwrap();
+    let bx = make_box(&mut topo, 60.0, 60.0, 60.0).unwrap();
+    let tool = copy_and_transform_solid(&mut topo, bx, &Mat4::translation(-30.0, -30.0, 0.0))
+        .unwrap();
+    match boolean(&mut topo, BooleanOp::Cut, sph, tool) {
+        Ok(half) => {
+            println!("half sphere: {}", describe(&topo, half));
+            match offset_solid_v2(&mut topo, half, 2.0) {
+                Ok(o) => println!(
+                    "  half sphere offset +2: vol={:.4} exact={:.4} {}",
+                    solid_volume(&topo, o, DEFL).unwrap(),
+                    2.0 / 3.0 * PI * 12.0f64.powi(3),
+                    describe(&topo, o)
+                ),
+                Err(e) => println!("  half sphere offset +2 ERR {e}"),
+            }
+        }
+        Err(e) => println!("half sphere cut ERR {e}"),
+    }
+}
+
+#[test]
+fn repro_cyl_offset_scales() {
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    use brepkit_operations::primitives::make_cylinder;
+    for scale in [1000.0f64, 0.001, 1.0] {
+        let s = 10.0 * scale;
+        let mut topo = Topology::default();
+        let solid = make_cylinder(&mut topo, s / 2.0, s).unwrap();
+        match offset_solid_v2(&mut topo, solid, s * 0.2) {
+            Ok(o) => println!("cyl scale={scale}: ok vol={:.6} exact={:.6}",
+                solid_volume(&topo, o, s*0.001).unwrap(),
+                PI*(s/2.0+s*0.2).powi(2)*(s+2.0*s*0.2)),
+            Err(e) => println!("cyl scale={scale}: ERR {e}"),
+        }
+    }
+}
