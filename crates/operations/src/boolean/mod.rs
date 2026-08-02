@@ -425,7 +425,7 @@ pub fn boolean(
     // result is a deep copy, so it does not alias the input.
     if op == BooleanOp::Cut && solids_provably_disjoint(topo, a, b, tol.linear) {
         log::debug!("Cut short-circuited: tool is provably disjoint from the blank");
-        return Ok(crate::copy::copy_solid(topo, a)?);
+        return crate::copy::copy_solid(topo, a);
     }
 
     if op == BooleanOp::Fuse && solids_provably_disjoint(topo, a, b, tol.linear) {

@@ -19,7 +19,12 @@
 //! Every assertion below is against a closed form written out by hand, never
 //! against another integrator.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::type_complexity
+)]
 
 use std::collections::HashMap;
 use std::f64::consts::PI;
