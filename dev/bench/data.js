@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785641462009,
+  "lastUpdate": 1785641615698,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3833,6 +3833,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22984254,
             "range": "± 45193",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4819a58b58a0a1d7f3c34a3adcaab59096657afd",
+          "message": "Three dimensional-tolerance defects: a rotated ellipse, and two valid inputs refused (#60)\n\n1. convert_to_elementary published a rotated ellipse as an exact one.\n\nFails open. The ellipse arm destructured the recognizer's u_axis as\n`u_axis: _` and called Ellipse3D::new, which derives its own in-plane\nframe from the normal alone and lays semi_major along whatever that\nframe's x-axis happens to be. For any ellipse whose measured major axis\nis not that direction, the converted edge is the source ellipse rotated\ninside its own plane -- written into the arena as an exact analytic\nconversion, with no refusal and no diagnostic. Measured on a 3.0/1.2\nellipse with its major axis at 37 degrees: recovered axis was off by\n53.000 degrees before, under 1e-9 rad after.\n\nThe old comment claimed both frames \"describe the same ellipse SET in\n3D\". That is true only for a circle, where rotation about the normal is\nthe identity, which is presumably why it survived.\n\n2. transform_solid refused every uniform scale at or below 0.00464.\n\nFails closed. Four sites guarded degeneracy with\ntol.approx_eq(determinant, 0.0). A determinant is a VOLUME ratio;\nTolerance.linear is a LENGTH. Dimensionally wrong, and for a uniform\nscale it collapses to s^3 <= 1e-7 -- so a millimetres-to-metres rescale\nwas refused, while a matrix that genuinely collapses space onto a plane\nwas waved through because its entries were large.\n\nThe guard now compares the linear part's Hadamard ratio,\n|det| / (||c0||*||c1||*||c2||), against a dimensionless floor of 1e-12.\nThat is 1 for any similarity, 0 for a matrix that flattens space, and\ncarries no units at all. Cubing the length tolerance was rejected as the\nalternative: it is dimensionally consistent but still absolute, moving\nthe false-refusal band down rather than removing it. Degeneracy is a\nproperty of a transform's shape, never of its size.\n\n3. A large ellipse stopped being recognized as an ellipse.\n\nFails closed, and not in the brief -- found because defect 1's test could\nnot be written honestly without it. try_recognize_ellipse classified the\nconic on the RAW discriminant B^2-4AC against the LINEAR tolerance. That\ndiscriminant carries L^-4, so it shrinks as the model grows: a 3:1.2 arc\nclassified up to semi-major 234 and returned NotRecognized from 240 up.\nAn ellipse that classifies in metres stops classifying in millimetres.\nRouted through the existing dimensionless helper the other two conic arms\nalready use.\n\nCorrections to the brief: the fuzz oracle was NOT silently inert -- the\nharness authors had already worked around the band by choosing 0.01 over\n0.001, so the cost was a capped reach, not a vacuous pass, and no prior\nresult needs re-reading. And it was three defects, not two: defect 3 sits\none stage upstream of defect 1, so fixing the rotation alone would have\nleft the corrected code unexercised on exactly the models most likely to\nreach it.\n\nThe one constant introduced, DEGENERATE_SHAPE_RATIO = 1e-12, is\ndimensionless by construction.",
+          "timestamp": "2026-08-01T22:28:56-05:00",
+          "tree_id": "e7b91b738e23d5cc82b7d331fed166519adb3d0b",
+          "url": "https://github.com/esaueng/brepkit/commit/4819a58b58a0a1d7f3c34a3adcaab59096657afd"
+        },
+        "date": 1785641615207,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 837360,
+            "range": "± 2832",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 927140,
+            "range": "± 11473",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12737,
+            "range": "± 259",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 684535,
+            "range": "± 2718",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22102967,
+            "range": "± 102301",
             "unit": "ns/iter"
           }
         ]
