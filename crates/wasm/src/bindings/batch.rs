@@ -22,8 +22,8 @@ use crate::handles::{
     compound_id_to_u32, edge_id_to_u32, face_id_to_u32, solid_id_to_u32, wire_id_to_u32,
 };
 use crate::helpers::{
-    TOL, classify_to_string, get_f64, get_f64_array, get_u32, panic_message, try_chamfer,
-    try_fillet,
+    TOL, classify_to_string, get_f64, get_f64_array, get_u32, get_u32_array, panic_message,
+    try_chamfer, try_fillet,
 };
 use crate::kernel::BrepKernel;
 
@@ -1635,6 +1635,80 @@ impl BrepKernel {
                 )
                 .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(wire_id_to_u32(result)))
+            }
+            // ── Shape construction ──────────────────────────────
+            // Building one glyph outline costs dozens of these calls; a
+            // 20-character word costs roughly a thousand. Batching them
+            // collapses that into a single boundary crossing.
+            "makeLineEdge" => {
+                let eid = brepkit_topology::builder::make_line_edge(
+                    self.topo_mut(),
+                    Point3::new(
+                        get_f64(args, "x1")?,
+                        get_f64(args, "y1")?,
+                        get_f64(args, "z1")?,
+                    ),
+                    Point3::new(
+                        get_f64(args, "x2")?,
+                        get_f64(args, "y2")?,
+                        get_f64(args, "z2")?,
+                    ),
+                    TOL,
+                )
+                .map_err(|e| e.to_string())?;
+                Ok(serde_json::json!(edge_id_to_u32(eid)))
+            }
+            "makeNurbsEdge" => {
+                let eid = self
+                    .make_nurbs_edge_impl(
+                        get_f64(args, "startX")?,
+                        get_f64(args, "startY")?,
+                        get_f64(args, "startZ")?,
+                        get_f64(args, "endX")?,
+                        get_f64(args, "endY")?,
+                        get_f64(args, "endZ")?,
+                        get_u32(args, "degree")?,
+                        get_f64_array(args, "knots")?,
+                        get_f64_array(args, "controlPoints")?,
+                        get_f64_array(args, "weights")?,
+                    )
+                    .map_err(|e| e.to_string())?;
+                Ok(serde_json::json!(eid))
+            }
+            "makeWire" => {
+                let edges = get_u32_array(args, "edges")?;
+                let closed = args["closed"].as_bool().unwrap_or(true);
+                let wid = self
+                    .make_wire_impl(&edges, closed)
+                    .map_err(|e| e.to_string())?;
+                Ok(serde_json::json!(wid))
+            }
+            "makePlanarFaceFromWire" => {
+                let w = get_u32(args, "wire")?;
+                let wid = self.resolve_wire(w).map_err(|e| e.to_string())?;
+                let fid =
+                    brepkit_topology::builder::make_planar_face_from_wire(self.topo_mut(), wid)
+                        .map_err(|e| e.to_string())?;
+                Ok(serde_json::json!(face_id_to_u32(fid)))
+            }
+            "makeFaceFromWires" => {
+                let outer = get_u32(args, "outerWire")?;
+                let inner = match args.get("innerWires") {
+                    None | Some(serde_json::Value::Null) => Vec::new(),
+                    Some(_) => get_u32_array(args, "innerWires")?,
+                };
+                let fid = self
+                    .make_face_from_wires_impl(outer, &inner)
+                    .map_err(|e| e.to_string())?;
+                Ok(serde_json::json!(fid))
+            }
+            "addHolesToFace" => {
+                let face = get_u32(args, "face")?;
+                let holes = get_u32_array(args, "holeWires")?;
+                let fid = self
+                    .add_holes_to_face_impl(face, &holes)
+                    .map_err(|e| e.to_string())?;
+                Ok(serde_json::json!(fid))
             }
             "polygonUnion2d" | "polygonBoolean2d" => {
                 let coords_a = get_f64_array(args, "coordsA")?;
