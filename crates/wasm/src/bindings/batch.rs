@@ -22,7 +22,8 @@ use crate::handles::{
     compound_id_to_u32, edge_id_to_u32, face_id_to_u32, solid_id_to_u32, wire_id_to_u32,
 };
 use crate::helpers::{
-    TOL, classify_to_string, get_f64, get_u32, panic_message, try_chamfer, try_fillet,
+    TOL, classify_to_string, get_f64, get_f64_array, get_u32, panic_message, try_chamfer,
+    try_fillet,
 };
 use crate::kernel::BrepKernel;
 
@@ -1634,6 +1635,28 @@ impl BrepKernel {
                 )
                 .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(wire_id_to_u32(result)))
+            }
+            "polygonUnion2d" | "polygonBoolean2d" => {
+                let coords_a = get_f64_array(args, "coordsA")?;
+                let coords_b = get_f64_array(args, "coordsB")?;
+                let op = if op == "polygonUnion2d" {
+                    brepkit_math::polygon_boolean::BooleanOp::Union
+                } else {
+                    let name = args["operation"]
+                        .as_str()
+                        .ok_or("missing or invalid 'operation' string")?;
+                    super::polygon2d::parse_polygon_boolean_op(name).map_err(|e| e.to_string())?
+                };
+                // Absent `tolerance` means "kernel default"; a present but
+                // non-numeric one is a caller error, not a default request.
+                let tolerance = match args.get("tolerance") {
+                    None | Some(serde_json::Value::Null) => None,
+                    Some(v) => Some(v.as_f64().ok_or("invalid 'tolerance'")?),
+                };
+                let result =
+                    super::polygon2d::polygon_boolean_2d_impl(&coords_a, &coords_b, op, tolerance)
+                        .map_err(|e| e.to_string())?;
+                serde_json::to_value(result).map_err(|e| e.to_string())
             }
             "getNurbsCurveData" => {
                 let edge = get_u32(args, "edge")?;
