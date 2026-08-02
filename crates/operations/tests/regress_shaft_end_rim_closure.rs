@@ -152,12 +152,18 @@ fn end_rim_open_edges(mesh: &TriangleMesh, s: f64) -> usize {
 /// Before the fix this failed at every entry in the sweep: the shaft has two
 /// end rims and each contributed one full ring of open segments from the cap
 /// plus the same ring again from the wall.
+///
+/// The two coarsest entries assert something the fix also changed and that was
+/// worth catching on its own: at `deflection >= 0.3` this body used to
+/// tessellate to NOTHING — zero triangles for a valid five-face solid, at every
+/// bore radius — and a caller reading `is_watertight` on an empty mesh is told
+/// `true`. It now returns the same 68-triangle mesh the next step down does.
 #[test]
 fn the_shaft_end_rims_carry_no_open_edge() {
     for s in SCALES {
         for bore in [3.0_f64, 2.0, 1.0] {
             let (topo, solid) = cross_drilled_shaft(bore, s);
-            for defl in [0.1_f64, 0.05, 0.02, 0.01] {
+            for defl in [0.5_f64, 0.3, 0.1, 0.05, 0.02, 0.01] {
                 let (mesh, _) =
                     tessellate_solid_grouped_with_tolerance(&topo, solid, defl * s, 0.35).unwrap();
                 assert!(
@@ -235,7 +241,8 @@ fn the_cap_and_the_wall_share_one_rim_vertex_ring() {
         caps_ring.extend(r);
     }
     assert_eq!(
-        wall_ring, caps_ring,
+        wall_ring,
+        caps_ring,
         "the wall and the caps reference different rim vertex sets \
          ({} vs {}, {} in common)",
         wall_ring.len(),
