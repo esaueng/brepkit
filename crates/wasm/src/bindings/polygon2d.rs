@@ -337,6 +337,22 @@ mod polygon_boolean_tests {
         }
     }
 
+    /// Even-odd point-in-polygon on a flat `[x,y,...]` loop, so a test can
+    /// assert the SHAPE of a result loop and not only its area.
+    fn point_in_loop(loop_coords: &[f64], x: f64, y: f64) -> bool {
+        let n = loop_coords.len() / 2;
+        let mut inside = false;
+        for i in 0..n {
+            let j = (i + n - 1) % n;
+            let (xi, yi) = (loop_coords[2 * i], loop_coords[2 * i + 1]);
+            let (xj, yj) = (loop_coords[2 * j], loop_coords[2 * j + 1]);
+            if (yi > y) != (yj > y) && x < (xj - xi) * (y - yi) / (yj - yi) + xi {
+                inside = !inside;
+            }
+        }
+        inside
+    }
+
     /// Pull `outer` / `holes` out of the payload as flat coordinate loops.
     fn loops(payload: &serde_json::Value) -> (Vec<Vec<f64>>, Vec<Vec<f64>>) {
         let take = |key: &str| -> Vec<Vec<f64>> {
@@ -373,6 +389,23 @@ mod polygon_boolean_tests {
             "union area was {}",
             signed_area(&outer[0])
         );
+        // Area alone does not pin the shape: an axis-aligned rectangle of
+        // 175 units, or a wrongly ordered ring, would satisfy it. The true
+        // union is an 8-vertex L, and the notch at (12, 2) is outside it.
+        assert_eq!(
+            outer[0].len(),
+            16,
+            "the union of two offset squares is an 8-vertex L-shaped ring, got {:?}",
+            outer[0]
+        );
+        assert!(
+            !point_in_loop(&outer[0], 12.0, 2.0),
+            "(12, 2) is in the notch of the L and must be outside the union"
+        );
+        assert!(
+            point_in_loop(&outer[0], 2.0, 2.0) && point_in_loop(&outer[0], 12.0, 12.0),
+            "both arms of the L must be inside the union"
+        );
     }
 
     #[test]
@@ -391,21 +424,37 @@ mod polygon_boolean_tests {
     }
 
     #[test]
-    fn union_outer_loops_are_counter_clockwise() {
-        let payload = run_ok(
-            "polygonUnion2d",
-            // Both inputs written CW; the engine normalizes.
-            serde_json::json!({
-                "coordsA": vec![0.0, 0.0, 0.0, 10.0, 10.0, 10.0, 10.0, 0.0],
-                "coordsB": sq(5.0, 5.0, 10.0),
-            }),
-        );
-        let (outer, _) = loops(&payload);
-        assert_eq!(outer.len(), 1);
-        assert!(
-            signed_area(&outer[0]) > 0.0,
-            "outer loop must be CCW (positive signed area)"
-        );
+    fn union_outer_loops_are_counter_clockwise_whatever_the_input_winding() {
+        // `sq` emits CCW, so all four permutations have to be spelled out
+        // rather than assumed.
+        let cw = |x: f64, y: f64, s: f64| vec![x, y, x, y + s, x + s, y + s, x + s, y];
+        let a_cw = cw(0.0, 0.0, 10.0);
+        let a_ccw = sq(0.0, 0.0, 10.0);
+        let b_cw = cw(5.0, 5.0, 10.0);
+        let b_ccw = sq(5.0, 5.0, 10.0);
+        assert!(signed_area(&a_cw) < 0.0 && signed_area(&a_ccw) > 0.0);
+        for (label, a, b) in [
+            ("CW + CW", &a_cw, &b_cw),
+            ("CW + CCW", &a_cw, &b_ccw),
+            ("CCW + CW", &a_ccw, &b_cw),
+            ("CCW + CCW", &a_ccw, &b_ccw),
+        ] {
+            let payload = run_ok(
+                "polygonUnion2d",
+                serde_json::json!({"coordsA": a, "coordsB": b}),
+            );
+            let (outer, _) = loops(&payload);
+            assert_eq!(outer.len(), 1, "{label}");
+            assert!(
+                signed_area(&outer[0]) > 0.0,
+                "{label}: outer loop must be CCW (positive signed area)"
+            );
+            assert!(
+                (signed_area(&outer[0]) - 175.0).abs() < 1e-6,
+                "{label}: union area was {}",
+                signed_area(&outer[0])
+            );
+        }
     }
 
     // ── polygonBoolean2d ──────────────────────────────────────────
@@ -437,6 +486,11 @@ mod polygon_boolean_tests {
             "hole area was {}",
             signed_area(&holes[0])
         );
+        assert_eq!(outer[0].len(), 8, "outer is the original 4-vertex square");
+        assert_eq!(holes[0].len(), 8, "hole is the 4-vertex punched square");
+        // The hole sits where B was, not somewhere else of the same area.
+        assert!(point_in_loop(&holes[0], 4.0, 4.0));
+        assert!(!point_in_loop(&holes[0], 8.0, 8.0));
     }
 
     #[test]
@@ -453,6 +507,9 @@ mod polygon_boolean_tests {
         assert_eq!(outer.len(), 1);
         assert!(holes.is_empty());
         assert!((signed_area(&outer[0]) - 4.0).abs() < 1e-6);
+        assert_eq!(outer[0].len(), 8, "the overlap is B itself, 4 vertices");
+        assert!(point_in_loop(&outer[0], 4.0, 4.0));
+        assert!(!point_in_loop(&outer[0], 1.0, 1.0));
     }
 
     #[test]
@@ -549,6 +606,46 @@ mod polygon_boolean_tests {
             }),
         );
         assert_eq!(with_default, explicit);
+    }
+
+    #[test]
+    fn the_caller_tolerance_actually_reaches_the_boolean_engine() {
+        // The test above cannot fail on an implementation that parses the
+        // caller's tolerance and then throws it away, because it compares
+        // the default against an explicit copy of the default. This one
+        // demands a result that CHANGES with the tolerance.
+        //
+        // Two 10×10 squares separated by a 1e-3 gap. Below the gap the union
+        // is two disjoint loops; above it the near-coincident edges snap
+        // together and the union is a single 6-vertex loop.
+        let a = sq(0.0, 0.0, 10.0);
+        let b = sq(10.001, 0.0, 10.0);
+        let union_at = |tol: Option<f64>| -> Vec<Vec<f64>> {
+            let mut args = serde_json::json!({"coordsA": a, "coordsB": b});
+            if let Some(t) = tol {
+                args["tolerance"] = serde_json::json!(t);
+            }
+            loops(&run_ok("polygonUnion2d", args)).0
+        };
+
+        let fine = union_at(Some(1e-4));
+        assert_eq!(
+            fine.len(),
+            2,
+            "at tolerance 1e-4 the 1e-3 gap is real and the squares stay apart"
+        );
+
+        let coarse = union_at(Some(1e-2));
+        assert_eq!(
+            coarse.len(),
+            1,
+            "at tolerance 1e-2 the gap is below tolerance and the squares merge"
+        );
+        assert_eq!(coarse[0].len(), 12, "the merged loop has 6 vertices");
+
+        // And the default behaves like the fine tolerance, not the coarse
+        // one — so a hard-coded coarse constant would fail here too.
+        assert_eq!(union_at(None).len(), 2);
     }
 
     #[test]

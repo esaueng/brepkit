@@ -1677,7 +1677,15 @@ impl BrepKernel {
             }
             "makeWire" => {
                 let edges = get_u32_array(args, "edges")?;
-                let closed = args["closed"].as_bool().unwrap_or(true);
+                // Absent `closed` means "closed"; a present but non-boolean
+                // one is a caller error. `as_bool().unwrap_or(true)` would
+                // turn `"closed": 0` / `"false"` into a CLOSED wire — the
+                // opposite of the intent — and `Wire::new` does not validate
+                // closure, so nothing downstream would catch it.
+                let closed = match args.get("closed") {
+                    None | Some(serde_json::Value::Null) => true,
+                    Some(v) => v.as_bool().ok_or("invalid 'closed' boolean")?,
+                };
                 let wid = self
                     .make_wire_impl(&edges, closed)
                     .map_err(|e| e.to_string())?;
