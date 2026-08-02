@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785640285836,
+  "lastUpdate": 1785641462009,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3779,6 +3779,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21765333,
             "range": "± 66424",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1d5d095658439ab857d6077b61d79f32fabf3a4e",
+          "message": "Measure inner shells, and tile NURBS quadrature by knot span (#61)\n\nTwo measurement defects that returned a wrong number silently, on a valid\nsolid, with no error and no refusal. One was live in the product.\n\n1. volume() reported a hollowed body as if it were solid.\n\ntry_analytic_solid_volume is the first rung of solid_volume's fast-path\nladder and read its face list from solid.outer_shell() alone. A body\nhollowed by a fully contained tool carries that cavity as an INNER shell,\nso the outer wall still matched the primitive recogniser and it returned\nthe un-hollowed closed form: 6283.185307179587 for a body whose closed\nform is 5881.061447520093, a 6.8% overstatement passing every structural\ncheck. Four further paths shared the blindness and now enumerate\nexplorer::solid_faces; the recogniser refuses outright when an inner\nshell is present, since its closed forms cannot represent a cavity.\n\ncheck::properties has always enumerated outer AND inner shells, which is\nexactly why mass_properties was right and the disagreement was visible.\n\nScope correction: the brief said \"any shelled or hollowed part\". Only\nbodies whose OUTER SHELL ALONE is a recognisable primitive were affected.\nA hollowed box never matched the recogniser and was already correct.\n\n2. patch_count compared a NURBS knot span against an absolute pi/4.\n\nspan/FRAC_PI_4 is dimensionless only for an angle. A knot vector carries\nwhatever units its control points were built in, so the same surface\nuniformly scaled integrated to a different answer -- 1.24e-5 at 0.001x\nagainst 3.50e-14 at 1000x, and a cliff rather than a slope: one\nthousandth of a unit of half-width across the pi/4 boundary changed the\nerror 33,600x. NURBS axes now tile per knot span, so the count depends on\nknot structure rather than knot values. Angular axes keep pi/4, which was\nalways right for them.\n\nCorrection: the brief said a NURBS surface's u/v are knot values carrying\nlength. On the actual repro domain_u is normalised to (0,1) at every\nscale and it is domain_v that spans (-w,w), so the fix derives the scale\nper axis rather than assuming either. A fix that normalised only u would\nhave done nothing.\n\nThe lane also caught itself trading one error for another: widening the\nthree ROUTING scans pushed sphere-in-box off the correct whole-solid mesh\nonto a direct path that credits a full sphere cavity face with zero, a\nfresh 7.0% error. The landed fix changes what each path INTEGRATES, never\nwhich path RUNS.\n\nVerified against hand closed forms only; mass_properties is never\ncompared against solid_volume, since they share integrate_face. Both\ntests confirmed failing with each fix reverted in isolation.\n\nNot fixed, tracked separately: solid_center_of_mass and\ncenter_of_mass_from_faces have the identical outer-shell-only bug, so a\nhollow body's centroid is still wrong.",
+          "timestamp": "2026-08-01T22:28:32-05:00",
+          "tree_id": "4d00b61d19563735412258ff7d30ba87f116f4da",
+          "url": "https://github.com/esaueng/brepkit/commit/1d5d095658439ab857d6077b61d79f32fabf3a4e"
+        },
+        "date": 1785641461220,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 870458,
+            "range": "± 65526",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 978752,
+            "range": "± 27790",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14205,
+            "range": "± 175",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 696450,
+            "range": "± 11646",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22984254,
+            "range": "± 45193",
             "unit": "ns/iter"
           }
         ]
