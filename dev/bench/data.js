@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785658037665,
+  "lastUpdate": 1785666870837,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4049,6 +4049,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22605803,
             "range": "± 1206345",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ace25ff541c1c05efb5fc8985734e318df3163e0",
+          "message": "A drilled shaft's end rims stopped closing: anchor the analytic grid on the face's own seam (#66)\n\n* fix(operations): anchor a full-turn analytic grid on the face's own seam\n\n`tessellate_solid` tessellates each edge once and hands the same polyline\nto every face that touches it — except for two faces that build their own\ngeometry and then reconcile:\n\n* a cylindrical/conical band whose outer wire is two closed rims and two\n  seam lines is stitched straight from the shared rim vertices\n  (`tessellate_revolution_band_shared`), watertight by construction;\n* the SAME band carrying inner wires is declined by that path — it would\n  skin the holes over — and falls through to `tessellate_nonplanar_snap`,\n  which tessellates the face from its own analytic grid and reconciles\n  with the shared pool by 1 um proximity.\n\nThe second one only closes while the grid and the pool agree on where a\nfull turn STARTS. brepkit#64 moved a closed rim's polyline to begin at\nthe edge's own seam vertex — right, and it stays — but `compute_angular_\nrange` kept anchoring the grid at the SURFACE FRAME's `u = 0`, which\nafter a transform or a boolean is unrelated to where the seam sits. The\ntwo used to coincide only because a primitive builds its rim circles and\nits lateral surface from one frame.\n\nOn a cross-drilled r = 3, h = 30 shaft the two anchors are 2.3077 deg\napart — 0.121 mm, five orders of magnitude past the 1 um snap tolerance —\nso not one grid column snapped, the wall and its two end caps ended up\nsharing no rim vertex at all, and every rim segment on both sides became\na boundary edge. Position-welded open edges at deflection 0.01:\n\n    bore r | before #64 | with #64 | with this fix\n       3   |    1526    |   1682   |     1526\n       2   |     264    |    420   |      264\n       1   |     206    |    362   |      206\n\nA CONSTANT +156 — one full ring from each of the two end rims, twice over\n(cap side and wall side) — independent of bore radius, because it is the\nSHAFT's rims that came apart and the bore never touches them. Volume,\ntriangle count and enclosed mesh volume are identical across all three\ncolumns to the last digit: the same triangles, only the pairing changed.\n\n`compute_angular_range`'s three full-revolution exits now return\n`(u_seam, u_seam + TAU)`, anchored on the start vertex of the first\nclosed conic edge of the outer wire — the same vertex\n`circle_param_range` anchors the polyline on. The span is still exactly\nTAU, so every sample count is unchanged; only the phase moves.\n\nNot fixed here, and left visible rather than asserted away:\n\n* A cylindrical wall carrying inner wires still renders with its holes\n  pasted over (`face::cylinder_has_non_standard_boundary` documents it,\n  `holed_cylindrical_wall_is_rendered_without_its_holes` pins it). That\n  is what the residual open edges in the table above are, and why the new\n  regression counts only the two end rims instead of reading\n  `welded_mesh_quality` whole.\n* A ball cut by an overlapping box leaks 108-368 open edges depending on\n  deflection, all of them on `make_sphere`'s EQUATORIAL seam at z = 0 and\n  none at the cut plane. Identical before #64, with #64, and with this\n  fix — a different site and a different cause.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(operations): only anchor on a rim both faces can read\n\nThe first cut anchored a full-turn grid on the first boundary vertex when\nthe wire had no closed conic edge. That is per-FACE data, and the two\nfaces that have to agree do not read the same vertex from it:\n`make_sphere` builds the ball as two hemispheres sharing one equatorial\nloop and walking it in OPPOSITE directions, so each patch anchored on a\ndifferent point of the equator and their grids came apart. Two tangent\nunit balls fused measured 6.03 against 8.38\n(`boolean_edge_cases::test_two_spheres_tangent`).\n\nA closed rim edge does not have that problem: it is one entity shared by\nboth faces that meet on it, so both read one vertex from it. That is now\nthe only anchor accepted; a wire without one keeps the surface frame's\n`u = 0` exactly as before, which is the case those two hemispheres are\nin.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* test(operations): pin the coarse-deflection empty mesh the anchor also cured\n\nAt deflection >= 0.3 the cross-drilled shaft tessellated to ZERO triangles\n— a valid five-face solid rendering as nothing, at every bore radius and\nevery scale — and `is_watertight` answers `true` for an empty mesh, so\nnothing downstream could tell. Anchoring the grid on the rim returns the\nsame 68-triangle mesh the next step down already produced, so the sweep\nnow starts at 0.5 rather than 0.1 and asserts non-emptiness there.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-02T05:32:06-05:00",
+          "tree_id": "7b42f7a9d60bb8b6e342048274db324dacd08251",
+          "url": "https://github.com/esaueng/brepkit/commit/ace25ff541c1c05efb5fc8985734e318df3163e0"
+        },
+        "date": 1785666869863,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 862480,
+            "range": "± 3299",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 949922,
+            "range": "± 7365",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12966,
+            "range": "± 643",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 876498,
+            "range": "± 3733",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22356499,
+            "range": "± 60687",
             "unit": "ns/iter"
           }
         ]
