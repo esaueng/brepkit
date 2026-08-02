@@ -491,7 +491,7 @@ pub(super) fn weld_boundary_vertices(
 
     let mut parent: Vec<u32> = (0..n_verts as u32).collect();
 
-    let weld_tol = if std::env::var("BK_NOWELD").is_ok() { 1e-9 } else { deflection.max(1e-6) * 2.0 };
+    let weld_tol = deflection.max(1e-6) * 2.0;
     let inv_cell = 1.0 / weld_tol;
 
     #[allow(clippy::cast_possible_truncation)]
