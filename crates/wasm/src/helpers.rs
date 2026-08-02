@@ -131,6 +131,26 @@ pub fn get_f64_array(args: &serde_json::Value, key: &str) -> Result<Vec<f64>, St
         .collect()
 }
 
+/// Extract a required array of `u32` from a JSON object.
+///
+/// # Errors
+///
+/// Returns a message naming `key` if it is missing or not an array, or
+/// naming the offending index if an element is not a `u32`.
+pub fn get_u32_array(args: &serde_json::Value, key: &str) -> Result<Vec<u32>, String> {
+    args[key]
+        .as_array()
+        .ok_or_else(|| format!("missing or invalid '{key}' array"))?
+        .iter()
+        .enumerate()
+        .map(|(i, v)| {
+            v.as_u64()
+                .and_then(|n| u32::try_from(n).ok())
+                .ok_or_else(|| format!("{key}[{i}] is not a u32"))
+        })
+        .collect()
+}
+
 /// Extract a required `u32` value from a JSON object.
 pub fn get_u32(args: &serde_json::Value, key: &str) -> Result<u32, String> {
     args[key]
