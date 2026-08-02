@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785694398486,
+  "lastUpdate": 1785697438342,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4157,6 +4157,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22244589,
             "range": "± 1425879",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "36ea0e138ff290d1c3c2933346b1d5627395007a",
+          "message": "Merge pull request #68 from esaueng/claude/fork-sync-pr-jwy9t3\n\nSync fork with upstream andymai/brepkit: multi-region booleans, 2D interior sampling, fillet guard",
+          "timestamp": "2026-08-02T14:01:24-05:00",
+          "tree_id": "05259f94b50904b1a72083ad4ea20cef5973581d",
+          "url": "https://github.com/esaueng/brepkit/commit/36ea0e138ff290d1c3c2933346b1d5627395007a"
+        },
+        "date": 1785697437952,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 894140,
+            "range": "± 1083",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 996093,
+            "range": "± 6684",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14434,
+            "range": "± 62",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 893776,
+            "range": "± 2501",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 23292435,
+            "range": "± 27063",
             "unit": "ns/iter"
           }
         ]
