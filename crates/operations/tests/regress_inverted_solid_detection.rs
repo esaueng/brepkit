@@ -201,6 +201,70 @@ fn an_inside_out_body_is_reported_and_still_measures_its_volume() {
     }
 }
 
+/// The orientation check's cost knob, both ways.
+///
+/// `boolean/assembly.rs` runs the check at Gauss order 1 because integrating a
+/// trimmed quadric at the default order 5 was 45 % of a whole boolean, for a
+/// report that site only logs. That is only safe if a coarse order still gets
+/// the SIGN right — which is the whole verdict, since it only has to clear
+/// `diag^3 * 1e-9`. Asserted here on every model, upright and inverted, so the
+/// gating cannot quietly stop detecting anything.
+///
+/// `Skip` is asserted too, so the off position is known to be off rather than
+/// merely untested.
+#[test]
+fn a_coarse_order_reaches_the_same_verdict_and_skip_reaches_none() {
+    use brepkit_operations::validate::{OrientationCheck, ValidationOptions};
+
+    fn orientation_errors(topo: &Topology, solid: SolidId, check: OrientationCheck) -> usize {
+        let opts = ValidationOptions {
+            orientation: check,
+            ..ValidationOptions::default()
+        };
+        validate::validate_solid_with_options(topo, solid, &opts)
+            .expect("validate")
+            .issues
+            .iter()
+            .filter(|i| i.severity == validate::Severity::Error)
+            .filter(|i| {
+                i.description.contains("inside out") || i.description.contains("wound outward")
+            })
+            .count()
+    }
+
+    for k in SCALES {
+        for (name, build) in MODELS {
+            for inverted in [false, true] {
+                let mut topo = Topology::new();
+                let (solid, _) = build(&mut topo, k);
+                let solid = if inverted {
+                    invert(&mut topo, solid)
+                } else {
+                    solid
+                };
+                let what = format!("{name} at {k}x, inverted={inverted}");
+
+                let strict = orientation_errors(&topo, solid, OrientationCheck::Order(5));
+                let coarse = orientation_errors(&topo, solid, OrientationCheck::Order(1));
+                assert_eq!(
+                    coarse, strict,
+                    "{what}: Gauss order 1 reported {coarse} orientation error(s) where \
+                     order 5 reported {strict} — the sign does not survive the coarse order"
+                );
+                assert!(
+                    (strict > 0) == inverted,
+                    "{what}: order 5 reported {strict} orientation error(s)"
+                );
+                assert_eq!(
+                    orientation_errors(&topo, solid, OrientationCheck::Skip),
+                    0,
+                    "{what}: Skip still ran the check"
+                );
+            }
+        }
+    }
+}
+
 /// A cavity wound the wrong way round is the mirror statement: its void adds
 /// material instead of removing it, and it is invisible to every other check
 /// for the same reason.

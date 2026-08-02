@@ -1166,8 +1166,8 @@ fn volume_tessellation_deflection(topo: &Topology, solid: SolidId, requested: f6
 pub fn shell_signed_volume(
     topo: &Topology,
     shell: brepkit_topology::shell::ShellId,
+    gauss_order: usize,
 ) -> Option<f64> {
-    let gauss_order = brepkit_check::properties::PropertiesOptions::default().gauss_order;
     let mut total = 0.0;
     for &fid in topo.shell(shell).ok()?.faces() {
         total += brepkit_check::properties::face_integrator::integrate_face(topo, fid, gauss_order)
@@ -1217,8 +1217,9 @@ pub fn negligible_volume(topo: &Topology, solid: SolidId) -> Option<f64> {
 /// Returns an error if topology lookups fail.
 pub fn solid_is_inverted(topo: &Topology, solid: SolidId) -> Result<bool, crate::OperationsError> {
     let outer = topo.solid(solid)?.outer_shell();
+    let order = brepkit_check::properties::PropertiesOptions::default().gauss_order;
     let (Some(signed), Some(floor)) = (
-        shell_signed_volume(topo, outer),
+        shell_signed_volume(topo, outer, order),
         negligible_volume(topo, solid),
     ) else {
         return Ok(false);
