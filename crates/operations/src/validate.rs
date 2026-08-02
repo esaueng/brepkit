@@ -101,6 +101,64 @@ pub fn euler_characteristic(
     Ok(euler)
 }
 
+/// Report a shell that is turned the wrong way round.
+///
+/// A shell can be closed, 2-manifold and consistently wound and still face
+/// inward; every check above passes on such a body, and so does
+/// `measure::solid_volume`, which returns the magnitude of its integral and so
+/// reads an inside-out solid at its correct positive volume. brepkit#59 built
+/// exactly that from a segmented revolve and nothing in the kernel could say
+/// so. The winding sign is what an STL facet normal is derived from, so the
+/// body exported inside out.
+///
+/// Two statements, one per shell role:
+///
+/// * the OUTER shell must enclose a positive signed volume;
+/// * every INNER shell is a cavity and must enclose a negative one — a cavity
+///   wound outward adds its void to the body instead of removing it.
+///
+/// Both are silent when the answer cannot be established (a face that will not
+/// integrate, a body with no measurable extent) rather than guessing.
+fn shell_orientation_issues(
+    topo: &Topology,
+    solid: SolidId,
+) -> Result<Vec<ValidationIssue>, crate::OperationsError> {
+    let Some(floor) = crate::measure::negligible_volume(topo, solid) else {
+        return Ok(Vec::new());
+    };
+    let solid_data = topo.solid(solid)?;
+    let mut issues = Vec::new();
+
+    if let Some(signed) = crate::measure::shell_signed_volume(topo, solid_data.outer_shell())
+        && signed < -floor
+    {
+        issues.push(ValidationIssue {
+            severity: Severity::Error,
+            description: format!(
+                "the outer shell is inside out: it encloses a signed volume of {signed}, \
+                 so every face points into the body"
+            ),
+        });
+    }
+
+    for &inner in solid_data.inner_shells() {
+        if let Some(signed) = crate::measure::shell_signed_volume(topo, inner)
+            && signed > floor
+        {
+            issues.push(ValidationIssue {
+                severity: Severity::Error,
+                description: format!(
+                    "cavity shell {} is wound outward: it encloses a signed volume of \
+                     {signed}, so the void adds to the body instead of removing from it",
+                    inner.index()
+                ),
+            });
+        }
+    }
+
+    Ok(issues)
+}
+
 /// Validate a solid, returning a report of all issues found.
 ///
 /// Checks performed:
@@ -239,6 +297,8 @@ pub fn validate_solid_with_options(
             description: format!("{non_manifold_edges} non-manifold edge(s) found"),
         });
     }
+
+    issues.extend(shell_orientation_issues(topo, solid)?);
 
     // Only faces on a planar surface bounded entirely by straight edges
     // require ≥3 unique vertices. Faces with curved edges (Circle,

@@ -1153,6 +1153,79 @@ fn volume_tessellation_deflection(topo: &Topology, solid: SolidId, requested: f6
     requested.min((diag * 5e-5).max(1e-9))
 }
 
+/// The signed volume a shell's faces enclose, `(1/3) integral P.n dA` summed
+/// over the exact face geometry.
+///
+/// Positive when the shell is wound OUTWARD, negative when it faces inward.
+/// `integrate_face` already applies each face's stored reversal, so a cavity
+/// shell — every face reversed — comes back negative, which is what makes it
+/// subtract in [`solid_volume`].
+///
+/// Returns `None` when any face fails to integrate, which is a "cannot say"
+/// rather than a verdict: callers must not read that as "correctly wound".
+pub fn shell_signed_volume(
+    topo: &Topology,
+    shell: brepkit_topology::shell::ShellId,
+) -> Option<f64> {
+    let gauss_order = brepkit_check::properties::PropertiesOptions::default().gauss_order;
+    let mut total = 0.0;
+    for &fid in topo.shell(shell).ok()?.faces() {
+        total += brepkit_check::properties::face_integrator::integrate_face(topo, fid, gauss_order)
+            .ok()?
+            .volume;
+    }
+    Some(total)
+}
+
+/// The smallest volume this model can distinguish from zero: the cube of its
+/// own vertex-bounding-box diagonal, scaled by a dimensionless epsilon.
+///
+/// A volume is `L^3`, so the yardstick has to be too — an absolute `1e-9 mm^3`
+/// would call a 0.001x model inverted and a 1000x one flat. Returns `None` when
+/// the model has no measurable extent.
+pub fn negligible_volume(topo: &Topology, solid: SolidId) -> Option<f64> {
+    /// Dimensionless: the fraction of the model's own extent-cubed below which
+    /// a signed volume says nothing about orientation.
+    const RELATIVE_FLOOR: f64 = 1e-9;
+
+    let pts = collect_solid_vertex_points(topo, solid).ok()?;
+    let (&first, rest) = pts.split_first()?;
+    let (mut lo, mut hi) = (first, first);
+    for p in rest {
+        lo = Point3::new(lo.x().min(p.x()), lo.y().min(p.y()), lo.z().min(p.z()));
+        hi = Point3::new(hi.x().max(p.x()), hi.y().max(p.y()), hi.z().max(p.z()));
+    }
+    let diag = (hi - lo).length();
+    (diag.is_finite() && diag > 0.0).then_some(diag * diag * diag * RELATIVE_FLOOR)
+}
+
+/// Whether the solid's outer shell is turned inside out.
+///
+/// A shell can be closed, 2-manifold and consistently wound and still face
+/// inward — brepkit#59's segmented revolve built exactly that, and nothing in
+/// the measurement layer could see it, because [`solid_volume`] reports the
+/// magnitude of its integral and so reads an inverted body at its correct
+/// positive volume. The sign is what an STL facet normal is derived from, so
+/// such a body exports inside out.
+///
+/// Returns `false` when the answer cannot be established — a face that will not
+/// integrate, or a body with no measurable extent. This is a detector, not a
+/// proof of correctness: `false` means "not shown to be inverted".
+///
+/// # Errors
+///
+/// Returns an error if topology lookups fail.
+pub fn solid_is_inverted(topo: &Topology, solid: SolidId) -> Result<bool, crate::OperationsError> {
+    let outer = topo.solid(solid)?.outer_shell();
+    let (Some(signed), Some(floor)) = (
+        shell_signed_volume(topo, outer),
+        negligible_volume(topo, solid),
+    ) else {
+        return Ok(false);
+    };
+    Ok(signed < -floor)
+}
+
 /// Compute the volume of a solid using the signed tetrahedra method
 /// (divergence theorem on a surface tessellation).
 ///
@@ -1161,6 +1234,16 @@ fn volume_tessellation_deflection(topo: &Topology, solid: SolidId, requested: f6
 ///
 /// For pure-primitive solids (sphere, cylinder, cone, torus), uses exact
 /// analytic formulas instead of tessellation.
+///
+/// # Orientation
+///
+/// The result is a MAGNITUDE: an inside-out solid reports the same positive
+/// number its correctly-wound twin would. That is deliberate — a volume is a
+/// positive quantity and every caller reads it as one — but it means this
+/// function cannot be used to ask whether a body is inverted. Ask
+/// [`solid_is_inverted`], or run [`crate::validate::validate_solid`], which
+/// reports an inverted outer shell (and a cavity wound the wrong way) as an
+/// error.
 ///
 /// # Errors
 ///
