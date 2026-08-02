@@ -19,7 +19,12 @@
 //! geometry and hand-written closed forms rather than against another
 //! integrator.
 
-#![allow(clippy::unwrap_used, clippy::expect_used)]
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::type_complexity
+)]
 
 use std::collections::HashMap;
 use std::f64::consts::PI;
@@ -159,8 +164,7 @@ fn offsetting_a_sphere_produces_a_visible_body() {
             // defect produced two copies of the NORTHERN half with opposite
             // winding, so the span was [0, outer] before they cancelled.
             let (lo, hi) = mesh_z_span(&mesh);
-            let span_rel_error =
-                ((hi - lo) - 2.0 * outer).abs() / (2.0 * outer);
+            let span_rel_error = ((hi - lo) - 2.0 * outer).abs() / (2.0 * outer);
             assert!(
                 span_rel_error < 0.01,
                 "{what}: mesh spans z in [{lo}, {hi}] — expected the full \
