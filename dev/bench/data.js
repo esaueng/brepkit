@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785641615698,
+  "lastUpdate": 1785648398369,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3887,6 +3887,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22102967,
             "range": "± 102301",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0cb86610076c988d82caca24162de86c78aae8ef",
+          "message": "feat(wasm): 2D polygon booleans, validated hole wires, makeFaceFromWires (#63)\n\nPhase 0 kernel work for the text/emboss feature.\n\n- polygonUnion2d / polygonBoolean2d expose brepkit_math::polygon_boolean to\n  JS, returning {outer, holes} so multiple outer loops and the outer/hole\n  distinction survive the boundary. An explicit non-positive or non-finite\n  tolerance is an error rather than a silent default.\n- addHolesToFace is validated in new crates/wasm/src/holed_face.rs: hole\n  wires must be closed, distinct, and on the face surface; planar faces also\n  enforce containment, hole disjointness, and no self-crossing. Containment\n  requires no proper edge crossing, not point-in-polygon alone, so a bar\n  across the notch of a concave outer wire is rejected instead of extruding\n  to a 24-boundary-edge shell at 59% of the correct volume.\n- makeFaceFromWires(outerWire, innerWires[]) builds a holed face in one call,\n  sharing that validation. The shape-construction ops are now reachable from\n  executeBatch.\n\n43 tests drive the kernel through execute_batch. Two profiles (a polygon\nannulus and an 'O'-like contour mixing line and cubic-bezier NURBS edges)\nextrude and assert watertightness, exact face count, and volume against a\nshoelace oracle at two mesh densities. Validation is proved by mutation:\nneutering each check fails tests that previously passed.\n\nBehavioural change: addHolesToFace now rejects input it previously accepted\nsilently, which produced malformed solids. Callers passing off-plane,\nescaping, or self-crossing hole wires will begin to see errors.\n\nTwo pre-existing extrude defects were uncovered and are captured as #[ignore]\nready-repros rather than fixed: inconsistent shell orientation on holed\nextrusions, and inside-out classification through the bezier cap band.\n\nCo-Authored-By: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-02T00:23:58-05:00",
+          "tree_id": "682e132e7ce180eac643afbe25c8e80d53505a24",
+          "url": "https://github.com/esaueng/brepkit/commit/0cb86610076c988d82caca24162de86c78aae8ef"
+        },
+        "date": 1785648397320,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 865729,
+            "range": "± 2204",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 968214,
+            "range": "± 7561",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14107,
+            "range": "± 35",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 693253,
+            "range": "± 6071",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22832825,
+            "range": "± 30485",
             "unit": "ns/iter"
           }
         ]
