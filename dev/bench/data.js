@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785621630460,
+  "lastUpdate": 1785640285836,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3725,6 +3725,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21983090,
             "range": "± 52566",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "57f1f55a2b0476b3a7217ba91af5e3f3495bc583",
+          "message": "Wind the segmented revolve outward, not merely consistently (#59)\n\nThe segmented NURBS revolve path oriented each band off\ndu x dv = (profile tangent) x (sweep tangent). That is consistent across\nthe band but points outward only when n . s > 0, so for half the\nconfiguration space the solid came back inside out. extrude.rs:795 makes\nthe linear case orient explicitly instead of inheriting the cross-product\nsign.\n\nTwo corrections to the characterization this landed against:\n\n- It is not partial-only. The predictor is the sign of\n  input_normal . (axis x e_r), not the sweep angle -- half the\n  configuration space was already outward, which is why sampling found\n  it intermittent.\n- The 360 path is not correct either; it just usually is not this path.\n  A holed profile defers both fast paths and reproduces the reversal,\n  measuring -301.645 against Pappus 96*pi = 301.593.\n\nA Frame3::from_normal hint was proposed and correctly rejected -- it does\nnot apply here.\n\nWhy a green suite hid it: measure::solid_volume returns the magnitude of\nits integral, so an inside-out solid still reports a correct, positive\nvolume. Tracked separately.",
+          "timestamp": "2026-08-01T22:08:51-05:00",
+          "tree_id": "8cbd420e6bc36b5dd4261c9eba78002fc18d933d",
+          "url": "https://github.com/esaueng/brepkit/commit/57f1f55a2b0476b3a7217ba91af5e3f3495bc583"
+        },
+        "date": 1785640285397,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 837235,
+            "range": "± 1027",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 927103,
+            "range": "± 4886",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12765,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 691624,
+            "range": "± 1171",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21765333,
+            "range": "± 66424",
             "unit": "ns/iter"
           }
         ]
