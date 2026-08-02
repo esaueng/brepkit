@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785666870837,
+  "lastUpdate": 1785694398486,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4103,6 +4103,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22356499,
             "range": "± 60687",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f586e2e782a23ee5e4d1200383a16933d43f3b69",
+          "message": "A through bore's wall rendered as NOTHING, and no error said so (#67)\n\n`tessellate_analytic_with_boundary` built its UV boundary from one vertex\nper edge. That equals the real boundary only when every boundary edge is\nstraight, and the dispatcher sends a cylinder here precisely when its outer\nwire carries a NURBS edge — a boolean intersection curve.\n\nA bore cut clean through a shaft leaves a wall bounded by ONE closed such\ncurve. One edge, one vertex read, so the whole boundary collapsed to a\nsingle point, fell under the three-point floor, and the function returned\nan empty mesh with no error. Instrumented before the fix, every one of the\n14 calls on a cross-drilled shaft arrived with uv_pts = 1, and through the\nsingle-face `tessellate` entry point the wall measured 0 triangles and 0.0\narea at bore radii 1 and 2 and deflections 0.05 / 0.01 / 0.002. The drilled\nhole was invisible at every density.\n\nThe fix samples each edge's polyline through `sample_edge` and walks it in\nwire order, dropping the vertex two consecutive edges share and the closing\nrepeat of a closed walk.\n\nNot fixed, left visible: the wall is now drawable but still too large. The\nCDT fills the boundary in the cylinder's (u, v) parameters and the closed\nbore curve wraps u by a full turn, so part of the domain that should stay\nopen is paved over. Against the closed form, and not a constant factor —\nbore r=1 draws 63.526 against 36.629 (+73.4%), r=2 draws 69.021 against\n66.149 (+4.3%). `a_through_bore_wall_is_drawn_at_its_true_area` pins that\ngap as an #[ignore].\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-02T13:10:53-05:00",
+          "tree_id": "5ef06109521e6ef711b577a0e4b3177da5517e57",
+          "url": "https://github.com/esaueng/brepkit/commit/f586e2e782a23ee5e4d1200383a16933d43f3b69"
+        },
+        "date": 1785694397818,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 861794,
+            "range": "± 1956",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 952255,
+            "range": "± 1780",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12770,
+            "range": "± 45",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 875013,
+            "range": "± 2882",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22244589,
+            "range": "± 1425879",
             "unit": "ns/iter"
           }
         ]
