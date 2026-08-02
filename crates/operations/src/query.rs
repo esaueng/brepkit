@@ -2,10 +2,10 @@
 
 use std::collections::{HashMap, HashSet};
 
-use brepkit_topology::Topology;
-use brepkit_topology::edge::EdgeId;
-use brepkit_topology::face::{FaceId, FaceSurface};
-use brepkit_topology::solid::SolidId;
+use remus_topology::Topology;
+use remus_topology::edge::EdgeId;
+use remus_topology::face::{FaceId, FaceSurface};
+use remus_topology::solid::SolidId;
 
 use crate::OperationsError;
 
@@ -124,7 +124,7 @@ fn edge_is_tangent(
     let b = topo.vertex(edge.end())?.point();
     let mid = a + (b - a) * 0.5;
 
-    let normal = |fid: FaceId| -> Option<brepkit_math::vec::Vec3> {
+    let normal = |fid: FaceId| -> Option<remus_math::vec::Vec3> {
         let face = topo.face(fid).ok()?;
         let n = match face.surface() {
             FaceSurface::Plane { normal, .. } => *normal,
@@ -153,7 +153,7 @@ fn edge_is_tangent(
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, deprecated)]
 
-    use brepkit_topology::explorer::solid_edges;
+    use remus_topology::explorer::solid_edges;
 
     use super::*;
 

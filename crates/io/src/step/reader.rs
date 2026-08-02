@@ -19,7 +19,7 @@
 //!
 //! # Units
 //!
-//! brepkit works in millimetres and radians. The file's declared
+//! remus works in millimetres and radians. The file's declared
 //! `GLOBAL_UNIT_ASSIGNED_CONTEXT` is resolved once and applied to every
 //! length- and angle-valued quantity at parse time, so nothing downstream
 //! needs to know what the file said. A file that carries geometry but no
@@ -30,14 +30,14 @@
 
 use std::collections::HashMap;
 
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve};
-use brepkit_topology::face::{Face, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::{Solid, SolidId};
-use brepkit_topology::vertex::Vertex;
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve};
+use remus_topology::face::{Face, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::{Solid, SolidId};
+use remus_topology::vertex::Vertex;
+use remus_topology::wire::{OrientedEdge, Wire};
 
 use crate::IoError;
 use crate::limits::{ImportLimits, ensure_input_size, ensure_limit};
@@ -234,10 +234,10 @@ fn parse_entity_id(s: &str) -> Option<u64> {
 
 // ── Units ───────────────────────────────────────────────────────────
 
-/// Conversion factors from the file's declared units to brepkit's working
+/// Conversion factors from the file's declared units to remus's working
 /// units.
 ///
-/// brepkit works in **millimetres** and **radians**: the writer declares
+/// remus works in **millimetres** and **radians**: the writer declares
 /// `SI_UNIT(.MILLI.,.METRE.)` for length and `SI_UNIT($,.RADIAN.)` for plane
 /// angle (`writer::StepWriteContext::write_geometric_context`), and the
 /// default vertex/uncertainty tolerance of `1e-7` is a millimetre quantity.
@@ -502,7 +502,7 @@ fn resolve_unit_scale(
             }
             let (factor, base) = unit_si_factor(entities, unit_ref, 0)?;
             let (expected_base, to_working, slot, label) = match kind {
-                // SI base for length is the metre; brepkit works in mm.
+                // SI base for length is the metre; remus works in mm.
                 UnitKind::Length => (".METRE.", factor * 1e3, &mut length, "length"),
                 UnitKind::PlaneAngle => (".RADIAN.", factor, &mut angle, "plane angle"),
                 UnitKind::Other => unreachable!("filtered above"),
@@ -593,8 +593,8 @@ struct StepBuilder<'a> {
     /// Conversion from the file's declared units into millimetres/radians,
     /// applied to every length- and angle-valued quantity as it is read.
     units: UnitScale,
-    vertex_cache: HashMap<u64, brepkit_topology::vertex::VertexId>,
-    edge_cache: HashMap<u64, brepkit_topology::edge::EdgeId>,
+    vertex_cache: HashMap<u64, remus_topology::vertex::VertexId>,
+    edge_cache: HashMap<u64, remus_topology::edge::EdgeId>,
 }
 
 impl<'a> StepBuilder<'a> {
@@ -673,13 +673,13 @@ impl<'a> StepBuilder<'a> {
     /// `flip` inverts the sense of every face in the shell. It carries the
     /// `ORIENTED_CLOSED_SHELL` orientation flag, which void shells use
     /// (always `.F.` per ISO 10303-42) so their normals end up pointing away
-    /// from the solid's material — the same convention brepkit's inner
+    /// from the solid's material — the same convention remus's inner
     /// shells use.
     fn build_shell(
         &mut self,
         shell_ref: u64,
         flip: bool,
-    ) -> Result<brepkit_topology::shell::ShellId, IoError> {
+    ) -> Result<remus_topology::shell::ShellId, IoError> {
         let entity = self.get_entity(shell_ref)?;
         if entity.entity_type == "ORIENTED_CLOSED_SHELL" {
             let attrs = entity.attrs.clone();
@@ -716,7 +716,7 @@ impl<'a> StepBuilder<'a> {
         &mut self,
         face_ref: u64,
         flip: bool,
-    ) -> Result<brepkit_topology::face::FaceId, IoError> {
+    ) -> Result<remus_topology::face::FaceId, IoError> {
         let attrs = self.get_entity(face_ref)?.attrs.clone();
         // Check for reversed face orientation (.F. flag at end of ADVANCED_FACE),
         // then apply the enclosing shell's orientation on top of it.
@@ -806,7 +806,7 @@ impl<'a> StepBuilder<'a> {
                 })?;
                 let radius = radius * self.units.length;
                 let (origin, axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
-                let cyl = brepkit_math::surfaces::CylindricalSurface::new(origin, axis, radius)
+                let cyl = remus_math::surfaces::CylindricalSurface::new(origin, axis, radius)
                     .map_err(|e| IoError::ParseError {
                         reason: format!("CYLINDRICAL_SURFACE #{surface_ref}: {e}"),
                     })?;
@@ -823,7 +823,7 @@ impl<'a> StepBuilder<'a> {
                 // whatever PLANE_ANGLE_UNIT the file declared (radians for
                 // most writers, degrees for some).
                 //
-                // ISO 10303-42 measures `semi_angle` from the AXIS. brepkit's
+                // ISO 10303-42 measures `semi_angle` from the AXIS. remus's
                 // `ConicalSurface::half_angle` is measured from the radial
                 // plane. They are complements and coincide only at 45 degrees,
                 // so this conversion is what makes a foreign cone import at
@@ -833,7 +833,7 @@ impl<'a> StepBuilder<'a> {
                 })? * self.units.angle;
                 let half_angle = std::f64::consts::FRAC_PI_2 - semi_angle;
                 let (apex, axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
-                let cone = brepkit_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
+                let cone = remus_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
                     .map_err(|e| IoError::ParseError {
                         reason: format!("CONICAL_SURFACE #{surface_ref}: {e}"),
                     })?;
@@ -850,9 +850,11 @@ impl<'a> StepBuilder<'a> {
                 })?;
                 let radius = radius * self.units.length;
                 let (center, _axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
-                let sphere = brepkit_math::surfaces::SphericalSurface::new(center, radius)
-                    .map_err(|e| IoError::ParseError {
-                        reason: format!("SPHERICAL_SURFACE #{surface_ref}: {e}"),
+                let sphere =
+                    remus_math::surfaces::SphericalSurface::new(center, radius).map_err(|e| {
+                        IoError::ParseError {
+                            reason: format!("SPHERICAL_SURFACE #{surface_ref}: {e}"),
+                        }
                     })?;
                 Ok(FaceSurface::Sphere(sphere))
             }
@@ -871,7 +873,7 @@ impl<'a> StepBuilder<'a> {
                 let major_r = major_r * self.units.length;
                 let minor_r = minor_r * self.units.length;
                 let (center, axis, ref_dir) = self.build_axis2_placement(axis_ref)?;
-                let torus = brepkit_math::surfaces::ToroidalSurface::with_axis_and_ref_dir(
+                let torus = remus_math::surfaces::ToroidalSurface::with_axis_and_ref_dir(
                     center, major_r, minor_r, axis, ref_dir,
                 )
                 .map_err(|e| IoError::ParseError {
@@ -973,7 +975,7 @@ impl<'a> StepBuilder<'a> {
         &self,
         curve_ref: u64,
         attrs: &str,
-    ) -> Result<brepkit_math::curves::Line3D, IoError> {
+    ) -> Result<remus_math::curves::Line3D, IoError> {
         let refs = parse_refs(attrs);
         let [point_ref, vector_ref, ..] = refs[..] else {
             return Err(IoError::ParseError {
@@ -982,7 +984,7 @@ impl<'a> StepBuilder<'a> {
         };
         let origin = self.build_cartesian_point(point_ref)?;
         let (direction, _) = self.build_vector(vector_ref)?;
-        brepkit_math::curves::Line3D::new(origin, direction).map_err(|e| IoError::ParseError {
+        remus_math::curves::Line3D::new(origin, direction).map_err(|e| IoError::ParseError {
             reason: format!("LINE #{curve_ref}: {e}"),
         })
     }
@@ -1031,7 +1033,7 @@ impl<'a> StepBuilder<'a> {
 
     /// Build `SURFACE_OF_REVOLUTION('name', #swept_curve, #axis_position)`.
     ///
-    /// Revolving simple profiles reproduces brepkit's analytic surfaces
+    /// Revolving simple profiles reproduces remus's analytic surfaces
     /// exactly, and an exact analytic surface is worth far more downstream
     /// than a NURBS approximation of the same shape:
     ///
@@ -1146,10 +1148,7 @@ impl<'a> StepBuilder<'a> {
         Ok(FaceSurface::Nurbs(surface))
     }
 
-    fn build_edge_loop(
-        &mut self,
-        loop_ref: u64,
-    ) -> Result<brepkit_topology::wire::WireId, IoError> {
+    fn build_edge_loop(&mut self, loop_ref: u64) -> Result<remus_topology::wire::WireId, IoError> {
         let attrs = self.get_entity(loop_ref)?.attrs.clone();
         let oe_refs = parse_list_refs(&attrs);
 
@@ -1179,7 +1178,7 @@ impl<'a> StepBuilder<'a> {
         Ok(OrientedEdge::new(edge_id, forward))
     }
 
-    fn build_edge_curve(&mut self, ec_ref: u64) -> Result<brepkit_topology::edge::EdgeId, IoError> {
+    fn build_edge_curve(&mut self, ec_ref: u64) -> Result<remus_topology::edge::EdgeId, IoError> {
         if let Some(&cached) = self.edge_cache.get(&ec_ref) {
             return Ok(cached);
         }
@@ -1261,7 +1260,7 @@ impl<'a> StepBuilder<'a> {
                 })? * self.units.length;
                 let (center, normal, _u_axis) = self.build_axis2_placement(axis_ref)?;
                 let circle =
-                    brepkit_math::curves::Circle3D::new(center, normal, radius).map_err(|e| {
+                    remus_math::curves::Circle3D::new(center, normal, radius).map_err(|e| {
                         IoError::ParseError {
                             reason: format!("CIRCLE #{curve_ref}: {e}"),
                         }
@@ -1280,7 +1279,7 @@ impl<'a> StepBuilder<'a> {
                     });
                 }
                 let (center, normal, _u_axis) = self.build_axis2_placement(axis_ref)?;
-                let ellipse = brepkit_math::curves::Ellipse3D::new(
+                let ellipse = remus_math::curves::Ellipse3D::new(
                     center,
                     normal,
                     floats[0] * self.units.length,
@@ -1294,7 +1293,7 @@ impl<'a> StepBuilder<'a> {
             // HYPERBOLA('name', #axis2_placement_3d, semi_axis,
             // imaginary_semi_axis) — ISO 10303-42. The placement's z is the
             // plane normal and its ref_direction is the REAL axis, giving
-            // exactly brepkit's `H(t) = C + a·cosh(t)·u + b·sinh(t)·v` with
+            // exactly remus's `H(t) = C + a·cosh(t)·u + b·sinh(t)·v` with
             // `v = z × u`. The ref_direction is passed through explicitly
             // (`with_axes`, not `new`): `Hyperbola3D::new` would pick an
             // arbitrary in-plane axis and rotate the branch inside its plane.
@@ -1312,7 +1311,7 @@ impl<'a> StepBuilder<'a> {
                     });
                 }
                 let (center, normal, u_axis) = self.build_axis2_placement(axis_ref)?;
-                let hyp = brepkit_math::curves::Hyperbola3D::with_axes(
+                let hyp = remus_math::curves::Hyperbola3D::with_axes(
                     center,
                     normal,
                     u_axis,
@@ -1328,7 +1327,7 @@ impl<'a> StepBuilder<'a> {
             // 10303-42. The placement's location is the apex, its
             // ref_direction (x) points apex→focus, and z is the plane normal,
             // so the in-plane direction is `y = z × x`. STEP parameterizes as
-            // `λ(u) = V + f·u²·x + 2f·u·y`; brepkit uses
+            // `λ(u) = V + f·u²·x + 2f·u·y`; remus uses
             // `P(t) = V + (t²/4f)·axis + t·u_axis`, which is the same curve
             // under `t = 2f·u` — the same point SET, which is what the edge's
             // vertices trim.
@@ -1342,7 +1341,7 @@ impl<'a> StepBuilder<'a> {
                     reason: format!("PARABOLA #{curve_ref} missing focal_dist"),
                 })? * self.units.length;
                 let (vertex, normal, axis_dir) = self.build_axis2_placement(axis_ref)?;
-                let par = brepkit_math::curves::Parabola3D::with_axes(
+                let par = remus_math::curves::Parabola3D::with_axes(
                     vertex,
                     axis_dir,
                     normal.cross(axis_dir),
@@ -1378,7 +1377,7 @@ impl<'a> StepBuilder<'a> {
     /// [`EdgeCurve`] stores no parameter range: an edge's extent is recovered
     /// from its own vertices by
     /// [`EdgeCurve::parameter_range_with_endpoints`][pr]. For `Line`,
-    /// `Circle` and `Ellipse` that recovery is exact — brepkit already models
+    /// `Circle` and `Ellipse` that recovery is exact — remus already models
     /// an arc as the complete circle plus its two vertices, which is how a
     /// bare `CIRCLE` inside an `EDGE_CURVE` is read — so the basis is
     /// returned unchanged and the trim is carried by the edge.
@@ -1392,7 +1391,7 @@ impl<'a> StepBuilder<'a> {
     /// Trim parameters on a B-spline are knot-space values and carry no
     /// unit, so no unit scaling applies here.
     ///
-    /// [pr]: brepkit_topology::edge::EdgeCurve::parameter_range_with_endpoints
+    /// [pr]: remus_topology::edge::EdgeCurve::parameter_range_with_endpoints
     fn build_trimmed_curve(
         &self,
         curve_ref: u64,
@@ -1446,8 +1445,8 @@ impl<'a> StepBuilder<'a> {
             return Ok(EdgeCurve::NurbsCurve(nurbs));
         }
 
-        let split = |curve: &brepkit_math::nurbs::NurbsCurve, u: f64| {
-            brepkit_math::nurbs::knot_ops::curve_split(curve, u).map_err(|e| IoError::ParseError {
+        let split = |curve: &remus_math::nurbs::NurbsCurve, u: f64| {
+            remus_math::nurbs::knot_ops::curve_split(curve, u).map_err(|e| IoError::ParseError {
                 reason: format!("TRIMMED_CURVE #{curve_ref} could not be split at {u}: {e}"),
             })
         };
@@ -1523,9 +1522,11 @@ impl<'a> StepBuilder<'a> {
                 knots.push(params[n - 1]);
 
                 let weights = vec![1.0; n];
-                let nurbs = brepkit_math::nurbs::NurbsCurve::new(1, knots, points, weights)
-                    .map_err(|e| IoError::ParseError {
-                        reason: format!("POLYLINE #{curve_ref}: {e}"),
+                let nurbs =
+                    remus_math::nurbs::NurbsCurve::new(1, knots, points, weights).map_err(|e| {
+                        IoError::ParseError {
+                            reason: format!("POLYLINE #{curve_ref}: {e}"),
+                        }
                     })?;
                 Ok(EdgeCurve::NurbsCurve(nurbs))
             }
@@ -1560,7 +1561,7 @@ impl<'a> StepBuilder<'a> {
             vec![1.0; control_points.len()]
         };
 
-        let nurbs = brepkit_math::nurbs::NurbsCurve::new(degree, knots, control_points, weights)
+        let nurbs = remus_math::nurbs::NurbsCurve::new(degree, knots, control_points, weights)
             .map_err(|e| IoError::ParseError {
                 reason: format!("B_SPLINE_CURVE #{curve_ref}: {e}"),
             })?;
@@ -1600,7 +1601,7 @@ impl<'a> StepBuilder<'a> {
             vec![vec![1.0; n_cols]; n_rows]
         };
 
-        let nurbs = brepkit_math::nurbs::NurbsSurface::new(
+        let nurbs = remus_math::nurbs::NurbsSurface::new(
             degree_u, degree_v, knots_u, knots_v, cp_grid, weights,
         )
         .map_err(|e| IoError::ParseError {
@@ -1612,7 +1613,7 @@ impl<'a> StepBuilder<'a> {
     fn build_vertex_point(
         &mut self,
         vp_ref: u64,
-    ) -> Result<brepkit_topology::vertex::VertexId, IoError> {
+    ) -> Result<remus_topology::vertex::VertexId, IoError> {
         if let Some(&cached) = self.vertex_cache.get(&vp_ref) {
             return Ok(cached);
         }
@@ -1686,10 +1687,10 @@ impl<'a> StepBuilder<'a> {
 /// [`EdgeCurve`] drops for lines.
 #[derive(Debug, Clone)]
 enum SweptProfile {
-    Line(brepkit_math::curves::Line3D),
-    Circle(brepkit_math::curves::Circle3D),
-    Ellipse(brepkit_math::curves::Ellipse3D),
-    Nurbs(brepkit_math::nurbs::NurbsCurve),
+    Line(remus_math::curves::Line3D),
+    Circle(remus_math::curves::Circle3D),
+    Ellipse(remus_math::curves::Ellipse3D),
+    Nurbs(remus_math::nurbs::NurbsCurve),
 }
 
 impl SweptProfile {
@@ -1701,9 +1702,7 @@ impl SweptProfile {
     /// a swept surface over one is representable only when it collapses to an
     /// analytic surface. The two outcomes are kept apart from a construction
     /// failure so the caller can report the right reason.
-    fn into_nurbs(
-        self,
-    ) -> Result<Option<brepkit_math::nurbs::NurbsCurve>, brepkit_math::MathError> {
+    fn into_nurbs(self) -> Result<Option<remus_math::nurbs::NurbsCurve>, remus_math::MathError> {
         match self {
             Self::Line(_) => Ok(None),
             Self::Circle(circle) => conic_to_nurbs(
@@ -1748,13 +1747,13 @@ fn conic_to_nurbs(
     center: Point3,
     x: Vec3,
     y: Vec3,
-) -> Result<brepkit_math::nurbs::NurbsCurve, brepkit_math::MathError> {
+) -> Result<remus_math::nurbs::NurbsCurve, remus_math::MathError> {
     let control_points = conic_control_points(center, x, y);
     let weights = conic_weights();
     let knots = vec![
         0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0,
     ];
-    brepkit_math::nurbs::NurbsCurve::new(2, knots, control_points, weights)
+    remus_math::nurbs::NurbsCurve::new(2, knots, control_points, weights)
 }
 
 /// The nine control points of a full-turn rational quadratic conic, starting
@@ -1816,7 +1815,7 @@ fn revolve_analytic(
                             .to_string(),
                     ));
                 }
-                let cyl = brepkit_math::surfaces::CylindricalSurface::new(axis_pt, axis, radius)
+                let cyl = remus_math::surfaces::CylindricalSurface::new(axis_pt, axis, radius)
                     .map_err(|e| fail(e.to_string()))?;
                 return Ok(Some(FaceSurface::Cylinder(cyl)));
             }
@@ -1839,11 +1838,11 @@ fn revolve_analytic(
                 return Ok(Some(FaceSurface::Plane { normal: axis, d }));
             }
 
-            // brepkit measures a cone's half angle from the radial plane to
+            // remus measures a cone's half angle from the radial plane to
             // the generator, so it is the complement of the angle between the
             // generator and the axis: sin(half_angle) = |dir · axis|.
             let half_angle = cos_to_axis.clamp(-1.0, 1.0).asin();
-            let cone = brepkit_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
+            let cone = remus_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
                 .map_err(|e| fail(e.to_string()))?;
             Ok(Some(FaceSurface::Cone(cone)))
         }
@@ -1861,7 +1860,7 @@ fn revolve_analytic(
 
             let (foot, offset) = axis_projection(circle.center(), axis_pt, axis);
             if offset <= SWEEP_LENGTH_EPS {
-                let sphere = brepkit_math::surfaces::SphericalSurface::with_axis(
+                let sphere = remus_math::surfaces::SphericalSurface::with_axis(
                     circle.center(),
                     circle.radius(),
                     axis,
@@ -1873,7 +1872,7 @@ fn revolve_analytic(
             let ref_dir = (circle.center() - foot)
                 .normalize()
                 .map_err(|e| fail(e.to_string()))?;
-            let torus = brepkit_math::surfaces::ToroidalSurface::with_axis_and_ref_dir(
+            let torus = remus_math::surfaces::ToroidalSurface::with_axis_and_ref_dir(
                 foot,
                 offset,
                 circle.radius(),
@@ -1902,10 +1901,10 @@ fn extrude_analytic(
         SweptProfile::Circle(circle) => {
             if circle.normal().cross(direction).length() > SWEEP_DIR_EPS {
                 // Oblique sweep: still a cylinder in shape but not about the
-                // circle's own axis, so it is not brepkit's CylindricalSurface.
+                // circle's own axis, so it is not remus's CylindricalSurface.
                 return Ok(None);
             }
-            let cyl = brepkit_math::surfaces::CylindricalSurface::new(
+            let cyl = remus_math::surfaces::CylindricalSurface::new(
                 circle.center(),
                 direction,
                 circle.radius(),
@@ -1956,10 +1955,10 @@ fn line_line_intersection(p0: Point3, u: Vec3, q0: Point3, v: Vec3) -> Option<Po
 /// `u` runs around the revolution, `v` along the generatrix, matching STEP's
 /// own parameterization of `SURFACE_OF_REVOLUTION`.
 fn revolve_nurbs(
-    generatrix: &brepkit_math::nurbs::NurbsCurve,
+    generatrix: &remus_math::nurbs::NurbsCurve,
     axis_pt: Point3,
     axis: Vec3,
-) -> Result<brepkit_math::nurbs::NurbsSurface, brepkit_math::MathError> {
+) -> Result<remus_math::nurbs::NurbsSurface, remus_math::MathError> {
     let arc_weights = conic_weights();
     let n_cols = generatrix.control_points().len();
 
@@ -1991,7 +1990,7 @@ fn revolve_nurbs(
     let knots_u = vec![
         0.0, 0.0, 0.0, 0.25, 0.25, 0.5, 0.5, 0.75, 0.75, 1.0, 1.0, 1.0,
     ];
-    brepkit_math::nurbs::NurbsSurface::new(
+    remus_math::nurbs::NurbsSurface::new(
         2,
         generatrix.degree(),
         knots_u,
@@ -2007,9 +2006,9 @@ fn revolve_nurbs(
 /// `P(u, v) = C(u) + v · offset` with `v ∈ [0, 1]` — STEP's own
 /// parameterization of `SURFACE_OF_LINEAR_EXTRUSION`.
 fn extrude_nurbs(
-    profile: &brepkit_math::nurbs::NurbsCurve,
+    profile: &remus_math::nurbs::NurbsCurve,
     offset: Vec3,
-) -> Result<brepkit_math::nurbs::NurbsSurface, brepkit_math::MathError> {
+) -> Result<remus_math::nurbs::NurbsSurface, remus_math::MathError> {
     let grid: Vec<Vec<Point3>> = profile
         .control_points()
         .iter()
@@ -2017,7 +2016,7 @@ fn extrude_nurbs(
         .collect();
     let weights: Vec<Vec<f64>> = profile.weights().iter().map(|&w| vec![w, w]).collect();
 
-    brepkit_math::nurbs::NurbsSurface::new(
+    remus_math::nurbs::NurbsSurface::new(
         profile.degree(),
         1,
         profile.knots().to_vec(),
@@ -2250,7 +2249,7 @@ fn parse_weight_list(s: &str) -> Vec<f64> {
 /// Returns uniform weights if parsing fails.
 fn extract_rational_weight_grid(attrs: &str, n_rows: usize, n_cols: usize) -> Vec<Vec<f64>> {
     let flat = extract_rational_weights(attrs, n_rows * n_cols);
-    let tol = brepkit_math::tolerance::Tolerance::new();
+    let tol = remus_math::tolerance::Tolerance::new();
     if flat.len() == n_rows * n_cols && flat.iter().any(|&w| !tol.approx_eq(w, 1.0)) {
         flat.chunks(n_cols).map(<[f64]>::to_vec).collect()
     } else {
@@ -2496,8 +2495,8 @@ mod tests {
 
     use std::fmt::Write as _;
 
-    use brepkit_topology::Topology;
-    use brepkit_topology::test_utils::make_unit_cube_non_manifold;
+    use remus_topology::Topology;
+    use remus_topology::test_utils::make_unit_cube_non_manifold;
 
     use super::*;
     use crate::step::writer;
@@ -2575,8 +2574,7 @@ mod tests {
     #[test]
     fn roundtrip_box_primitive() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_box(&mut write_topo, 2.0, 3.0, 4.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut write_topo, 2.0, 3.0, 4.0).unwrap();
 
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
@@ -2592,7 +2590,7 @@ mod tests {
     #[test]
     fn roundtrip_multiple_solids() {
         let mut write_topo = Topology::new();
-        let s1 = brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let s1 = remus_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
         let s2 = make_unit_cube_non_manifold(&mut write_topo);
 
         let step_str = writer::write_step(&write_topo, &[s1, s2]).unwrap();
@@ -2668,8 +2666,7 @@ mod tests {
     #[test]
     fn ap214_and_ap242_schemas_import_like_ap203() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_box(&mut write_topo, 2.0, 3.0, 4.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut write_topo, 2.0, 3.0, 4.0).unwrap();
         let ap203 = writer::write_step(&write_topo, &[solid]).unwrap();
         assert!(
             ap203.contains("FILE_SCHEMA(('CONFIG_CONTROL_DESIGN'));"),
@@ -2679,7 +2676,7 @@ mod tests {
         let baseline_volume = {
             let mut topo = Topology::new();
             let solids = read_step(&ap203, &mut topo).unwrap();
-            brepkit_operations::measure::solid_volume(&topo, solids[0], 0.01).unwrap()
+            remus_operations::measure::solid_volume(&topo, solids[0], 0.01).unwrap()
         };
         assert!((baseline_volume - 24.0).abs() < 1e-9, "{baseline_volume}");
 
@@ -2700,7 +2697,7 @@ mod tests {
             let solids = read_step(&swapped, &mut topo)
                 .unwrap_or_else(|e| panic!("schema `{schema}` should import: {e}"));
             assert_eq!(solids.len(), 1, "schema {schema}");
-            let volume = brepkit_operations::measure::solid_volume(&topo, solids[0], 0.01).unwrap();
+            let volume = remus_operations::measure::solid_volume(&topo, solids[0], 0.01).unwrap();
             assert!(
                 (volume - baseline_volume).abs() < 1e-9,
                 "schema {schema} changed the imported solid: {volume} vs {baseline_volume}"
@@ -2740,8 +2737,7 @@ mod tests {
     #[test]
     fn roundtrip_cylinder_preserves_surface() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_cylinder(&mut write_topo, 1.5, 3.0).unwrap();
+        let solid = remus_operations::primitives::make_cylinder(&mut write_topo, 1.5, 3.0).unwrap();
 
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
@@ -2780,7 +2776,7 @@ mod tests {
                 Point3::new(-1.0, 1.0, z),
             ];
             let wire_id =
-                brepkit_topology::builder::make_polygon_wire(&mut write_topo, &pts, 1e-7).unwrap();
+                remus_topology::builder::make_polygon_wire(&mut write_topo, &pts, 1e-7).unwrap();
             let v01 = Vec3::new(
                 pts[1].x() - pts[0].x(),
                 pts[1].y() - pts[0].y(),
@@ -2796,7 +2792,7 @@ mod tests {
             let face = Face::new(wire_id, Vec::new(), FaceSurface::Plane { normal, d });
             profiles.push(write_topo.add_face(face));
         }
-        let solid = brepkit_operations::loft::loft_smooth(&mut write_topo, &profiles).unwrap();
+        let solid = remus_operations::loft::loft_smooth(&mut write_topo, &profiles).unwrap();
 
         let orig_solid = write_topo.solid(solid).unwrap();
         let orig_shell = write_topo.shell(orig_solid.outer_shell()).unwrap();
@@ -2859,7 +2855,7 @@ mod tests {
                 Point3::new(-1.0, 1.0, z),
             ];
             let wire_id =
-                brepkit_topology::builder::make_polygon_wire(&mut write_topo, &pts, 1e-7).unwrap();
+                remus_topology::builder::make_polygon_wire(&mut write_topo, &pts, 1e-7).unwrap();
             let v01 = Vec3::new(
                 pts[1].x() - pts[0].x(),
                 pts[1].y() - pts[0].y(),
@@ -2875,7 +2871,7 @@ mod tests {
             let face = Face::new(wire_id, Vec::new(), FaceSurface::Plane { normal, d });
             profiles.push(write_topo.add_face(face));
         }
-        let solid = brepkit_operations::loft::loft_smooth(&mut write_topo, &profiles).unwrap();
+        let solid = remus_operations::loft::loft_smooth(&mut write_topo, &profiles).unwrap();
 
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
@@ -2912,8 +2908,7 @@ mod tests {
     fn roundtrip_circle_edge_preserved() {
         // Cylinder has circle edges — they should round-trip.
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_cylinder(&mut write_topo, 1.0, 2.0).unwrap();
+        let solid = remus_operations::primitives::make_cylinder(&mut write_topo, 1.0, 2.0).unwrap();
 
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
         assert!(step_str.contains("CIRCLE"));
@@ -3245,7 +3240,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         );
     }
 
-    /// Trimming an analytic curve returns it whole: brepkit stores the
+    /// Trimming an analytic curve returns it whole: remus stores the
     /// complete circle and reads the arc extent off the edge's vertices,
     /// exactly as it does for a bare CIRCLE in an EDGE_CURVE.
     #[test]
@@ -3572,7 +3567,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     }
 
     /// A line skew to the axis sweeps a hyperboloid of one sheet, which is
-    /// neither one of brepkit's analytic surfaces nor bounded enough to
+    /// neither one of remus's analytic surfaces nor bounded enough to
     /// become a NURBS patch. It must be named, not approximated.
     #[test]
     fn line_skew_to_the_axis_is_refused_by_name() {
@@ -3680,7 +3675,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     }
 
     /// An oblique circle sweep is a cylinder in shape but not about the
-    /// circle's own axis, so it is not brepkit's `CylindricalSurface`. It
+    /// circle's own axis, so it is not remus's `CylindricalSurface`. It
     /// becomes an exact NURBS patch instead of being forced into the wrong
     /// analytic type.
     #[test]
@@ -3812,7 +3807,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     fn revolved_nurbs_handles_a_generatrix_touching_the_axis() {
         // A degree-1 profile from the axis out to (4, 0, 4): revolving it
         // gives a cone, whose apex is the on-axis control point.
-        let profile = brepkit_math::nurbs::NurbsCurve::new(
+        let profile = remus_math::nurbs::NurbsCurve::new(
             1,
             vec![0.0, 0.0, 1.0, 1.0],
             vec![Point3::new(0.0, 0.0, 0.0), Point3::new(4.0, 0.0, 4.0)],
@@ -3905,8 +3900,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn cylinder_with_surface_curve_wrapped_edges_imports() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_cylinder(&mut write_topo, 1.0, 2.0).unwrap();
+        let solid = remus_operations::primitives::make_cylinder(&mut write_topo, 1.0, 2.0).unwrap();
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
         let wrapped = wrap_edge_curves_in_surface_curves(&step_str);
@@ -4052,8 +4046,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn inch_declared_cube_imports_as_millimetres() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
         let inches = declare_length_unit_inch(&step_str);
@@ -4074,8 +4067,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn metre_declared_cube_imports_as_millimetres() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 2.0, 3.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut write_topo, 1.0, 2.0, 3.0).unwrap();
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
         let metres = declare_length_unit_metre(&step_str);
@@ -4095,8 +4087,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn millimetre_declared_file_is_unscaled() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_box(&mut write_topo, 4.0, 5.0, 6.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut write_topo, 4.0, 5.0, 6.0).unwrap();
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
         let mut read_topo = Topology::new();
@@ -4111,7 +4102,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     fn degree_declared_cone_matches_the_radian_declared_file() {
         let mut write_topo = Topology::new();
         let solid =
-            brepkit_operations::primitives::make_cone(&mut write_topo, 1.0, 0.0, 2.0).unwrap();
+            remus_operations::primitives::make_cone(&mut write_topo, 1.0, 0.0, 2.0).unwrap();
         let radian_step = writer::write_step(&write_topo, &[solid]).unwrap();
         let degree_step = declare_angle_unit_degrees(&radian_step);
         assert!(
@@ -4136,11 +4127,9 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         }
 
         let radian_volume =
-            brepkit_operations::measure::solid_volume(&radian_topo, radian_solids[0], 0.01)
-                .unwrap();
+            remus_operations::measure::solid_volume(&radian_topo, radian_solids[0], 0.01).unwrap();
         let degree_volume =
-            brepkit_operations::measure::solid_volume(&degree_topo, degree_solids[0], 0.01)
-                .unwrap();
+            remus_operations::measure::solid_volume(&degree_topo, degree_solids[0], 0.01).unwrap();
         assert!(
             (radian_volume - degree_volume).abs() < 1e-9 * radian_volume.abs().max(1.0),
             "degree- and radian-declared cones should be the same solid: \
@@ -4217,7 +4206,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn geometry_without_a_declared_length_unit_is_refused() {
         let mut topo = Topology::new();
-        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
         let step_str = writer::write_step(&topo, &[solid]).unwrap();
 
         // Strip the unit declarations the writer emits, leaving the B-Rep.
@@ -4388,17 +4377,17 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     /// A 3x3x3 box with a fully interior 1x1x1 cavity: one outer shell, one
     /// inner shell, volume 27 - 1 = 26.
     fn make_hollow_cube(topo: &mut Topology) -> SolidId {
-        let outer = brepkit_operations::primitives::make_box(topo, 3.0, 3.0, 3.0).unwrap();
-        let void = brepkit_operations::primitives::make_box(topo, 1.0, 1.0, 1.0).unwrap();
-        brepkit_operations::transform::transform_solid(
+        let outer = remus_operations::primitives::make_box(topo, 3.0, 3.0, 3.0).unwrap();
+        let void = remus_operations::primitives::make_box(topo, 1.0, 1.0, 1.0).unwrap();
+        remus_operations::transform::transform_solid(
             topo,
             void,
-            &brepkit_math::mat::Mat4::translation(1.0, 1.0, 1.0),
+            &remus_math::mat::Mat4::translation(1.0, 1.0, 1.0),
         )
         .unwrap();
-        let hollow = brepkit_operations::boolean::boolean(
+        let hollow = remus_operations::boolean::boolean(
             topo,
-            brepkit_operations::boolean::BooleanOp::Cut,
+            remus_operations::boolean::BooleanOp::Cut,
             outer,
             void,
         )
@@ -4416,7 +4405,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         let mut write_topo = Topology::new();
         let hollow = make_hollow_cube(&mut write_topo);
         let source_volume =
-            brepkit_operations::measure::solid_volume(&write_topo, hollow, 0.01).unwrap();
+            remus_operations::measure::solid_volume(&write_topo, hollow, 0.01).unwrap();
         assert!(
             (source_volume - 26.0).abs() < 1e-6,
             "hollow cube should measure 27 - 1 = 26, got {source_volume}"
@@ -4441,7 +4430,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         );
 
         let read_volume =
-            brepkit_operations::measure::solid_volume(&read_topo, solids[0], 0.01).unwrap();
+            remus_operations::measure::solid_volume(&read_topo, solids[0], 0.01).unwrap();
         assert!(
             (read_volume - source_volume).abs() < 1e-6,
             "re-imported volume {read_volume} should match {source_volume}"
@@ -4451,7 +4440,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn solid_without_voids_still_exports_as_manifold_solid_brep() {
         let mut topo = Topology::new();
-        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
         let step_str = writer::write_step(&topo, &[solid]).unwrap();
         assert!(step_str.contains("MANIFOLD_SOLID_BREP("));
         assert!(!step_str.contains("BREP_WITH_VOIDS("));
@@ -4460,8 +4449,7 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
     #[test]
     fn oriented_closed_shell_flag_flips_face_sense() {
         let mut write_topo = Topology::new();
-        let solid =
-            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let solid = remus_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
         let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
 
         // Re-root the same CLOSED_SHELL through an ORIENTED_CLOSED_SHELL with

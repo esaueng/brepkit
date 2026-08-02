@@ -35,7 +35,7 @@ pub(crate) fn install_hook() {
         std::panic::set_hook(Box::new(move |info| {
             let msg = info.to_string();
             #[cfg(target_arch = "wasm32")]
-            console_error(&format!("[brepkit] panic: {msg}"));
+            console_error(&format!("[remus] panic: {msg}"));
             if let Ok(mut slot) = LAST_PANIC.lock() {
                 *slot = Some(msg);
             }

@@ -12,9 +12,9 @@ pub use checks::{CheckId, EntityRef, Severity, ValidationIssue, ValidationReport
 
 use std::collections::HashSet;
 
-use brepkit_topology::Topology;
-use brepkit_topology::shell::ShellId;
-use brepkit_topology::solid::SolidId;
+use remus_topology::Topology;
+use remus_topology::shell::ShellId;
+use remus_topology::solid::SolidId;
 
 use crate::CheckError;
 
@@ -270,8 +270,8 @@ fn validate_shell_checks(
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
-    use brepkit_topology::Topology;
-    use brepkit_topology::test_utils::make_unit_cube_manifold;
+    use remus_topology::Topology;
+    use remus_topology::test_utils::make_unit_cube_manifold;
 
     use super::*;
 

@@ -1,9 +1,9 @@
 [book]
-authors = ["brepkit contributors"]
+authors = ["Remus contributors"]
 description = "A modern, pure-Rust B-Rep CAD kernel"
 language = "en"
 src = "src"
-title = "brepkit"
+title = "Remus"
 
 [build]
 build-dir = "book"

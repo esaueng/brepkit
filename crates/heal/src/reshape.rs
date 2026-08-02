@@ -9,13 +9,13 @@
 
 use std::collections::HashMap;
 
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeId};
-use brepkit_topology::face::FaceId;
-use brepkit_topology::shell::ShellId;
-use brepkit_topology::solid::SolidId;
-use brepkit_topology::vertex::VertexId;
-use brepkit_topology::wire::{OrientedEdge, WireId};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeId};
+use remus_topology::face::FaceId;
+use remus_topology::shell::ShellId;
+use remus_topology::solid::SolidId;
+use remus_topology::vertex::VertexId;
+use remus_topology::wire::{OrientedEdge, WireId};
 
 use crate::HealError;
 
@@ -351,7 +351,7 @@ impl ReShape {
                 }
 
                 if any_changed && !new_edges.is_empty() {
-                    let new_wire = brepkit_topology::wire::Wire::new(new_edges, is_closed)?;
+                    let new_wire = remus_topology::wire::Wire::new(new_edges, is_closed)?;
                     let new_wire_id = topo.add_wire(new_wire);
 
                     let face_mut = topo.face_mut(fid)?;
@@ -406,7 +406,7 @@ impl ReShape {
         }
 
         if any_changed && !new_faces.is_empty() {
-            let new_shell = brepkit_topology::shell::Shell::new(new_faces)?;
+            let new_shell = remus_topology::shell::Shell::new(new_faces)?;
             let shell_mut = topo.shell_mut(shell_id)?;
             *shell_mut = new_shell;
         }

@@ -5,7 +5,7 @@ resolver = "3"
 [workspace.package]
 edition = "2024"
 license = "MIT OR Apache-2.0"
-repository = "git+https://github.com/andymai/brepkit.git"
+repository = "git+https://github.com/esaueng/brepkit.git"
 rust-version = "1.88"
 
 [workspace.dependencies]
@@ -46,17 +46,17 @@ quick-xml = "0.41"
 zip = {version = "8", default-features = false, features = ["deflate"]}
 
 # Workspace crates
-brepkit-algo = {path = "crates/algo"}
-brepkit-blend = {path = "crates/blend"}
-brepkit-check = {path = "crates/check"}
-brepkit-geometry = {path = "crates/geometry"}
-brepkit-heal = {path = "crates/heal"}
-brepkit-io = {path = "crates/io"}
-brepkit-math = {path = "crates/math"}
-brepkit-offset = {path = "crates/offset"}
-brepkit-operations = {path = "crates/operations"}
-brepkit-sketch = {path = "crates/sketch"}
-brepkit-topology = {path = "crates/topology"}
+remus-algo = {path = "crates/algo"}
+remus-blend = {path = "crates/blend"}
+remus-check = {path = "crates/check"}
+remus-geometry = {path = "crates/geometry"}
+remus-heal = {path = "crates/heal"}
+remus-io = {path = "crates/io"}
+remus-math = {path = "crates/math"}
+remus-offset = {path = "crates/offset"}
+remus-operations = {path = "crates/operations"}
+remus-sketch = {path = "crates/sketch"}
+remus-topology = {path = "crates/topology"}
 
 [workspace.lints.rust]
 missing_docs = "warn"

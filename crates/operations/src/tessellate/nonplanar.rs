@@ -1,10 +1,10 @@
 //! Non-planar CDT and fallback paths for face tessellation.
 
-use brepkit_math::det_hash::{DetHashMap, DetHashSet};
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::EdgeCurve;
-use brepkit_topology::face::{FaceId, FaceSurface};
+use remus_math::det_hash::{DetHashMap, DetHashSet};
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::EdgeCurve;
+use remus_topology::face::{FaceId, FaceSurface};
 
 use super::edge_sampling::{sample_edge, segments_for_chord_deviation_a};
 use super::{MERGE_GRID, TriangleMesh, point_merge_key};
@@ -34,7 +34,7 @@ type NormalFn = Box<dyn Fn(f64, f64) -> Vec3>;
 /// counts on the two rims.
 pub(super) fn tessellate_revolution_band_shared(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
     merged: &mut TriangleMesh,
 ) -> Result<bool, crate::OperationsError> {
@@ -196,7 +196,7 @@ pub(super) fn tessellate_revolution_band_shared(
 /// `Ok(false)` when it did not (the caller falls back to CDT/snap unchanged).
 pub(super) fn tessellate_cone_apex_fan_shared(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
     merged: &mut TriangleMesh,
 ) -> Result<bool, crate::OperationsError> {
@@ -357,7 +357,7 @@ pub(super) fn tessellate_cone_apex_fan_shared(
 /// face.
 pub(super) fn tessellate_torus_two_rim_band(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
@@ -374,7 +374,7 @@ pub(super) fn tessellate_torus_two_rim_band(
 
     let wire = topo.wire(face_data.outer_wire())?;
     let mut rim_edge_ids: Vec<usize> = Vec::new();
-    let mut seam: Option<(brepkit_topology::edge::EdgeId, usize)> = None;
+    let mut seam: Option<(remus_topology::edge::EdgeId, usize)> = None;
     for oe in wire.edges() {
         let e = topo.edge(oe.edge())?;
         let closed = e.start() == e.end();
@@ -586,8 +586,8 @@ type LatRing = Vec<(f64, u32)>;
 /// has all its `v`-gaps below `π`, whereas a partial arc leaves one gap above it.
 fn collect_torus_phi_ring(
     topo: &Topology,
-    wire_id: brepkit_topology::wire::WireId,
-    torus: &brepkit_math::surfaces::ToroidalSurface,
+    wire_id: remus_topology::wire::WireId,
+    torus: &remus_math::surfaces::ToroidalSurface,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
     merged: &TriangleMesh,
 ) -> Result<Option<Vec<(f64, u32)>>, crate::OperationsError> {
@@ -640,7 +640,7 @@ fn collect_torus_phi_ring(
 /// sweep is along `u`.
 pub(super) fn tessellate_torus_notch_band(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
@@ -808,7 +808,7 @@ pub(super) fn tessellate_torus_notch_band(
 #[allow(clippy::too_many_lines)]
 pub(super) fn tessellate_latitude_band_shared(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
@@ -1099,7 +1099,7 @@ fn emit_aligned_quad_strip(
 /// `v` (built only from `Line`/`Circle` edges).
 fn collect_constant_v_ring(
     topo: &Topology,
-    wire_id: brepkit_topology::wire::WireId,
+    wire_id: remus_topology::wire::WireId,
     project: &dyn Fn(Point3) -> (f64, f64),
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
     merged: &TriangleMesh,
@@ -1179,7 +1179,7 @@ type VarRing = Vec<(f64, f64, u32)>;
 /// vary with longitude.
 fn collect_var_v_ring(
     topo: &Topology,
-    wire_id: brepkit_topology::wire::WireId,
+    wire_id: remus_topology::wire::WireId,
     project: &dyn Fn(Point3) -> (f64, f64),
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
     merged: &TriangleMesh,
@@ -1397,7 +1397,7 @@ fn stitch_rings(
 pub(super) fn tessellate_nonplanar_cdt(
     topo: &Topology,
     face_id: FaceId,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     circle_floor: bool,
@@ -1405,9 +1405,9 @@ pub(super) fn tessellate_nonplanar_cdt(
     merged: &mut TriangleMesh,
     point_to_global: &mut DetHashMap<(i64, i64, i64), u32>,
 ) -> Result<(), crate::OperationsError> {
-    use brepkit_math::cdt::Cdt;
-    use brepkit_math::vec::Point2;
-    use brepkit_topology::edge::EdgeId;
+    use remus_math::cdt::Cdt;
+    use remus_math::vec::Point2;
+    use remus_topology::edge::EdgeId;
 
     let wire = topo.wire(face_data.outer_wire())?;
     let tol_dup = 1e-10;
@@ -1780,7 +1780,7 @@ fn project_to_surface_uv(
         FaceSurface::Sphere(sphere) => Ok(sphere.project_point(pt)),
         FaceSurface::Torus(torus) => Ok(torus.project_point(pt)),
         FaceSurface::Nurbs(surface) => {
-            brepkit_math::nurbs::projection::project_point_to_surface(surface, pt, 1e-6)
+            remus_math::nurbs::projection::project_point_to_surface(surface, pt, 1e-6)
                 .map(|proj| (proj.u, proj.v))
                 .map_err(crate::OperationsError::Math)
         }
@@ -1792,7 +1792,7 @@ fn project_to_surface_uv(
 
 /// Try to find (u,v) coordinates for a 3D point using a PCurve.
 fn project_via_pcurve(
-    pcurve: &brepkit_topology::pcurve::PCurve,
+    pcurve: &remus_topology::pcurve::PCurve,
     pt: Point3,
     surface: &FaceSurface,
 ) -> Option<(f64, f64)> {
@@ -1835,7 +1835,7 @@ fn project_via_pcurve(
     let uv = pcurve.evaluate(t_final);
     let p_final = eval_surface_point(surface, uv.x(), uv.y());
 
-    if (p_final - pt).length() < brepkit_math::tolerance::Tolerance::default().linear {
+    if (p_final - pt).length() < remus_math::tolerance::Tolerance::default().linear {
         Some((uv.x(), uv.y()))
     } else {
         None
@@ -2082,7 +2082,7 @@ fn fill_sphere_cap_web(
 /// the closing duplicate are removed.
 fn collect_boundary_loop(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
@@ -2162,7 +2162,7 @@ fn collect_boundary_loop(
 /// `Ok(false)` defers to the CDT/snap path.
 pub(super) fn tessellate_sphere_cap_shared(
     topo: &Topology,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
@@ -2225,8 +2225,8 @@ pub(super) fn tessellate_sphere_cap_shared(
 pub(super) fn tessellate_trimmed_sphere_uvs(
     topo: &Topology,
     face_id: FaceId,
-    face_data: &brepkit_topology::face::Face,
-    sphere: &brepkit_math::surfaces::SphericalSurface,
+    face_data: &remus_topology::face::Face,
+    sphere: &remus_math::surfaces::SphericalSurface,
     deflection: f64,
     angular_tol: f64,
     try_cdt: bool,
@@ -2280,7 +2280,7 @@ pub(super) fn tessellate_trimmed_sphere_uvs(
 
 /// Check if a 2D point is inside a polygon defined by (u, v) coordinates.
 /// Uses the winding number algorithm for robustness.
-pub(super) fn point_in_polygon_2d(polygon: &[(f64, f64)], pt: brepkit_math::vec::Point2) -> bool {
+pub(super) fn point_in_polygon_2d(polygon: &[(f64, f64)], pt: remus_math::vec::Point2) -> bool {
     let n = polygon.len();
     let mut winding = 0i32;
     for i in 0..n {
@@ -2311,7 +2311,7 @@ pub(super) fn point_in_polygon_2d(polygon: &[(f64, f64)], pt: brepkit_math::vec:
 pub(super) fn tessellate_nonplanar_snap(
     topo: &Topology,
     face_id: FaceId,
-    face_data: &brepkit_topology::face::Face,
+    face_data: &remus_topology::face::Face,
     deflection: f64,
     angular_tol: f64,
     edge_global_indices: &DetHashMap<usize, Vec<u32>>,
@@ -2364,7 +2364,7 @@ pub(super) fn tessellate_nonplanar_snap(
     let snap_tol = 1e-6;
     let inv_cell = 1.0 / snap_tol;
     let mut snap_grid: DetHashMap<(i64, i64, i64), Vec<u32>> =
-        DetHashMap::with_capacity_and_hasher(snap_targets.len(), brepkit_math::det_hash::DetState);
+        DetHashMap::with_capacity_and_hasher(snap_targets.len(), remus_math::det_hash::DetState);
     for &(target_pos, gid) in &snap_targets {
         let cx = (target_pos.x() * inv_cell).round() as i64;
         let cy = (target_pos.y() * inv_cell).round() as i64;

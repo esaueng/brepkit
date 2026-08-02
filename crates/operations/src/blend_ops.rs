@@ -1,13 +1,13 @@
-//! Thin wrappers around `brepkit-blend` for the operations API.
+//! Thin wrappers around `remus-blend` for the operations API.
 
-use brepkit_blend::BlendResult;
-use brepkit_blend::chamfer_builder::ChamferBuilder;
-use brepkit_blend::fillet_builder::FilletBuilder;
-pub use brepkit_blend::{BlendError, BlendFaceOrigins};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{EdgeCurve, EdgeId};
-use brepkit_topology::face::FaceSurface;
-use brepkit_topology::solid::SolidId;
+use remus_blend::BlendResult;
+use remus_blend::chamfer_builder::ChamferBuilder;
+use remus_blend::fillet_builder::FilletBuilder;
+pub use remus_blend::{BlendError, BlendFaceOrigins};
+use remus_topology::Topology;
+use remus_topology::edge::{EdgeCurve, EdgeId};
+use remus_topology::face::FaceSurface;
+use remus_topology::solid::SolidId;
 
 use crate::OperationsError;
 use crate::evolution::EvolutionMap;
@@ -66,7 +66,7 @@ fn edge_is_convex(topo: &Topology, solid: SolidId, edge: EdgeId, probe: f64) -> 
         end,
     );
 
-    let outward = |fid: brepkit_topology::face::FaceId| {
+    let outward = |fid: remus_topology::face::FaceId| {
         let face = topo.face(fid).ok()?;
         let (u, v) = face.surface().project_point(mid)?;
         let n = face.surface().normal(u, v);
@@ -177,15 +177,15 @@ fn validate_blend_volume(
 fn error_magnitudes(
     topo: &Topology,
     solid: SolidId,
-) -> Result<std::collections::HashMap<brepkit_check::validate::CheckId, f64>, OperationsError> {
-    let report = brepkit_check::validate::validate_solid(
+) -> Result<std::collections::HashMap<remus_check::validate::CheckId, f64>, OperationsError> {
+    let report = remus_check::validate::validate_solid(
         topo,
         solid,
-        &brepkit_check::validate::ValidateOptions::default(),
+        &remus_check::validate::ValidateOptions::default(),
     )?;
     let mut map = std::collections::HashMap::new();
     for issue in &report.issues {
-        if issue.severity == brepkit_check::validate::Severity::Error {
+        if issue.severity == remus_check::validate::Severity::Error {
             *map.entry(issue.check).or_insert(0.0) += issue.deviation.unwrap_or(1.0);
         }
     }
@@ -208,10 +208,10 @@ fn validate_complete_blend(
             failed: result.failed.len(),
         });
     }
-    let report = brepkit_check::validate::validate_solid(
+    let report = remus_check::validate::validate_solid(
         topo,
         result.solid,
-        &brepkit_check::validate::ValidateOptions::default(),
+        &remus_check::validate::ValidateOptions::default(),
     )?;
     if report.is_valid() {
         return Ok(());
@@ -219,7 +219,7 @@ fn validate_complete_blend(
     let after = {
         let mut map = std::collections::HashMap::new();
         for issue in &report.issues {
-            if issue.severity == brepkit_check::validate::Severity::Error {
+            if issue.severity == remus_check::validate::Severity::Error {
                 *map.entry(issue.check).or_insert(0.0) += issue.deviation.unwrap_or(1.0);
             }
         }
@@ -233,7 +233,7 @@ fn validate_complete_blend(
         let summary = report
             .issues
             .iter()
-            .filter(|issue| issue.severity == brepkit_check::validate::Severity::Error)
+            .filter(|issue| issue.severity == remus_check::validate::Severity::Error)
             .take(3)
             .map(|issue| issue.description.as_str())
             .collect::<Vec<_>>()
@@ -250,9 +250,9 @@ fn validate_complete_blend(
 
 /// Shortest distance from `p` to the segment `a`–`b`.
 fn point_segment_distance(
-    p: brepkit_math::vec::Point3,
-    a: brepkit_math::vec::Point3,
-    b: brepkit_math::vec::Point3,
+    p: remus_math::vec::Point3,
+    a: remus_math::vec::Point3,
+    b: remus_math::vec::Point3,
 ) -> f64 {
     let ab = b - a;
     let len_sq = ab.dot(ab);
@@ -268,7 +268,7 @@ fn sample_edge(
     topo: &Topology,
     edge: EdgeId,
     samples: usize,
-) -> Result<Vec<brepkit_math::vec::Point3>, OperationsError> {
+) -> Result<Vec<remus_math::vec::Point3>, OperationsError> {
     let e = topo.edge(edge)?;
     let start = topo.vertex(e.start())?.point();
     let end = topo.vertex(e.end())?.point();
@@ -435,7 +435,7 @@ fn edge_polyline(
     topo: &Topology,
     edge: EdgeId,
     step: f64,
-) -> Result<Vec<brepkit_math::vec::Point3>, OperationsError> {
+) -> Result<Vec<remus_math::vec::Point3>, OperationsError> {
     const MAX_SAMPLES: usize = 256;
     let coarse = sample_edge(topo, edge, 8)?;
     let rough: f64 = coarse.windows(2).map(|w| (w[1] - w[0]).length()).sum();
@@ -454,7 +454,7 @@ fn edge_polyline(
 }
 
 /// Shortest distance between two sampled polylines.
-fn polyline_distance(a: &[brepkit_math::vec::Point3], b: &[brepkit_math::vec::Point3]) -> f64 {
+fn polyline_distance(a: &[remus_math::vec::Point3], b: &[remus_math::vec::Point3]) -> f64 {
     let mut best = f64::INFINITY;
     for &p in a {
         for w in b.windows(2) {
@@ -516,15 +516,15 @@ fn independent_blend_groups(
     if edges.len() < 2 {
         return Ok(vec![edges.to_vec()]);
     }
-    let tol = brepkit_math::tolerance::Tolerance::new();
+    let tol = remus_math::tolerance::Tolerance::new();
 
     // What each seed actually blends: both engines expand a seed to its whole
     // G1 ridgeline first, so two distant seeds on one smooth run belong
     // together even though the seeds themselves are far apart.
     let mut chains: Vec<Vec<EdgeId>> = Vec::with_capacity(edges.len());
-    let mut outlines: Vec<Vec<brepkit_math::vec::Point3>> = Vec::with_capacity(edges.len());
+    let mut outlines: Vec<Vec<remus_math::vec::Point3>> = Vec::with_capacity(edges.len());
     for &edge in edges {
-        let chain = brepkit_blend::g1_chain::expand_g1_chain(topo, solid, &[edge], tol)?;
+        let chain = remus_blend::g1_chain::expand_g1_chain(topo, solid, &[edge], tol)?;
         let chain = if chain.is_empty() { vec![edge] } else { chain };
         let mut outline = Vec::new();
         for &member in &chain {
@@ -875,7 +875,7 @@ pub fn evolution_from_blend_origins(
     origins: Option<&BlendFaceOrigins>,
     input_signatures: &[crate::evolution::FaceSignature],
 ) -> Result<EvolutionMap, OperationsError> {
-    use brepkit_topology::explorer::solid_faces;
+    use remus_topology::explorer::solid_faces;
 
     let Some(origins) = origins else {
         let output_signatures = crate::boolean::collect_face_signatures(topo, result_solid)?;
@@ -887,7 +887,7 @@ pub fn evolution_from_blend_origins(
 
     let result_faces: std::collections::HashSet<usize> = solid_faces(topo, result_solid)?
         .into_iter()
-        .map(brepkit_topology::arena::Id::index)
+        .map(remus_topology::arena::Id::index)
         .collect();
 
     let mut evo = EvolutionMap::exact();
@@ -993,9 +993,9 @@ pub fn chamfer_with_evolution(
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use brepkit_math::vec::Point3;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::vertex::Vertex;
+    use remus_math::vec::Point3;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::vertex::Vertex;
 
     use super::*;
 

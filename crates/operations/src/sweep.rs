@@ -5,18 +5,18 @@
 //! point. Uses rotation-minimizing frames (double-reflection method) to avoid
 //! Frenet-frame singularities on straight segments and inflection points.
 
-use brepkit_math::mat::Mat4;
-use brepkit_math::nurbs::curve::NurbsCurve;
-use brepkit_math::nurbs::surface_fitting::interpolate_surface;
-use brepkit_math::tolerance::Tolerance;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve};
-use brepkit_topology::face::{Face, FaceId, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::{Solid, SolidId};
-use brepkit_topology::vertex::{Vertex, VertexId};
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use remus_math::mat::Mat4;
+use remus_math::nurbs::curve::NurbsCurve;
+use remus_math::nurbs::surface_fitting::interpolate_surface;
+use remus_math::tolerance::Tolerance;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve};
+use remus_topology::face::{Face, FaceId, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::{Solid, SolidId};
+use remus_topology::vertex::{Vertex, VertexId};
+use remus_topology::wire::{OrientedEdge, Wire};
 
 use crate::dot_normal_point;
 
@@ -187,8 +187,8 @@ fn transform_point(
 /// Data from sweeping a single wire through frames.
 struct SweptWireData {
     ring_verts: Vec<Vec<VertexId>>,
-    ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>>,
-    path_edges: Vec<Vec<brepkit_topology::edge::EdgeId>>,
+    ring_edges: Vec<Vec<remus_topology::edge::EdgeId>>,
+    path_edges: Vec<Vec<remus_topology::edge::EdgeId>>,
     n: usize,
 }
 
@@ -200,7 +200,7 @@ struct SweptWireData {
 #[allow(clippy::too_many_arguments)]
 fn sweep_wire_through_frames(
     topo: &mut Topology,
-    wire_id: brepkit_topology::wire::WireId,
+    wire_id: remus_topology::wire::WireId,
     centroid: Point3,
     initial_right: Vec3,
     initial_up: Vec3,
@@ -224,10 +224,7 @@ fn sweep_wire_through_frames(
 
     let positions: Vec<Point3> = verts
         .iter()
-        .map(|&vid| {
-            topo.vertex(vid)
-                .map(brepkit_topology::vertex::Vertex::point)
-        })
+        .map(|&vid| topo.vertex(vid).map(remus_topology::vertex::Vertex::point))
         .collect::<Result<_, _>>()?;
 
     let mut ring_verts: Vec<Vec<VertexId>> = Vec::with_capacity(num_segments + 1);
@@ -259,7 +256,7 @@ fn sweep_wire_through_frames(
     } else {
         ring_verts.len()
     };
-    let mut ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
+    let mut ring_edges: Vec<Vec<remus_topology::edge::EdgeId>> =
         Vec::with_capacity(num_segments + 1);
     for ring in &ring_verts[..real_ring_count] {
         let edges: Vec<_> = (0..n)
@@ -274,7 +271,7 @@ fn sweep_wire_through_frames(
         ring_edges.push(ring_edges[0].clone());
     }
 
-    let mut path_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> = Vec::with_capacity(num_segments);
+    let mut path_edges: Vec<Vec<remus_topology::edge::EdgeId>> = Vec::with_capacity(num_segments);
     for seg in 0..num_segments {
         let edges: Vec<_> = (0..n)
             .map(|i| {
@@ -354,7 +351,7 @@ fn build_inner_cap_wires(
     inner_data: &[SweptWireData],
     ring_idx: usize,
     reversed: bool,
-) -> Result<Vec<brepkit_topology::wire::WireId>, crate::OperationsError> {
+) -> Result<Vec<remus_topology::wire::WireId>, crate::OperationsError> {
     let mut wires = Vec::new();
     for iwd in inner_data {
         let edges: Vec<OrientedEdge> = if reversed {
@@ -571,7 +568,7 @@ pub fn sweep(
 
     let face_data = topo.face(profile)?;
     let input_wire_id = face_data.outer_wire();
-    let inner_wire_ids: Vec<brepkit_topology::wire::WireId> = face_data.inner_wires().to_vec();
+    let inner_wire_ids: Vec<remus_topology::wire::WireId> = face_data.inner_wires().to_vec();
 
     let start_end_coincide = tol.approx_eq(
         (path.evaluate(1.0) - path.evaluate(0.0)).length_squared(),
@@ -620,10 +617,7 @@ pub fn sweep(
 
     let mut input_positions: Vec<Point3> = input_verts
         .iter()
-        .map(|&vid| {
-            topo.vertex(vid)
-                .map(brepkit_topology::vertex::Vertex::point)
-        })
+        .map(|&vid| topo.vertex(vid).map(remus_topology::vertex::Vertex::point))
         .collect::<Result<_, _>>()?;
 
     // Up-hint for the rotation-minimizing frame: the section boundary's own
@@ -694,7 +688,7 @@ pub fn sweep(
     } else {
         num_segments + 1
     };
-    let mut ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
+    let mut ring_edges: Vec<Vec<remus_topology::edge::EdgeId>> =
         Vec::with_capacity(num_segments + 1);
     for ring in &ring_verts[..real_ring_count] {
         let edges: Vec<_> = (0..n)
@@ -711,7 +705,7 @@ pub fn sweep(
     }
 
     // path_edges[seg][i] = edge from ring_verts[seg][i] to ring_verts[seg+1][i].
-    let mut path_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> = Vec::with_capacity(num_segments);
+    let mut path_edges: Vec<Vec<remus_topology::edge::EdgeId>> = Vec::with_capacity(num_segments);
     for seg in 0..num_segments {
         let edges: Vec<_> = (0..n)
             .map(|i| {
@@ -862,8 +856,7 @@ pub fn sweep_smooth(
 
     let face_data = topo.face(profile)?;
     let input_wire_id = face_data.outer_wire();
-    let inner_wire_ids_smooth: Vec<brepkit_topology::wire::WireId> =
-        face_data.inner_wires().to_vec();
+    let inner_wire_ids_smooth: Vec<remus_topology::wire::WireId> = face_data.inner_wires().to_vec();
 
     // Detect closed vs degenerate paths.
     let start_end_coincide_smooth = tol.approx_eq(
@@ -909,10 +902,7 @@ pub fn sweep_smooth(
 
     let mut input_positions: Vec<Point3> = input_verts
         .iter()
-        .map(|&vid| {
-            topo.vertex(vid)
-                .map(brepkit_topology::vertex::Vertex::point)
-        })
+        .map(|&vid| topo.vertex(vid).map(remus_topology::vertex::Vertex::point))
         .collect::<Result<_, _>>()?;
 
     // Profile normal from the section boundary (planar or non-planar alike); the
@@ -1359,7 +1349,7 @@ pub fn sweep_with_options(
 /// polygon, its inner wires, and the centroid / normal derived from it.
 struct SweptProfile {
     positions: Vec<Point3>,
-    inner_wire_ids: Vec<brepkit_topology::wire::WireId>,
+    inner_wire_ids: Vec<remus_topology::wire::WireId>,
     normal: Vec3,
     centroid: Point3,
 }
@@ -1378,7 +1368,7 @@ fn prepare_profile(
 
     let face_data = topo.face(profile)?;
     let input_wire_id = face_data.outer_wire();
-    let inner_wire_ids: Vec<brepkit_topology::wire::WireId> = face_data.inner_wires().to_vec();
+    let inner_wire_ids: Vec<remus_topology::wire::WireId> = face_data.inner_wires().to_vec();
 
     let input_wire = topo.wire(input_wire_id)?;
     let original_oriented: Vec<_> = input_wire.edges().to_vec();
@@ -1434,7 +1424,7 @@ fn prepare_profile(
 fn assemble_swept_solid(
     topo: &mut Topology,
     input_positions: &[Point3],
-    inner_wire_ids: &[brepkit_topology::wire::WireId],
+    inner_wire_ids: &[remus_topology::wire::WireId],
     centroid: Point3,
     input_normal: Vec3,
     frames: &[Frame],
@@ -1481,7 +1471,7 @@ fn assemble_swept_solid(
         ring_verts.push(ring);
     }
 
-    let mut ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
+    let mut ring_edges: Vec<Vec<remus_topology::edge::EdgeId>> =
         Vec::with_capacity(num_segments + 1);
     for ring in &ring_verts {
         let edges: Vec<_> = (0..n)
@@ -1493,7 +1483,7 @@ fn assemble_swept_solid(
         ring_edges.push(edges);
     }
 
-    let mut path_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> = Vec::with_capacity(num_segments);
+    let mut path_edges: Vec<Vec<remus_topology::edge::EdgeId>> = Vec::with_capacity(num_segments);
     for seg in 0..num_segments {
         let edges: Vec<_> = (0..n)
             .map(|i| {
@@ -1672,7 +1662,7 @@ fn sweep_miter(
     path: &NurbsCurve,
     options: &SweepOptions,
 ) -> Result<SolidId, crate::OperationsError> {
-    use brepkit_math::nurbs::knot_ops::curve_split;
+    use remus_math::nurbs::knot_ops::curve_split;
 
     let tol = Tolerance::new();
 
@@ -1694,7 +1684,7 @@ fn sweep_miter(
         }
     };
     let input_wire_id = face_data.outer_wire();
-    let inner_wire_ids: Vec<brepkit_topology::wire::WireId> = face_data.inner_wires().to_vec();
+    let inner_wire_ids: Vec<remus_topology::wire::WireId> = face_data.inner_wires().to_vec();
 
     let input_wire = topo.wire(input_wire_id)?;
     let original_oriented: Vec<_> = input_wire.edges().to_vec();
@@ -1719,10 +1709,7 @@ fn sweep_miter(
     }
     let mut input_positions: Vec<Point3> = input_verts
         .iter()
-        .map(|&vid| {
-            topo.vertex(vid)
-                .map(brepkit_topology::vertex::Vertex::point)
-        })
+        .map(|&vid| topo.vertex(vid).map(remus_topology::vertex::Vertex::point))
         .collect::<Result<_, _>>()?;
 
     // Ensure CCW winding relative to the path direction at domain start.
@@ -1756,7 +1743,7 @@ fn sweep_miter(
     // Track the ring vertices at the end of each segment / start of the next
     // so we can connect them via miter faces.
     let mut prev_end_ring: Option<Vec<VertexId>> = None;
-    let mut prev_end_ring_edges: Option<Vec<brepkit_topology::edge::EdgeId>> = None;
+    let mut prev_end_ring_edges: Option<Vec<remus_topology::edge::EdgeId>> = None;
     // The previous segment's end frame (tangent, up), used to transport the
     // frame orientation through each kink so ring corner `i` on both sides of
     // a miter is the image of the same profile corner.
@@ -1867,7 +1854,7 @@ fn sweep_miter(
         // from that same ring: replace the freshly built start ring and reuse
         // the miter ring's edges so both segments' side faces share the same
         // edge entities.
-        let miter_ring_edges_for_reuse: Option<Vec<brepkit_topology::edge::EdgeId>> =
+        let miter_ring_edges_for_reuse: Option<Vec<remus_topology::edge::EdgeId>> =
             if let Some(prev_ring) = prev_end_ring.take() {
                 ring_verts[0] = prev_ring;
                 prev_end_ring_edges.take()
@@ -1910,7 +1897,7 @@ fn sweep_miter(
 
         // Create ring edges. If the start ring was carried over from the
         // previous segment's miter, reuse its edges.
-        let mut ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
+        let mut ring_edges: Vec<Vec<remus_topology::edge::EdgeId>> =
             Vec::with_capacity(num_segments + 1);
         for (ring_idx, ring) in ring_verts.iter().enumerate() {
             if ring_idx == 0 {
@@ -1936,7 +1923,7 @@ fn sweep_miter(
             }
         }
 
-        let mut path_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
+        let mut path_edges: Vec<Vec<remus_topology::edge::EdgeId>> =
             Vec::with_capacity(num_segments);
         for seg in 0..num_segments {
             let edges: Vec<_> = (0..n)

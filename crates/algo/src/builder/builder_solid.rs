@@ -12,13 +12,13 @@
 
 use std::collections::{HashMap, HashSet, VecDeque};
 
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::EdgeId;
-use brepkit_topology::face::{Face, FaceId, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::{Solid, SolidId};
-use brepkit_topology::wire::{OrientedEdge, WireId};
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::EdgeId;
+use remus_topology::face::{Face, FaceId, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::{Solid, SolidId};
+use remus_topology::wire::{OrientedEdge, WireId};
 
 use super::FaceProvenance;
 
@@ -203,7 +203,7 @@ pub fn build_solid_with_origins(
 
     // Phase 4: Assemble
     let solid_id = assemble(topo, growth, holes, &face_source)?;
-    let origins = brepkit_topology::explorer::solid_faces(topo, solid_id)?
+    let origins = remus_topology::explorer::solid_faces(topo, solid_id)?
         .into_iter()
         .map(|f| (f, face_source.get(&f).copied().flatten()))
         .collect();
@@ -918,7 +918,7 @@ fn excise_out_and_back_spurs(
             }
             let closed = oriented_edges_form_closed_loop(topo, &outer);
             if let (Ok(new_wire), Ok(slot)) = (
-                brepkit_topology::wire::Wire::new(outer, closed),
+                remus_topology::wire::Wire::new(outer, closed),
                 topo.wire_mut(outer_wid),
             ) {
                 *slot = new_wire;
@@ -942,7 +942,7 @@ fn excise_out_and_back_spurs(
                 }
                 let closed = oriented_edges_form_closed_loop(topo, &inner);
                 if let (Ok(new_wire), Ok(slot)) = (
-                    brepkit_topology::wire::Wire::new(inner, closed),
+                    remus_topology::wire::Wire::new(inner, closed),
                     topo.wire_mut(wid),
                 ) {
                     *slot = new_wire;
@@ -1123,7 +1123,7 @@ fn normalize_face_wires(topo: &mut Topology, fid: FaceId) {
     if outer_changed {
         let closed = oriented_edges_form_closed_loop(topo, &outer_oes);
         if let (Ok(new_outer), Ok(slot)) = (
-            brepkit_topology::wire::Wire::new(outer_oes, closed),
+            remus_topology::wire::Wire::new(outer_oes, closed),
             topo.wire_mut(outer_wid),
         ) {
             *slot = new_outer;
@@ -1133,7 +1133,7 @@ fn normalize_face_wires(topo: &mut Topology, fid: FaceId) {
     for (wid, oes) in normalized_inners {
         let closed = oriented_edges_form_closed_loop(topo, &oes);
         if let (Ok(new_inner), Ok(slot)) = (
-            brepkit_topology::wire::Wire::new(oes, closed),
+            remus_topology::wire::Wire::new(oes, closed),
             topo.wire_mut(wid),
         ) {
             *slot = new_inner;
@@ -1468,7 +1468,7 @@ fn quantize_point(p: Point3, tol: f64) -> QPos {
 
 /// Edge data for duplicate detection.
 struct EdgeEntry {
-    edge_id: brepkit_topology::edge::EdgeId,
+    edge_id: remus_topology::edge::EdgeId,
     face_idx: usize,
     qpair: QPosEdge,
 }
@@ -1506,7 +1506,7 @@ impl PointGrid {
     }
 
     fn choose_cell(points: &[Point3], min_cell: f64) -> f64 {
-        let Some(bb) = brepkit_math::aabb::Aabb3::try_from_points(points.iter().copied()) else {
+        let Some(bb) = remus_math::aabb::Aabb3::try_from_points(points.iter().copied()) else {
             return min_cell.max(1.0);
         };
         let ext = bb.max - bb.min;
@@ -1595,7 +1595,7 @@ impl PointGrid {
 /// start == end), dropping those edges. Closed curved edges (full circles)
 /// legitimately have coincident endpoints and are kept.
 fn remove_zero_length_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Result<(), AlgoError> {
-    use brepkit_topology::edge::{EdgeCurve, EdgeId};
+    use remus_topology::edge::{EdgeCurve, EdgeId};
 
     for fid in face_ids.iter_mut() {
         let (surface, is_reversed, outer_oes, inner_oes_list, has_zero) = {
@@ -1642,7 +1642,7 @@ fn remove_zero_length_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Res
         if !is_rebuildable_loop(topo, &new_outer) {
             continue;
         }
-        let Ok(new_outer_wire) = brepkit_topology::wire::Wire::new(new_outer, true) else {
+        let Ok(new_outer_wire) = remus_topology::wire::Wire::new(new_outer, true) else {
             continue;
         };
         let new_outer_id = topo.add_wire(new_outer_wire);
@@ -1650,7 +1650,7 @@ fn remove_zero_length_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Res
         for inner_oes in &inner_oes_list {
             let kept = strip(inner_oes);
             if is_rebuildable_loop(topo, &kept)
-                && let Ok(w) = brepkit_topology::wire::Wire::new(kept, true)
+                && let Ok(w) = remus_topology::wire::Wire::new(kept, true)
             {
                 new_inner_ids.push(topo.add_wire(w));
             }
@@ -1670,7 +1670,7 @@ fn remove_zero_length_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Res
 /// equals end vertex, or the curve is inherently closed (Circle/Ellipse).
 /// Genuinely degenerate single-Line leftovers are rejected.
 fn is_rebuildable_loop(topo: &Topology, oes: &[OrientedEdge]) -> bool {
-    use brepkit_topology::edge::EdgeCurve;
+    use remus_topology::edge::EdgeCurve;
 
     match oes {
         [] => false,
@@ -1687,7 +1687,7 @@ fn is_rebuildable_loop(topo: &Topology, oes: &[OrientedEdge]) -> bool {
 /// Whether a face's outer wire is an all-Line loop with fewer than 3
 /// distinct vertex positions (zero enclosed area).
 fn is_degenerate_line_sliver(topo: &Topology, fid: FaceId) -> bool {
-    use brepkit_topology::edge::EdgeCurve;
+    use remus_topology::edge::EdgeCurve;
 
     let Ok(face) = topo.face(fid) else {
         return false;
@@ -1732,8 +1732,8 @@ fn is_degenerate_line_sliver(topo: &Topology, fid: FaceId) -> bool {
 /// canonical vertex within `snap`. The pass is O(V log V) and runs on every
 /// `build_solid`, but returns early without rebuilding when nothing welds.
 fn weld_coincident_vertices(topo: &mut Topology, face_ids: &mut [FaceId]) -> Result<(), AlgoError> {
-    use brepkit_topology::edge::{Edge, EdgeCurve, EdgeId};
-    use brepkit_topology::vertex::VertexId;
+    use remus_topology::edge::{Edge, EdgeCurve, EdgeId};
+    use remus_topology::vertex::VertexId;
 
     let snap = MERGE_TOL * 10.0;
 
@@ -1886,7 +1886,7 @@ fn weld_coincident_vertices(topo: &mut Topology, face_ids: &mut [FaceId]) -> Res
         if !is_rebuildable_loop(topo, &new_outer) {
             continue;
         }
-        let Ok(new_outer_wire) = brepkit_topology::wire::Wire::new(new_outer, true) else {
+        let Ok(new_outer_wire) = remus_topology::wire::Wire::new(new_outer, true) else {
             continue;
         };
         let new_outer_id = topo.add_wire(new_outer_wire);
@@ -1894,7 +1894,7 @@ fn weld_coincident_vertices(topo: &mut Topology, face_ids: &mut [FaceId]) -> Res
         for inner_oes in &inner_oes_list {
             let kept = rebuild_wire(topo, inner_oes)?;
             if is_rebuildable_loop(topo, &kept)
-                && let Ok(w) = brepkit_topology::wire::Wire::new(kept, true)
+                && let Ok(w) = remus_topology::wire::Wire::new(kept, true)
             {
                 new_inner_ids.push(topo.add_wire(w));
             }
@@ -1921,8 +1921,8 @@ fn split_edges_at_collinear_vertices(
     topo: &mut Topology,
     face_ids: &mut [FaceId],
 ) -> Result<(), AlgoError> {
-    use brepkit_topology::edge::{Edge, EdgeCurve, EdgeId};
-    use brepkit_topology::vertex::VertexId;
+    use remus_topology::edge::{Edge, EdgeCurve, EdgeId};
+    use remus_topology::vertex::VertexId;
 
     let tol = MERGE_TOL;
     let snap = tol * 10.0;
@@ -2069,13 +2069,13 @@ fn split_edges_at_collinear_vertices(
             out
         };
 
-        let Ok(new_outer) = brepkit_topology::wire::Wire::new(expand(&outer_oes), true) else {
+        let Ok(new_outer) = remus_topology::wire::Wire::new(expand(&outer_oes), true) else {
             continue;
         };
         let new_outer_id = topo.add_wire(new_outer);
         let mut new_inner_ids = Vec::new();
         for inner_oes in &inner_oes_list {
-            if let Ok(w) = brepkit_topology::wire::Wire::new(expand(inner_oes), true) {
+            if let Ok(w) = remus_topology::wire::Wire::new(expand(inner_oes), true) {
                 new_inner_ids.push(topo.add_wire(w));
             }
         }
@@ -2105,15 +2105,15 @@ fn split_edges_at_collinear_vertices(
 ///
 /// A child arc reuses its parent's `EdgeCurve::Circle`/`Ellipse` geometry with
 /// the new endpoints; the edge's trimmed span is derived from its endpoints
-/// (see [`brepkit_topology::edge::EdgeCurve::domain_with_endpoints`]), so no
+/// (see [`remus_topology::edge::EdgeCurve::domain_with_endpoints`]), so no
 /// geometry needs re-fitting. Full (closed) circles are skipped — they have no
 /// interior to split and re-anchoring them is the section builder's job.
 fn split_arc_edges_at_collinear_vertices(
     topo: &mut Topology,
     face_ids: &mut [FaceId],
 ) -> Result<(), AlgoError> {
-    use brepkit_topology::edge::{Edge, EdgeCurve, EdgeId};
-    use brepkit_topology::vertex::VertexId;
+    use remus_topology::edge::{Edge, EdgeCurve, EdgeId};
+    use remus_topology::vertex::VertexId;
 
     let tol = MERGE_TOL;
     let snap = tol * 10.0;
@@ -2344,13 +2344,13 @@ fn split_arc_edges_at_collinear_vertices(
             out
         };
 
-        let Ok(new_outer) = brepkit_topology::wire::Wire::new(expand(&outer_oes), true) else {
+        let Ok(new_outer) = remus_topology::wire::Wire::new(expand(&outer_oes), true) else {
             continue;
         };
         let new_outer_id = topo.add_wire(new_outer);
         let mut new_inner_ids = Vec::new();
         for inner_oes in &inner_oes_list {
-            if let Ok(w) = brepkit_topology::wire::Wire::new(expand(inner_oes), true) {
+            if let Ok(w) = remus_topology::wire::Wire::new(expand(inner_oes), true) {
                 new_inner_ids.push(topo.add_wire(w));
             }
         }
@@ -2369,8 +2369,8 @@ fn split_arc_edges_at_collinear_vertices(
 
 /// Project a point onto a Circle/Ellipse `EdgeCurve`, returning the angle
 /// parameter; returns `0.0` for non-arc curves (never called on them).
-fn project_angle_on_curve(curve: &brepkit_topology::edge::EdgeCurve, p: Point3) -> f64 {
-    use brepkit_topology::edge::EdgeCurve;
+fn project_angle_on_curve(curve: &remus_topology::edge::EdgeCurve, p: Point3) -> f64 {
+    use remus_topology::edge::EdgeCurve;
     match curve {
         EdgeCurve::Circle(c) => c.project(p),
         EdgeCurve::Ellipse(e) => e.project(p),
@@ -2385,7 +2385,7 @@ fn project_angle_on_curve(curve: &brepkit_topology::edge::EdgeCurve, p: Point3) 
 /// Uses snapshot-then-allocate to satisfy the borrow checker.
 #[allow(clippy::too_many_lines)]
 fn merge_duplicate_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Result<(), AlgoError> {
-    use brepkit_topology::edge::EdgeId;
+    use remus_topology::edge::EdgeId;
 
     let tol = MERGE_TOL;
 
@@ -2507,13 +2507,13 @@ fn merge_duplicate_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Result
             .map(|(eid, fwd)| {
                 if let Some(&(new_eid, flip)) = replacements.get(eid) {
                     let new_fwd = if flip { !*fwd } else { *fwd };
-                    brepkit_topology::wire::OrientedEdge::new(new_eid, new_fwd)
+                    remus_topology::wire::OrientedEdge::new(new_eid, new_fwd)
                 } else {
-                    brepkit_topology::wire::OrientedEdge::new(*eid, *fwd)
+                    remus_topology::wire::OrientedEdge::new(*eid, *fwd)
                 }
             })
             .collect();
-        let Ok(new_outer) = brepkit_topology::wire::Wire::new(new_outer_oes, true) else {
+        let Ok(new_outer) = remus_topology::wire::Wire::new(new_outer_oes, true) else {
             continue;
         };
         let new_outer_id = topo.add_wire(new_outer);
@@ -2525,13 +2525,13 @@ fn merge_duplicate_edges(topo: &mut Topology, face_ids: &mut [FaceId]) -> Result
                 .map(|(eid, fwd)| {
                     if let Some(&(new_eid, flip)) = replacements.get(eid) {
                         let new_fwd = if flip { !*fwd } else { *fwd };
-                        brepkit_topology::wire::OrientedEdge::new(new_eid, new_fwd)
+                        remus_topology::wire::OrientedEdge::new(new_eid, new_fwd)
                     } else {
-                        brepkit_topology::wire::OrientedEdge::new(*eid, *fwd)
+                        remus_topology::wire::OrientedEdge::new(*eid, *fwd)
                     }
                 })
                 .collect();
-            if let Ok(w) = brepkit_topology::wire::Wire::new(new_oes, true) {
+            if let Ok(w) = remus_topology::wire::Wire::new(new_oes, true) {
                 new_inner_ids.push(topo.add_wire(w));
             }
         }
@@ -2573,8 +2573,8 @@ fn remove_doubled_faces(
     face_ids: &mut Vec<FaceId>,
     sources: &mut Vec<Option<FaceId>>,
 ) {
-    use brepkit_topology::edge::EdgeId;
-    use brepkit_topology::wire::OrientedEdge;
+    use remus_topology::edge::EdgeId;
+    use remus_topology::wire::OrientedEdge;
 
     // Key = sorted outer- AND inner-wire edge-ID multiset, so a face only
     // matches a TRULY identical one — a holed face never collides with a
@@ -2740,8 +2740,8 @@ fn cap_partial_overlap_free_loops(
     sources: &mut Vec<Option<FaceId>>,
     cap_planes: &[CapPlane],
 ) -> Result<(), AlgoError> {
-    use brepkit_topology::edge::EdgeId;
-    use brepkit_topology::wire::Wire;
+    use remus_topology::edge::EdgeId;
+    use remus_topology::wire::Wire;
 
     if cap_planes.is_empty() {
         return Ok(());
@@ -2946,8 +2946,8 @@ mod tests {
     #[test]
     fn shell_outward_orientation_outward_cube_is_growth() {
         let mut topo = Topology::new();
-        let solid = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
-        let faces = brepkit_topology::explorer::solid_faces(&topo, solid).unwrap();
+        let solid = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
+        let faces = remus_topology::explorer::solid_faces(&topo, solid).unwrap();
         assert_eq!(
             shell_is_outward_oriented(&topo, &faces),
             Some(true),
@@ -2961,10 +2961,10 @@ mod tests {
         // arcs on the mate face (a pad bore whose rim crosses other faces).
         // The refinement must split the full circle at the mate's vertices so
         // the duplicate merge can pair the two partitions.
-        use brepkit_math::curves::Circle3D;
-        use brepkit_topology::edge::{Edge, EdgeCurve};
-        use brepkit_topology::face::{Face, FaceSurface};
-        use brepkit_topology::wire::Wire;
+        use remus_math::curves::Circle3D;
+        use remus_topology::edge::{Edge, EdgeCurve};
+        use remus_topology::face::{Face, FaceSurface};
+        use remus_topology::wire::Wire;
 
         let mut topo = Topology::new();
         let circle =
@@ -2975,7 +2975,7 @@ mod tests {
         };
 
         // Face A: disc bounded by the full circle (one closed edge).
-        let seam = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let seam = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(0.0),
             1e-7,
         ));
@@ -2985,15 +2985,15 @@ mod tests {
 
         // Face B: the same circle as three arcs split at 0, 2π/3, 4π/3.
         let thirds = std::f64::consts::TAU / 3.0;
-        let v0 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v0 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(0.0),
             1e-7,
         ));
-        let v1 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v1 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(thirds),
             1e-7,
         ));
-        let v2 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v2 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(2.0 * thirds),
             1e-7,
         ));
@@ -3024,10 +3024,10 @@ mod tests {
         // One interior cut would produce two arcs sharing BOTH endpoints —
         // the endpoint-keyed merge would conflate them. The refinement must
         // leave the circle whole in that case.
-        use brepkit_math::curves::Circle3D;
-        use brepkit_topology::edge::{Edge, EdgeCurve};
-        use brepkit_topology::face::{Face, FaceSurface};
-        use brepkit_topology::wire::Wire;
+        use remus_math::curves::Circle3D;
+        use remus_topology::edge::{Edge, EdgeCurve};
+        use remus_topology::face::{Face, FaceSurface};
+        use remus_topology::wire::Wire;
 
         let mut topo = Topology::new();
         let circle =
@@ -3036,7 +3036,7 @@ mod tests {
             normal: Vec3::new(0.0, 0.0, 1.0),
             d: 0.0,
         };
-        let seam = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let seam = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(0.0),
             1e-7,
         ));
@@ -3045,11 +3045,11 @@ mod tests {
         let face_a = topo.add_face(Face::new(wire_a, vec![], plane.clone()));
 
         // A lone vertex on the circle, referenced by an unrelated line edge.
-        let v_on = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v_on = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(std::f64::consts::PI),
             1e-7,
         ));
-        let v_off = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v_off = topo.add_vertex(remus_topology::vertex::Vertex::new(
             Point3::new(5.0, 5.0, 0.0),
             1e-7,
         ));
@@ -3077,10 +3077,10 @@ mod tests {
         // anchored at the seam, or they overlap past one revolution. The
         // three arcs must partition the rim exactly (total sweep TAU) and
         // pair with the mate's partition, which shares the seam vertex.
-        use brepkit_math::curves::Circle3D;
-        use brepkit_topology::edge::{Edge, EdgeCurve};
-        use brepkit_topology::face::{Face, FaceSurface};
-        use brepkit_topology::wire::Wire;
+        use remus_math::curves::Circle3D;
+        use remus_topology::edge::{Edge, EdgeCurve};
+        use remus_topology::face::{Face, FaceSurface};
+        use remus_topology::wire::Wire;
 
         let mut topo = Topology::new();
         let circle =
@@ -3090,7 +3090,7 @@ mod tests {
             d: 0.0,
         };
         let pi = std::f64::consts::PI;
-        let seam = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let seam = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(pi),
             1e-7,
         ));
@@ -3098,15 +3098,15 @@ mod tests {
         let wire_a = topo.add_wire(Wire::new(vec![OrientedEdge::new(full, true)], true).unwrap());
         let face_a = topo.add_face(Face::new(wire_a, vec![], plane.clone()));
 
-        let vs = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let vs = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(pi),
             1e-7,
         ));
-        let v1 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v1 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(pi / 2.0),
             1e-7,
         ));
-        let v2 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v2 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             circle.evaluate(3.0 * pi / 2.0),
             1e-7,
         ));
@@ -3132,10 +3132,10 @@ mod tests {
 
     #[test]
     fn closed_ellipse_splits_at_matching_mate_vertices() {
-        use brepkit_math::curves::Ellipse3D;
-        use brepkit_topology::edge::{Edge, EdgeCurve};
-        use brepkit_topology::face::{Face, FaceSurface};
-        use brepkit_topology::wire::Wire;
+        use remus_math::curves::Ellipse3D;
+        use remus_topology::edge::{Edge, EdgeCurve};
+        use remus_topology::face::{Face, FaceSurface};
+        use remus_topology::wire::Wire;
 
         let mut topo = Topology::new();
         let ellipse = Ellipse3D::new(
@@ -3149,7 +3149,7 @@ mod tests {
             normal: Vec3::new(0.0, 0.0, 1.0),
             d: 0.0,
         };
-        let seam = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let seam = topo.add_vertex(remus_topology::vertex::Vertex::new(
             ellipse.evaluate(0.0),
             1e-7,
         ));
@@ -3158,15 +3158,15 @@ mod tests {
         let face_a = topo.add_face(Face::new(wire_a, vec![], plane.clone()));
 
         let thirds = std::f64::consts::TAU / 3.0;
-        let v0 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v0 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             ellipse.evaluate(0.0),
             1e-7,
         ));
-        let v1 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v1 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             ellipse.evaluate(thirds),
             1e-7,
         ));
-        let v2 = topo.add_vertex(brepkit_topology::vertex::Vertex::new(
+        let v2 = topo.add_vertex(remus_topology::vertex::Vertex::new(
             ellipse.evaluate(2.0 * thirds),
             1e-7,
         ));
@@ -3196,8 +3196,8 @@ mod tests {
         // "Cut leaving only a cavity" case Greptile flagged) must NOT read as
         // growth, or `perform_areas` would invert it into a solid.
         let mut topo = Topology::new();
-        let solid = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
-        let faces = brepkit_topology::explorer::solid_faces(&topo, solid).unwrap();
+        let solid = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
+        let faces = remus_topology::explorer::solid_faces(&topo, solid).unwrap();
         for &fid in &faces {
             let reversed = topo.face(fid).unwrap().is_reversed();
             if let Ok(f) = topo.face_mut(fid) {
@@ -3272,10 +3272,10 @@ mod tests {
         // branches.
         for omit in 0..6 {
             let mut topo = Topology::new();
-            let outer = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
-            let second = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
-            let ids: Vec<_> = brepkit_topology::explorer::solid_faces(&topo, second).unwrap();
-            let mut moved: std::collections::HashSet<brepkit_topology::vertex::VertexId> =
+            let outer = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
+            let second = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
+            let ids: Vec<_> = remus_topology::explorer::solid_faces(&topo, second).unwrap();
+            let mut moved: std::collections::HashSet<remus_topology::vertex::VertexId> =
                 std::collections::HashSet::new();
             for &fid in &ids {
                 let face = topo.face(fid).unwrap();
@@ -3300,7 +3300,7 @@ mod tests {
                 }
             }
             let mut selected: Vec<SelectedFace> = Vec::new();
-            for &fid in &brepkit_topology::explorer::solid_faces(&topo, outer).unwrap() {
+            for &fid in &remus_topology::explorer::solid_faces(&topo, outer).unwrap() {
                 selected.push(SelectedFace {
                     face_id: fid,
                     source_face: fid,

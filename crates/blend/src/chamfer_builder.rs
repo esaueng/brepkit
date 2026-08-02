@@ -6,15 +6,15 @@
 
 use std::collections::HashSet;
 
-use brepkit_math::curves::Circle3D;
-use brepkit_math::vec::Point3;
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve, EdgeId};
-use brepkit_topology::face::{Face, FaceId, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::{Solid, SolidId};
-use brepkit_topology::vertex::Vertex;
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use remus_math::curves::Circle3D;
+use remus_math::vec::Point3;
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve, EdgeId};
+use remus_topology::face::{Face, FaceId, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::{Solid, SolidId};
+use remus_topology::vertex::Vertex;
+use remus_topology::wire::{OrientedEdge, Wire};
 
 use crate::analytic;
 use crate::builder_utils::{
@@ -154,11 +154,9 @@ impl<'a> ChamferBuilder<'a> {
             .collect();
 
         if all_edges.is_empty() {
-            return Err(BlendError::Topology(
-                brepkit_topology::TopologyError::Empty {
-                    entity: "chamfer edge set",
-                },
-            ));
+            return Err(BlendError::Topology(remus_topology::TopologyError::Empty {
+                entity: "chamfer edge set",
+            }));
         }
 
         let topo = self.topo;
@@ -375,7 +373,7 @@ impl<'a> ChamferBuilder<'a> {
 /// fail, or if the analytic path cannot produce a result.
 fn compute_chamfer_stripe(
     topo: &Topology,
-    adjacency: &brepkit_topology::adjacency::AdjacencyIndex,
+    adjacency: &remus_topology::adjacency::AdjacencyIndex,
     edge_id: EdgeId,
     d1: f64,
     d2: f64,
@@ -406,7 +404,7 @@ fn compute_chamfer_stripe(
     }
 
     log::debug!(
-        target: "brepkit_approx",
+        target: "remus_approx",
         "chamfer: analytic path unavailable for {}+{} — v1 has no walker fallback, returning UnsupportedSurface",
         surf1.type_tag(),
         surf2.type_tag()
@@ -589,7 +587,7 @@ fn closed_rim_info(topo: &Topology, stripe: &Stripe) -> Result<Option<ClosedRimI
     // approach by more than the clearance being tested.
     {
         let cap = topo.face(plane_face)?;
-        let mut others: Vec<brepkit_topology::wire::WireId> = Vec::new();
+        let mut others: Vec<remus_topology::wire::WireId> = Vec::new();
         match cap_rim_wire {
             CapRimWire::Outer => others.extend(cap.inner_wires().iter().copied()),
             CapRimWire::Inner(i) => {
@@ -860,8 +858,8 @@ fn cone_band_needs_reversal(surface: &FaceSurface, rim: &ClosedRimInfo) -> bool 
         (plate_pt.y() + wall_pt.y()) * 0.5,
         (plate_pt.z() + wall_pt.z()) * 0.5,
     );
-    let (u, v) = brepkit_math::traits::ParametricSurface::project_point(cone, mid);
-    let n = brepkit_math::traits::ParametricSurface::normal(cone, u, v);
+    let (u, v) = remus_math::traits::ParametricSurface::project_point(cone, mid);
+    let n = remus_math::traits::ParametricSurface::normal(cone, u, v);
     n.dot(outward_axial) < 0.0
 }
 
@@ -870,8 +868,8 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
     use super::*;
-    use brepkit_topology::adjacency::AdjacencyIndex;
-    use brepkit_topology::test_utils::make_unit_cube_manifold;
+    use remus_topology::adjacency::AdjacencyIndex;
+    use remus_topology::test_utils::make_unit_cube_manifold;
 
     /// Find the first manifold edge of the solid (shared by exactly 2 faces).
     fn find_manifold_edge(topo: &Topology, solid: SolidId) -> EdgeId {

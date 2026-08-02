@@ -4,11 +4,11 @@
 //! this phase creates the corresponding topology: vertices at the intersection
 //! line endpoints and edges connecting them.
 
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve, EdgeId};
-use brepkit_topology::solid::SolidId;
-use brepkit_topology::vertex::VertexId;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve, EdgeId};
+use remus_topology::solid::SolidId;
+use remus_topology::vertex::VertexId;
 
 use crate::data::{OffsetData, find_or_create_vertex};
 use crate::error::OffsetError;
@@ -99,7 +99,7 @@ fn dist_sq(a: Point3, b: Point3) -> f64 {
 /// projected exactly onto the fitted circle. Returns `None` if points
 /// don't form a circle.
 #[allow(clippy::too_many_lines)]
-fn fit_circle_3d(points: &[Point3], tol: f64) -> Option<(brepkit_math::curves::Circle3D, Point3)> {
+fn fit_circle_3d(points: &[Point3], tol: f64) -> Option<(remus_math::curves::Circle3D, Point3)> {
     let n = points.len();
     if n < 8 {
         return None;
@@ -172,7 +172,7 @@ fn fit_circle_3d(points: &[Point3], tol: f64) -> Option<(brepkit_math::curves::C
         return None; // Deviation exceeds tolerance → not a circle
     }
 
-    let circle = brepkit_math::curves::Circle3D::new(center, normal, radius).ok()?;
+    let circle = remus_math::curves::Circle3D::new(center, normal, radius).ok()?;
 
     // Seam point: project first point exactly onto the circle.
     let dir = Vec3::new(
@@ -199,8 +199,8 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
     use crate::data::{OffsetData, OffsetOptions};
-    use brepkit_topology::Topology;
-    use brepkit_topology::solid::SolidId;
+    use remus_topology::Topology;
+    use remus_topology::solid::SolidId;
 
     fn run_phases_1_to_4(topo: &mut Topology, solid: SolidId, distance: f64) -> OffsetData {
         let mut data = OffsetData::new(distance, OffsetOptions::default(), vec![]);
@@ -214,7 +214,7 @@ mod tests {
     #[test]
     fn box_intersections_have_new_edges() {
         let mut topo = Topology::new();
-        let solid = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
+        let solid = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
         let data = run_phases_1_to_4(&mut topo, solid, 0.5);
         for fi in &data.intersections {
             assert!(
@@ -228,7 +228,7 @@ mod tests {
     #[test]
     fn box_new_edges_are_valid() {
         let mut topo = Topology::new();
-        let solid = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
+        let solid = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
         let data = run_phases_1_to_4(&mut topo, solid, 0.5);
         for fi in &data.intersections {
             for &eid in &fi.new_edges {
@@ -252,13 +252,13 @@ mod tests {
         let mut topo = Topology::new();
         let mut cache = Vec::new();
         let tol = 1e-7;
-        let p = brepkit_math::vec::Point3::new(1.0, 2.0, 3.0);
+        let p = remus_math::vec::Point3::new(1.0, 2.0, 3.0);
         let v1 = find_or_create_vertex(&mut topo, &mut cache, p, tol);
-        let p_near = brepkit_math::vec::Point3::new(1.0, 2.0, 3.0 + 1e-9);
+        let p_near = remus_math::vec::Point3::new(1.0, 2.0, 3.0 + 1e-9);
         let v2 = find_or_create_vertex(&mut topo, &mut cache, p_near, tol);
         assert_eq!(v1, v2, "nearby points should reuse the same vertex");
 
-        let p_far = brepkit_math::vec::Point3::new(1.0, 2.0, 4.0);
+        let p_far = remus_math::vec::Point3::new(1.0, 2.0, 4.0);
         let v3 = find_or_create_vertex(&mut topo, &mut cache, p_far, tol);
         assert_ne!(v1, v3, "distant points should get different vertices");
     }
@@ -266,7 +266,7 @@ mod tests {
     #[test]
     fn box_creates_12_edges() {
         let mut topo = Topology::new();
-        let solid = brepkit_topology::test_utils::make_unit_cube_manifold(&mut topo);
+        let solid = remus_topology::test_utils::make_unit_cube_manifold(&mut topo);
         let data = run_phases_1_to_4(&mut topo, solid, 0.5);
         let total_new_edges: usize = data.intersections.iter().map(|fi| fi.new_edges.len()).sum();
         assert_eq!(
@@ -287,7 +287,7 @@ mod tests {
         let points: Vec<_> = (0..n)
             .map(|i| {
                 let t = TAU * i as f64 / n as f64;
-                brepkit_math::vec::Point3::new(radius * t.cos(), radius * t.sin(), 5.0)
+                remus_math::vec::Point3::new(radius * t.cos(), radius * t.sin(), 5.0)
             })
             .collect();
 
@@ -301,7 +301,7 @@ mod tests {
             "circle edge should be closed (start == end)"
         );
         assert!(
-            matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Circle(_)),
+            matches!(edge.curve(), remus_topology::edge::EdgeCurve::Circle(_)),
             "edge should be a Circle, got {:?}",
             edge.curve()
         );

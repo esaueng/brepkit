@@ -37,17 +37,17 @@
 //!
 //! Operands captured from the live tool on a local 2.128.5 build via
 //! `kumikoCornerCutCapture.test.ts`; full six-call capture in
-//! `~/.cache/brepkit-parity-captures/2026-07-25/kumiko-corner/`.
+//! `~/.cache/remus-parity-captures/2026-07-25/kumiko-corner/`.
 
 #![allow(clippy::unwrap_used, clippy::expect_used)]
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 
-use brepkit_io::arena_io::deserialize_solid;
-use brepkit_topology::Topology;
-use brepkit_topology::edge::EdgeId;
-use brepkit_topology::explorer::solid_faces;
+use remus_io::arena_io::deserialize_solid;
+use remus_topology::Topology;
+use remus_topology::edge::EdgeId;
+use remus_topology::explorer::solid_faces;
 
 fn fixture(name: &str) -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -55,13 +55,13 @@ fn fixture(name: &str) -> PathBuf {
         .join(name)
 }
 
-fn load(name: &str, topo: &mut Topology) -> brepkit_topology::solid::SolidId {
+fn load(name: &str, topo: &mut Topology) -> remus_topology::solid::SolidId {
     deserialize_solid(&std::fs::read(fixture(name)).unwrap(), topo).unwrap()
 }
 
 fn surface_mix(
     topo: &Topology,
-    sid: brepkit_topology::solid::SolidId,
+    sid: remus_topology::solid::SolidId,
 ) -> HashMap<&'static str, usize> {
     let mut mix: HashMap<&'static str, usize> = HashMap::new();
     for fid in solid_faces(topo, sid).unwrap() {
@@ -71,7 +71,7 @@ fn surface_mix(
     mix
 }
 
-fn edge_uses(topo: &Topology, sid: brepkit_topology::solid::SolidId) -> (usize, usize) {
+fn edge_uses(topo: &Topology, sid: remus_topology::solid::SolidId) -> (usize, usize) {
     let mut uses: HashMap<EdgeId, usize> = HashMap::new();
     for fid in solid_faces(topo, sid).unwrap() {
         let f = topo.face(fid).unwrap();
@@ -116,9 +116,9 @@ fn kumiko_corner_wedge_cut_stays_analytic() {
     let wedge = load("kumiko_corner_wedge.bin", &mut topo);
     let strut = load("kumiko_corner_strut.bin", &mut topo);
 
-    let result = brepkit_operations::boolean::boolean(
+    let result = remus_operations::boolean::boolean(
         &mut topo,
-        brepkit_operations::boolean::BooleanOp::Cut,
+        remus_operations::boolean::BooleanOp::Cut,
         wedge,
         strut,
     )

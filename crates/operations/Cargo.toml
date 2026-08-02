@@ -1,33 +1,33 @@
 [package]
-description = "CAD modeling operations (booleans, fillets, extrusions) for brepkit"
+description = "CAD modeling operations (booleans, fillets, extrusions) for remus"
 edition.workspace = true
 license.workspace = true
-name = "brepkit-operations"
+name = "remus-operations"
 repository.workspace = true
 rust-version.workspace = true
 version = "0.1.0"
 
 [features]
-# Pass-through to brepkit-algo's deterministic work counters, enabled by the
+# Pass-through to remus-algo's deterministic work counters, enabled by the
 # complexity-regression scaling guard (`boolean::tests::scaling_*`).
-perf-counters = ["brepkit-algo/perf-counters"]
+perf-counters = ["remus-algo/perf-counters"]
 
 [dependencies]
-brepkit-algo.workspace = true
-brepkit-blend.workspace = true
-brepkit-check.workspace = true
-brepkit-geometry.workspace = true
-brepkit-heal.workspace = true
-brepkit-math.workspace = true
-brepkit-offset.workspace = true
-brepkit-sketch.workspace = true
-brepkit-topology.workspace = true
+remus-algo.workspace = true
+remus-blend.workspace = true
+remus-check.workspace = true
+remus-geometry.workspace = true
+remus-heal.workspace = true
+remus-math.workspace = true
+remus-offset.workspace = true
+remus-sketch.workspace = true
+remus-topology.workspace = true
 log.workspace = true
 rayon.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-brepkit-topology = {workspace = true, features = ["test-utils"]}
+remus-topology = {workspace = true, features = ["test-utils"]}
 criterion.workspace = true
 env_logger.workspace = true
 proptest.workspace = true

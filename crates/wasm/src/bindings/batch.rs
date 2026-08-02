@@ -4,18 +4,18 @@
 
 use wasm_bindgen::prelude::*;
 
-use brepkit_math::mat::Mat4;
-use brepkit_math::nurbs::curve::NurbsCurve;
-use brepkit_math::nurbs::surface::NurbsSurface;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_operations::boolean::{self, BooleanOp, boolean};
-use brepkit_operations::extrude::extrude;
-use brepkit_operations::measure;
-use brepkit_operations::push_pull::{push_pull_face, resize_cylindrical_face};
-use brepkit_operations::revolve::revolve;
-use brepkit_operations::sweep::sweep;
-use brepkit_operations::transform::transform_solid;
-use brepkit_topology::edge::EdgeCurve;
+use remus_math::mat::Mat4;
+use remus_math::nurbs::curve::NurbsCurve;
+use remus_math::nurbs::surface::NurbsSurface;
+use remus_math::vec::{Point3, Vec3};
+use remus_operations::boolean::{self, BooleanOp, boolean};
+use remus_operations::extrude::extrude;
+use remus_operations::measure;
+use remus_operations::push_pull::{push_pull_face, resize_cylindrical_face};
+use remus_operations::revolve::revolve;
+use remus_operations::sweep::sweep;
+use remus_operations::transform::transform_solid;
+use remus_topology::edge::EdgeCurve;
 
 use crate::error::WasmError;
 use crate::handles::{
@@ -109,7 +109,7 @@ type UvRanges = ((f64, f64), (f64, f64));
 
 /// Build the in-plane axes used by `plane_to_nurbs`.
 ///
-/// Must match `brepkit_heal::construct::convert_surface`'s private frame
+/// Must match `remus_heal::construct::convert_surface`'s private frame
 /// so projected face corners reconstruct the plane rectangle consistently.
 fn plane_frame_axes(normal: Vec3) -> (Vec3, Vec3) {
     let seed = if normal.x().abs() < 0.9 {
@@ -133,7 +133,7 @@ impl BrepKernel {
     /// edge's bounding vertices (and the curve's analytic params for
     /// circles/ellipses).
     pub(crate) fn extract_nurbs_curve(&self, edge: u32) -> Result<NurbsCurve, WasmError> {
-        use brepkit_geometry::convert::{circle_to_nurbs, ellipse_to_nurbs, line_to_nurbs};
+        use remus_geometry::convert::{circle_to_nurbs, ellipse_to_nurbs, line_to_nurbs};
         use std::f64::consts::TAU;
 
         let edge_id = self.resolve_edge(edge)?;
@@ -193,7 +193,7 @@ impl BrepKernel {
                 let (t0, t1) = (h.project(start_pt), h.project(end_pt));
                 let (lo, hi) = (t0.min(t1), t0.max(t1));
                 Ok(
-                    brepkit_heal::construct::convert_curve::hyperbola_to_nurbs(h, lo, hi).map_err(
+                    remus_heal::construct::convert_curve::hyperbola_to_nurbs(h, lo, hi).map_err(
                         |err| WasmError::InvalidInput {
                             reason: format!("hyperbola_to_nurbs failed: {err}"),
                         },
@@ -204,7 +204,7 @@ impl BrepKernel {
                 let (t0, t1) = (pb.project(start_pt), pb.project(end_pt));
                 let (lo, hi) = (t0.min(t1), t0.max(t1));
                 Ok(
-                    brepkit_heal::construct::convert_curve::parabola_to_nurbs(pb, lo, hi).map_err(
+                    remus_heal::construct::convert_curve::parabola_to_nurbs(pb, lo, hi).map_err(
                         |err| WasmError::InvalidInput {
                             reason: format!("parabola_to_nurbs failed: {err}"),
                         },
@@ -219,16 +219,16 @@ impl BrepKernel {
     /// NURBS faces are returned directly. Analytic surfaces are converted to
     /// their NURBS equivalent: planes and cylinders are geometrically exact;
     /// cones, spheres, and tori use the exact rational forms from
-    /// `brepkit_heal::construct::convert_surface`. Plane and cone parameter
+    /// `remus_heal::construct::convert_surface`. Plane and cone parameter
     /// ranges are derived from the face's boundary vertices.
     pub(crate) fn extract_nurbs_surface(&self, face: u32) -> Result<NurbsSurface, WasmError> {
-        use brepkit_heal::construct::convert_surface;
-        use brepkit_topology::face::FaceSurface;
+        use remus_heal::construct::convert_surface;
+        use remus_topology::face::FaceSurface;
 
         let face_id = self.resolve_face(face)?;
         let face_data = self.topo.face(face_id)?;
 
-        let map_err = |context: &str, e: brepkit_heal::HealError| WasmError::InvalidInput {
+        let map_err = |context: &str, e: remus_heal::HealError| WasmError::InvalidInput {
             reason: format!("{context}: {e}"),
         };
 
@@ -268,7 +268,7 @@ impl BrepKernel {
     #[allow(clippy::cast_precision_loss)]
     fn plane_face_uv_bounds(
         &self,
-        face_id: brepkit_topology::face::FaceId,
+        face_id: remus_topology::face::FaceId,
         normal: Vec3,
         d: f64,
     ) -> Result<UvRanges, WasmError> {
@@ -313,10 +313,10 @@ impl BrepKernel {
     /// projecting its boundary vertices onto the surface.
     fn analytic_face_v_bounds(
         &self,
-        face_id: brepkit_topology::face::FaceId,
-        surface: &brepkit_topology::face::FaceSurface,
+        face_id: remus_topology::face::FaceId,
+        surface: &remus_topology::face::FaceSurface,
     ) -> Result<(f64, f64), WasmError> {
-        let verts = brepkit_topology::explorer::face_vertices(&self.topo, face_id)?;
+        let verts = remus_topology::explorer::face_vertices(&self.topo, face_id)?;
         let mut v_min = f64::INFINITY;
         let mut v_max = f64::NEG_INFINITY;
         for vid in verts {
@@ -339,26 +339,26 @@ impl BrepKernel {
         &mut self,
         points: &[Point3],
         curve: NurbsCurve,
-    ) -> brepkit_topology::edge::EdgeId {
+    ) -> remus_topology::edge::EdgeId {
         let start = points[0];
         let end = points[points.len() - 1];
-        brepkit_topology::builder::make_nurbs_edge(self.topo_mut(), start, end, curve, TOL)
+        remus_topology::builder::make_nurbs_edge(self.topo_mut(), start, end, curve, TOL)
     }
 
     /// Create an edge from a `NurbsCurve`, evaluating its endpoints.
     pub(crate) fn nurbs_curve_to_edge_from_curve(
         &mut self,
         curve: &NurbsCurve,
-    ) -> brepkit_topology::edge::EdgeId {
-        brepkit_topology::builder::make_nurbs_edge_from_curve(self.topo_mut(), curve, TOL)
+    ) -> remus_topology::edge::EdgeId {
+        remus_topology::builder::make_nurbs_edge_from_curve(self.topo_mut(), curve, TOL)
     }
 
     /// Create a face from a `NurbsSurface` with a rectangular domain wire.
     pub(crate) fn nurbs_surface_to_face(
         &mut self,
         surface: NurbsSurface,
-    ) -> Result<brepkit_topology::face::FaceId, JsError> {
-        Ok(brepkit_topology::builder::make_nurbs_face(
+    ) -> Result<remus_topology::face::FaceId, JsError> {
+        Ok(remus_topology::builder::make_nurbs_face(
             self.topo_mut(),
             surface,
             TOL,
@@ -377,21 +377,21 @@ impl BrepKernel {
                 let w = get_f64(args, "width")?;
                 let h = get_f64(args, "height")?;
                 let d = get_f64(args, "depth")?;
-                let solid = brepkit_operations::primitives::make_box(self.topo_mut(), w, h, d)
+                let solid = remus_operations::primitives::make_box(self.topo_mut(), w, h, d)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
             "makeCylinder" => {
                 let r = get_f64(args, "radius")?;
                 let h = get_f64(args, "height")?;
-                let solid = brepkit_operations::primitives::make_cylinder(self.topo_mut(), r, h)
+                let solid = remus_operations::primitives::make_cylinder(self.topo_mut(), r, h)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
             "makeSphere" => {
                 let r = get_f64(args, "radius")?;
                 let segments = get_u32(args, "segments").unwrap_or(16);
-                let solid = brepkit_operations::primitives::make_sphere(
+                let solid = remus_operations::primitives::make_sphere(
                     self.topo_mut(),
                     r,
                     segments as usize,
@@ -403,7 +403,7 @@ impl BrepKernel {
                 let br = get_f64(args, "bottomRadius")?;
                 let tr = get_f64(args, "topRadius")?;
                 let h = get_f64(args, "height")?;
-                let solid = brepkit_operations::primitives::make_cone(self.topo_mut(), br, tr, h)
+                let solid = remus_operations::primitives::make_cone(self.topo_mut(), br, tr, h)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
@@ -411,7 +411,7 @@ impl BrepKernel {
                 let major = get_f64(args, "majorRadius")?;
                 let minor = get_f64(args, "minorRadius")?;
                 let segments = get_u32(args, "segments").unwrap_or(16);
-                let solid = brepkit_operations::primitives::make_torus(
+                let solid = remus_operations::primitives::make_torus(
                     self.topo_mut(),
                     major,
                     minor,
@@ -427,9 +427,9 @@ impl BrepKernel {
                 if rx <= 0.0 || ry <= 0.0 || rz <= 0.0 {
                     return Err("rx, ry, rz must be positive".to_string());
                 }
-                let solid = brepkit_operations::primitives::make_sphere(self.topo_mut(), 1.0, 16)
+                let solid = remus_operations::primitives::make_sphere(self.topo_mut(), 1.0, 16)
                     .map_err(|e| e.to_string())?;
-                let mat = brepkit_math::mat::Mat4::scale(rx, ry, rz);
+                let mat = remus_math::mat::Mat4::scale(rx, ry, rz);
                 transform_solid(self.topo_mut(), solid, &mat).map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
@@ -471,11 +471,11 @@ impl BrepKernel {
                 };
                 let a_id = self.resolve_solid(a).map_err(|e| e.to_string())?;
                 let b_id = self.resolve_solid(b).map_err(|e| e.to_string())?;
-                let opts = brepkit_operations::boolean::BooleanOptions {
+                let opts = remus_operations::boolean::BooleanOptions {
                     unify_faces: unify_faces.unwrap_or(true),
                     ..Default::default()
                 };
-                let result = brepkit_operations::boolean::boolean_with_options(
+                let result = remus_operations::boolean::boolean_with_options(
                     self.topo_mut(),
                     bool_op,
                     a_id,
@@ -490,11 +490,11 @@ impl BrepKernel {
                 let b = get_u32(args, "solidB")?;
                 let a_id = self.resolve_solid(a).map_err(|e| e.to_string())?;
                 let b_id = self.resolve_solid(b).map_err(|e| e.to_string())?;
-                let pairs = brepkit_algo::diagnostic::detect_coincident_faces(
+                let pairs = remus_algo::diagnostic::detect_coincident_faces(
                     self.topo(),
                     a_id,
                     b_id,
-                    brepkit_math::tolerance::Tolerance::default(),
+                    remus_math::tolerance::Tolerance::default(),
                 )
                 .map_err(|e| e.to_string())?;
                 Ok(crate::bindings::booleans::coincident_face_pairs_to_json(
@@ -507,7 +507,7 @@ impl BrepKernel {
                 let tool_arr = args["tools"]
                     .as_array()
                     .ok_or("missing or invalid 'tools' array")?;
-                let tools: Vec<brepkit_topology::solid::SolidId> = tool_arr
+                let tools: Vec<remus_topology::solid::SolidId> = tool_arr
                     .iter()
                     .enumerate()
                     .map(|(i, v)| {
@@ -531,7 +531,7 @@ impl BrepKernel {
                 let solid_arr = args["solids"]
                     .as_array()
                     .ok_or("missing or invalid 'solids' array")?;
-                let solids: Vec<brepkit_topology::solid::SolidId> = solid_arr
+                let solids: Vec<remus_topology::solid::SolidId> = solid_arr
                     .iter()
                     .enumerate()
                     .map(|(i, v)| {
@@ -544,8 +544,8 @@ impl BrepKernel {
                     .collect::<Result<Vec<_>, String>>()?;
                 let compound = self
                     .topo_mut()
-                    .add_compound(brepkit_topology::compound::Compound::new(solids));
-                let result = brepkit_operations::compound_ops::fuse_all(self.topo_mut(), compound)
+                    .add_compound(remus_topology::compound::Compound::new(solids));
+                let result = remus_operations::compound_ops::fuse_all(self.topo_mut(), compound)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
@@ -630,11 +630,11 @@ impl BrepKernel {
                 let s = get_u32(args, "solid")?;
                 let deflection = get_f64(args, "deflection").unwrap_or(0.1);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let mesh = brepkit_operations::tessellate::tessellate_solid(
+                let mesh = remus_operations::tessellate::tessellate_solid(
                     &self.topo, solid_id, deflection,
                 )
                 .map_err(|e| e.to_string())?;
-                let quality = brepkit_operations::tessellate::welded_mesh_quality(&mesh);
+                let quality = remus_operations::tessellate::welded_mesh_quality(&mesh);
                 Ok(serde_json::json!({
                     "boundaryEdges": quality.boundary_edges,
                     "nonManifoldEdges": quality.non_manifold_edges,
@@ -645,7 +645,7 @@ impl BrepKernel {
             "solidEdges" => {
                 let s = get_u32(args, "solid")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let edges = brepkit_topology::explorer::solid_edges(&self.topo, solid_id)
+                let edges = remus_topology::explorer::solid_edges(&self.topo, solid_id)
                     .map_err(|e| e.to_string())?;
                 let handles: Vec<u32> = edges.iter().map(|&e| edge_id_to_u32(e)).collect();
                 Ok(serde_json::json!(handles))
@@ -656,7 +656,7 @@ impl BrepKernel {
                 let a_id = self.resolve_solid(a).map_err(|e| e.to_string())?;
                 let b_id = self.resolve_solid(b).map_err(|e| e.to_string())?;
                 let result =
-                    brepkit_operations::distance::solid_to_solid_distance(&self.topo, a_id, b_id)
+                    remus_operations::distance::solid_to_solid_distance(&self.topo, a_id, b_id)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!([
                     result.distance,
@@ -671,7 +671,7 @@ impl BrepKernel {
             "copySolid" => {
                 let s = get_u32(args, "solid")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let copy = brepkit_operations::copy::copy_solid(self.topo_mut(), solid_id)
+                let copy = remus_operations::copy::copy_solid(self.topo_mut(), solid_id)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(copy)))
             }
@@ -697,7 +697,7 @@ impl BrepKernel {
                     .collect::<Result<_, _>>()?;
                 let rows = std::array::from_fn(|i| std::array::from_fn(|j| elems[i * 4 + j]));
                 let mat = Mat4(rows);
-                let copy = brepkit_operations::copy::copy_and_transform_solid(
+                let copy = remus_operations::copy::copy_and_transform_solid(
                     self.topo_mut(),
                     solid_id,
                     &mat,
@@ -808,7 +808,7 @@ impl BrepKernel {
                     }
                 };
                 let ruled = args["ruled"].as_bool().unwrap_or(true);
-                let sections: Vec<(brepkit_topology::face::FaceId, f64)> = faces
+                let sections: Vec<(remus_topology::face::FaceId, f64)> = faces
                     .iter()
                     .zip(params.iter())
                     .map(|(&h, &p)| {
@@ -817,7 +817,7 @@ impl BrepKernel {
                             .map_err(|e| e.to_string())
                     })
                     .collect::<Result<Vec<_>, _>>()?;
-                let solid = brepkit_operations::sweep::multi_section_sweep(
+                let solid = remus_operations::sweep::multi_section_sweep(
                     self.topo_mut(),
                     &spine,
                     &sections,
@@ -848,7 +848,7 @@ impl BrepKernel {
                 let spine = nurbs_of(self, get_u32(args, "spineEdge")?, "spineEdge")?;
                 let aux = nurbs_of(self, get_u32(args, "auxEdge")?, "auxEdge")?;
                 let solid =
-                    brepkit_operations::sweep::sweep_guided(self.topo_mut(), face_id, &spine, aux)
+                    remus_operations::sweep::sweep_guided(self.topo_mut(), face_id, &spine, aux)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
@@ -859,9 +859,8 @@ impl BrepKernel {
                 let b = self
                     .resolve_solid(get_u32(args, "solidB")?)
                     .map_err(|e| e.to_string())?;
-                let solid =
-                    brepkit_operations::primitives::make_minkowski_sum(self.topo_mut(), a, b)
-                        .map_err(|e| e.to_string())?;
+                let solid = remus_operations::primitives::make_minkowski_sum(self.topo_mut(), a, b)
+                    .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
             "projectEdges" => {
@@ -885,7 +884,7 @@ impl BrepKernel {
                 );
                 let hidden_lines = args["hiddenLines"].as_bool().unwrap_or(true);
                 let deflection = get_f64(args, "deflection").unwrap_or(0.1);
-                let result = brepkit_operations::projection::project_edges(
+                let result = remus_operations::projection::project_edges(
                     &self.topo,
                     solid,
                     origin,
@@ -895,7 +894,7 @@ impl BrepKernel {
                     deflection,
                 )
                 .map_err(|e| e.to_string())?;
-                let flatten = |polys: &[Vec<brepkit_math::vec::Point2>]| -> Vec<Vec<f64>> {
+                let flatten = |polys: &[Vec<remus_math::vec::Point2>]| -> Vec<Vec<f64>> {
                     polys
                         .iter()
                         .map(|poly| poly.iter().flat_map(|p| [p.x(), p.y()]).collect())
@@ -990,22 +989,22 @@ impl BrepKernel {
                                 _ => "constant",
                             });
                     let law = match law_str {
-                        "linear" => brepkit_operations::fillet::FilletRadiusLaw::Linear {
+                        "linear" => remus_operations::fillet::FilletRadiusLaw::Linear {
                             start: start_val.unwrap_or(1.0),
                             end: end_val.unwrap_or(1.0),
                         },
-                        "scurve" => brepkit_operations::fillet::FilletRadiusLaw::SCurve {
+                        "scurve" => remus_operations::fillet::FilletRadiusLaw::SCurve {
                             start: start_val.unwrap_or(1.0),
                             end: end_val.unwrap_or(1.0),
                         },
                         _ => {
                             let r = spec["radius"].as_f64().or(start_val).unwrap_or(1.0);
-                            brepkit_operations::fillet::FilletRadiusLaw::Constant(r)
+                            remus_operations::fillet::FilletRadiusLaw::Constant(r)
                         }
                     };
                     edge_laws.push((edge_id, law));
                 }
-                let result = brepkit_operations::fillet::fillet_variable(
+                let result = remus_operations::fillet::fillet_variable(
                     self.topo_mut(),
                     solid_id,
                     &edge_laws,
@@ -1029,7 +1028,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_edge(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let result = brepkit_operations::blend_ops::fillet_v2(
+                let result = remus_operations::blend_ops::fillet_v2(
                     self.topo_mut(),
                     solid_id,
                     &edge_ids,
@@ -1055,7 +1054,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_edge(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let result = brepkit_operations::blend_ops::chamfer_v2(
+                let result = remus_operations::blend_ops::chamfer_v2(
                     self.topo_mut(),
                     solid_id,
                     &edge_ids,
@@ -1085,7 +1084,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_edge(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let result = brepkit_operations::blend_ops::chamfer_distance_angle(
+                let result = remus_operations::blend_ops::chamfer_distance_angle(
                     self.topo_mut(),
                     solid_id,
                     &edge_ids,
@@ -1111,7 +1110,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_face(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let result = brepkit_operations::shell_op::shell(
+                let result = remus_operations::shell_op::shell(
                     self.topo_mut(),
                     solid_id,
                     thickness,
@@ -1129,7 +1128,7 @@ impl BrepKernel {
                 let ny = get_f64(args, "ny").unwrap_or(0.0);
                 let nz = get_f64(args, "nz").unwrap_or(0.0);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let result = brepkit_operations::mirror::mirror(
+                let result = remus_operations::mirror::mirror(
                     self.topo_mut(),
                     solid_id,
                     Point3::new(px, py, pz),
@@ -1141,14 +1140,14 @@ impl BrepKernel {
             "unifyFaces" => {
                 let s = get_u32(args, "solid")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                brepkit_operations::heal::unify_faces(self.topo_mut(), solid_id)
+                remus_operations::heal::unify_faces(self.topo_mut(), solid_id)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid_id)))
             }
             "convertToBspline" => {
                 let s = get_u32(args, "solid")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let count = brepkit_operations::heal::convert_to_bspline(self.topo_mut(), solid_id)
+                let count = remus_operations::heal::convert_to_bspline(self.topo_mut(), solid_id)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!({
                     "solid": solid_id_to_u32(solid_id),
@@ -1160,7 +1159,7 @@ impl BrepKernel {
                 let tol = get_f64(args, "tolerance").unwrap_or(crate::helpers::TOL);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
                 let count =
-                    brepkit_operations::heal::convert_to_elementary(self.topo_mut(), solid_id, tol)
+                    remus_operations::heal::convert_to_elementary(self.topo_mut(), solid_id, tol)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!({
                     "solid": solid_id_to_u32(solid_id),
@@ -1171,7 +1170,7 @@ impl BrepKernel {
                 let s = get_u32(args, "solid")?;
                 let tol = get_f64(args, "tolerance").unwrap_or(1e-7);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                brepkit_operations::heal::heal_solid(self.topo_mut(), solid_id, tol)
+                remus_operations::heal::heal_solid(self.topo_mut(), solid_id, tol)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid_id)))
             }
@@ -1179,7 +1178,7 @@ impl BrepKernel {
                 let s = get_u32(args, "solid")?;
                 let tol = get_f64(args, "tolerance").unwrap_or(1e-7);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let report = brepkit_operations::heal::repair_solid(self.topo_mut(), solid_id, tol)
+                let report = remus_operations::heal::repair_solid(self.topo_mut(), solid_id, tol)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!({
                     "solid": solid_id_to_u32(solid_id),
@@ -1196,10 +1195,9 @@ impl BrepKernel {
                 let tol = get_f64(args, "tolerance").unwrap_or(1e-7);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
                 let pt = Point3::new(x, y, z);
-                let result = brepkit_operations::classify::classify_point(
-                    &self.topo, solid_id, pt, 0.1, tol,
-                )
-                .map_err(|e| e.to_string())?;
+                let result =
+                    remus_operations::classify::classify_point(&self.topo, solid_id, pt, 0.1, tol)
+                        .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(classify_to_string(result)))
             }
             "loft" => {
@@ -1215,7 +1213,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_face(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let result = brepkit_operations::loft::loft(self.topo_mut(), &face_ids)
+                let result = remus_operations::loft::loft(self.topo_mut(), &face_ids)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
@@ -1232,7 +1230,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_face(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let result = brepkit_operations::loft::loft_smooth(self.topo_mut(), &face_ids)
+                let result = remus_operations::loft::loft_smooth(self.topo_mut(), &face_ids)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
@@ -1244,7 +1242,7 @@ impl BrepKernel {
                 let count = get_u32(args, "count")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
                 let axis = Vec3::new(ax, ay, az);
-                let compound = brepkit_operations::pattern::circular_pattern(
+                let compound = remus_operations::pattern::circular_pattern(
                     self.topo_mut(),
                     solid_id,
                     axis,
@@ -1266,7 +1264,7 @@ impl BrepKernel {
                 let cx = get_u32(args, "countX")?;
                 let cy = get_u32(args, "countY")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let compound = brepkit_operations::pattern::grid_pattern(
+                let compound = remus_operations::pattern::grid_pattern(
                     self.topo_mut(),
                     solid_id,
                     Vec3::new(dxx, dxy, dxz),
@@ -1295,21 +1293,21 @@ impl BrepKernel {
                     .map(|&h| self.resolve_face(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
                 let result =
-                    brepkit_operations::defeature::defeature(self.topo_mut(), solid_id, &face_ids)
+                    remus_operations::defeature::defeature(self.topo_mut(), solid_id, &face_ids)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
             "copyWire" => {
                 let w = get_u32(args, "wire")?;
                 let wire_id = self.resolve_wire(w).map_err(|e| e.to_string())?;
-                let copy = brepkit_operations::copy::copy_wire(self.topo_mut(), wire_id)
+                let copy = remus_operations::copy::copy_wire(self.topo_mut(), wire_id)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(wire_id_to_u32(copy)))
             }
             "copyFace" => {
                 let f = get_u32(args, "face")?;
                 let face_id = self.resolve_face(f).map_err(|e| e.to_string())?;
-                let copy = brepkit_operations::copy::copy_face(self.topo_mut(), face_id)
+                let copy = remus_operations::copy::copy_face(self.topo_mut(), face_id)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(face_id_to_u32(copy)))
             }
@@ -1338,7 +1336,7 @@ impl BrepKernel {
                 }
                 let rows = std::array::from_fn(|i| std::array::from_fn(|j| elems[i * 4 + j]));
                 let mat = Mat4(rows);
-                brepkit_operations::transform::transform_wire(self.topo_mut(), wire_id, &mat)
+                remus_operations::transform::transform_wire(self.topo_mut(), wire_id, &mat)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(null))
             }
@@ -1367,7 +1365,7 @@ impl BrepKernel {
                 }
                 let rows = std::array::from_fn(|i| std::array::from_fn(|j| elems[i * 4 + j]));
                 let mat = Mat4(rows);
-                brepkit_operations::transform::transform_face(self.topo_mut(), face_id, &mat)
+                remus_operations::transform::transform_face(self.topo_mut(), face_id, &mat)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(null))
             }
@@ -1376,7 +1374,7 @@ impl BrepKernel {
                 let dist = get_f64(args, "distance")?;
                 let samples = get_u32(args, "samples").unwrap_or(16);
                 let face_id = self.resolve_face(f).map_err(|e| e.to_string())?;
-                let result = brepkit_operations::offset_face::offset_face(
+                let result = remus_operations::offset_face::offset_face(
                     self.topo_mut(),
                     face_id,
                     dist,
@@ -1390,7 +1388,7 @@ impl BrepKernel {
                 let dist = get_f64(args, "distance")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
                 let result =
-                    brepkit_operations::offset_v2::offset_solid_v2(self.topo_mut(), solid_id, dist)
+                    remus_operations::offset_v2::offset_solid_v2(self.topo_mut(), solid_id, dist)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
@@ -1399,7 +1397,7 @@ impl BrepKernel {
                 let dist = get_f64(args, "distance")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
                 let result =
-                    brepkit_operations::offset_v2::offset_solid_v2(self.topo_mut(), solid_id, dist)
+                    remus_operations::offset_v2::offset_solid_v2(self.topo_mut(), solid_id, dist)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
@@ -1412,7 +1410,7 @@ impl BrepKernel {
                 let ny = get_f64(args, "ny").unwrap_or(0.0);
                 let nz = get_f64(args, "nz").unwrap_or(1.0);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let result = brepkit_operations::section::section(
+                let result = remus_operations::section::section(
                     self.topo_mut(),
                     solid_id,
                     Point3::new(px, py, pz),
@@ -1431,7 +1429,7 @@ impl BrepKernel {
                 let ny = get_f64(args, "ny").unwrap_or(0.0);
                 let nz = get_f64(args, "nz").unwrap_or(1.0);
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let result = brepkit_operations::split::split(
+                let result = remus_operations::split::split(
                     self.topo_mut(),
                     solid_id,
                     Point3::new(px, py, pz),
@@ -1457,7 +1455,7 @@ impl BrepKernel {
                     .iter()
                     .map(|&h| self.resolve_face(h).map_err(|e| e.to_string()))
                     .collect::<Result<Vec<_>, _>>()?;
-                let solid = brepkit_operations::sew::sew_faces(self.topo_mut(), &face_ids, tol)
+                let solid = remus_operations::sew::sew_faces(self.topo_mut(), &face_ids, tol)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
@@ -1466,7 +1464,7 @@ impl BrepKernel {
                 let thickness = get_f64(args, "thickness")?;
                 let face_id = self.resolve_face(f).map_err(|e| e.to_string())?;
                 let result =
-                    brepkit_operations::thicken::thicken(self.topo_mut(), face_id, thickness)
+                    remus_operations::thicken::thicken(self.topo_mut(), face_id, thickness)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(result)))
             }
@@ -1486,7 +1484,7 @@ impl BrepKernel {
                         return Err("pipe path must be a NURBS edge".into());
                     }
                 };
-                let solid = brepkit_operations::pipe::pipe(self.topo_mut(), face_id, &curve, None)
+                let solid = remus_operations::pipe::pipe(self.topo_mut(), face_id, &curve, None)
                     .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(solid_id_to_u32(solid)))
             }
@@ -1498,7 +1496,7 @@ impl BrepKernel {
                 let spacing = get_f64(args, "spacing")?;
                 let count = get_u32(args, "count")?;
                 let solid_id = self.resolve_solid(s).map_err(|e| e.to_string())?;
-                let compound = brepkit_operations::pattern::linear_pattern(
+                let compound = remus_operations::pattern::linear_pattern(
                     self.topo_mut(),
                     solid_id,
                     Vec3::new(dx, dy, dz),
@@ -1532,7 +1530,7 @@ impl BrepKernel {
                 let npz = get_f64(args, "neutralZ").unwrap_or(0.0);
                 let dir = Vec3::new(dx, dy, dz);
                 let neutral = Point3::new(npx, npy, npz);
-                let result = brepkit_operations::draft::draft(
+                let result = remus_operations::draft::draft(
                     self.topo_mut(),
                     solid_id,
                     &face_ids,
@@ -1592,7 +1590,7 @@ impl BrepKernel {
                 let dist = get_f64(args, "distance")?;
                 let face_id = self.resolve_face(f).map_err(|e| e.to_string())?;
                 let wire_id =
-                    brepkit_operations::offset_wire::offset_wire(self.topo_mut(), face_id, dist)
+                    remus_operations::offset_wire::offset_wire(self.topo_mut(), face_id, dist)
                         .map_err(|e| e.to_string())?;
                 Ok(serde_json::json!(wire_id_to_u32(wire_id)))
             }
@@ -1605,7 +1603,7 @@ impl BrepKernel {
                 let jt =
                     super::operations::parse_join_type_str(jt_str).map_err(|e| e.to_string())?;
                 let face_id = self.resolve_face(f).map_err(|e| e.to_string())?;
-                let wire_id = brepkit_operations::offset_wire::offset_wire_with_join(
+                let wire_id = remus_operations::offset_wire::offset_wire_with_join(
                     self.topo_mut(),
                     face_id,
                     dist,
@@ -1624,9 +1622,9 @@ impl BrepKernel {
                     super::operations::parse_join_type_str(jt_str).map_err(|e| e.to_string())?;
                 let wire_id = self.resolve_wire(w).map_err(|e| e.to_string())?;
                 let face_id =
-                    brepkit_topology::builder::make_planar_face_from_wire(self.topo_mut(), wire_id)
+                    remus_topology::builder::make_planar_face_from_wire(self.topo_mut(), wire_id)
                         .map_err(|e| e.to_string())?;
-                let result = brepkit_operations::offset_wire::offset_wire_with_join(
+                let result = remus_operations::offset_wire::offset_wire_with_join(
                     self.topo_mut(),
                     face_id,
                     dist,

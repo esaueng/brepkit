@@ -1,4 +1,4 @@
-# Contributing to brepkit
+# Contributing to Remus
 
 ## Contributor License Agreement
 

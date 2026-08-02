@@ -6,9 +6,9 @@
 //! camera enters the solid (a face is in front of it). Edges themselves are
 //! sampled to polylines because a projected drawing is inherently polygonal.
 
-use brepkit_math::vec::{Point2, Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::solid::SolidId;
+use remus_math::vec::{Point2, Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::solid::SolidId;
 
 use crate::classify::{PointClassification, classify_point};
 

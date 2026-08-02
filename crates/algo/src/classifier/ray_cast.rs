@@ -7,11 +7,11 @@
 //! logic. Bug fixes should be applied here first; the operations copy
 //! will be deleted during the GFA step 5 switchover.
 
-use brepkit_math::predicates::point_in_polygon;
-use brepkit_math::tolerance::Tolerance;
-use brepkit_math::vec::{Point2, Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::solid::SolidId;
+use remus_math::predicates::point_in_polygon;
+use remus_math::tolerance::Tolerance;
+use remus_math::vec::{Point2, Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::solid::SolidId;
 
 use crate::builder::FaceClass;
 use crate::error::AlgoError;
@@ -34,7 +34,7 @@ enum FaceGeom {
     /// (a flush-cap interaction can leave such a holed lateral). A crossing
     /// whose axial parameter falls inside a hole band is excluded.
     Cylinder {
-        surface: brepkit_math::surfaces::CylindricalSurface,
+        surface: remus_math::surfaces::CylindricalSurface,
         v_min: f64,
         v_max: f64,
         hole_bands: Vec<(f64, f64)>,
@@ -51,7 +51,7 @@ enum FaceGeom {
     /// polygon fallback mis-counts crossings against a strongly curved
     /// tapered corner patch, flipping the parity for nearby points.
     Cone {
-        surface: brepkit_math::surfaces::ConicalSurface,
+        surface: remus_math::surfaces::ConicalSurface,
         v_min: f64,
         v_max: f64,
         u_gap: Option<(f64, f64)>,
@@ -306,7 +306,7 @@ fn dist_to_polygon_boundary(p: Point3, verts: &[Point3]) -> f64 {
 /// samples for better coverage.
 fn wire_polygon(
     topo: &Topology,
-    wire_id: brepkit_topology::wire::WireId,
+    wire_id: remus_topology::wire::WireId,
 ) -> Result<Vec<Point3>, AlgoError> {
     let wire = topo.wire(wire_id)?;
 
@@ -316,7 +316,7 @@ fn wire_polygon(
         let raw_start = topo.vertex(edge.start())?.point();
         let raw_end = topo.vertex(edge.end())?.point();
         let mut pts = vec![raw_start];
-        if !matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Line) {
+        if !matches!(edge.curve(), remus_topology::edge::EdgeCurve::Line) {
             let (t0, t1) = edge.curve().domain_with_endpoints(raw_start, raw_end);
             let is_closed = (raw_start - raw_end).length() < 1e-9;
             let n_samples = if is_closed { 16_i32 } else { 3_i32 };
@@ -389,7 +389,7 @@ fn wire_polygon(
 /// Collect per-face ray-cast geometry from a solid.
 fn collect_face_geoms(topo: &Topology, solid: SolidId) -> Result<Vec<FaceGeom>, AlgoError> {
     crate::perf::bump_ray_geom_build();
-    let faces = brepkit_topology::explorer::solid_faces(topo, solid)?;
+    let faces = remus_topology::explorer::solid_faces(topo, solid)?;
     let mut result = Vec::with_capacity(faces.len());
 
     for fid in faces {
@@ -401,12 +401,12 @@ fn collect_face_geoms(topo: &Topology, solid: SolidId) -> Result<Vec<FaceGeom>, 
         // each is a full-circumference v-band (the shape a flush-cap
         // interaction carves out); any non-banded hole forces the polygon
         // fallback. Partial cylinder patches also fall through.
-        if let brepkit_topology::face::FaceSurface::Cylinder(cyl) = face.surface() {
+        if let remus_topology::face::FaceSurface::Cylinder(cyl) = face.surface() {
             let wire = topo.wire(face.outer_wire())?;
             let mut has_closed_circle = false;
             for oe in wire.edges() {
                 let edge = topo.edge(oe.edge())?;
-                if matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Circle(_))
+                if matches!(edge.curve(), remus_topology::edge::EdgeCurve::Circle(_))
                     && edge.start() == edge.end()
                 {
                     has_closed_circle = true;
@@ -474,14 +474,14 @@ fn collect_face_geoms(topo: &Topology, solid: SolidId) -> Result<Vec<FaceGeom>, 
         // yields the patch's `[v_min, v_max]`; a closed circle edge marks a
         // full-period band (no angular trim), otherwise the largest angular
         // gap trims the patch like the partial-arc cylinder path above.
-        if let brepkit_topology::face::FaceSurface::Cone(cone) = face.surface()
+        if let remus_topology::face::FaceSurface::Cone(cone) = face.surface()
             && face.inner_wires().is_empty()
         {
             let wire = topo.wire(face.outer_wire())?;
             let mut has_closed_circle = false;
             for oe in wire.edges() {
                 let edge = topo.edge(oe.edge())?;
-                if matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Circle(_))
+                if matches!(edge.curve(), remus_topology::edge::EdgeCurve::Circle(_))
                     && edge.start() == edge.end()
                 {
                     has_closed_circle = true;
@@ -532,7 +532,7 @@ fn collect_face_geoms(topo: &Topology, solid: SolidId) -> Result<Vec<FaceGeom>, 
         }
 
         let raw_normal =
-            if let brepkit_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
+            if let remus_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
                 *normal
             } else {
                 newell_normal(&verts)
@@ -564,8 +564,8 @@ fn collect_face_geoms(topo: &Topology, solid: SolidId) -> Result<Vec<FaceGeom>, 
 /// non-banded hole, which the caller uses to force the polygon fallback.
 fn cylinder_hole_bands(
     topo: &Topology,
-    face: &brepkit_topology::face::Face,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    face: &remus_topology::face::Face,
+    cyl: &remus_math::surfaces::CylindricalSurface,
 ) -> Result<Vec<(f64, f64)>, AlgoError> {
     use std::f64::consts::TAU;
 
@@ -694,7 +694,7 @@ fn ray_face_crossing(
 fn ray_cylinder_crossings(
     origin: Point3,
     ray_dir: Vec3,
-    surface: &brepkit_math::surfaces::CylindricalSurface,
+    surface: &remus_math::surfaces::CylindricalSurface,
     v_range: (f64, f64),
     hole_bands: &[(f64, f64)],
     u_gap: Option<(f64, f64)>,
@@ -786,7 +786,7 @@ fn near_gap_border(u: f64, gap: (f64, f64), eps: f64) -> bool {
 fn ray_cone_crossings(
     origin: Point3,
     ray_dir: Vec3,
-    surface: &brepkit_math::surfaces::ConicalSurface,
+    surface: &remus_math::surfaces::ConicalSurface,
     v_range: (f64, f64),
     u_gap: Option<(f64, f64)>,
     tol: Tolerance,
@@ -943,19 +943,19 @@ pub type FacePolygons = (Vec<Point3>, Vec<Vec<Point3>>, Vec3);
 /// Returns [`AlgoError`] on a topology lookup failure.
 pub fn planar_face_polygons(
     topo: &Topology,
-    face_id: brepkit_topology::face::FaceId,
+    face_id: remus_topology::face::FaceId,
 ) -> Result<Option<FacePolygons>, AlgoError> {
     let face = topo.face(face_id)?;
     let verts = wire_polygon(topo, face.outer_wire())?;
     if verts.len() < 3 {
         return Ok(None);
     }
-    let raw_normal =
-        if let brepkit_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
-            *normal
-        } else {
-            newell_normal(&verts)
-        };
+    let raw_normal = if let remus_topology::face::FaceSurface::Plane { normal, .. } = face.surface()
+    {
+        *normal
+    } else {
+        newell_normal(&verts)
+    };
     let normal = if face.is_reversed() {
         -raw_normal
     } else {
@@ -995,9 +995,9 @@ pub fn point_in_planar_region(
 pub fn compute_solid_bbox(
     topo: &Topology,
     solid: SolidId,
-) -> Result<brepkit_math::aabb::Aabb3, AlgoError> {
+) -> Result<remus_math::aabb::Aabb3, AlgoError> {
     let mut points = Vec::new();
-    let faces = brepkit_topology::explorer::solid_faces(topo, solid)?;
+    let faces = remus_topology::explorer::solid_faces(topo, solid)?;
     for fid in faces {
         let face = topo.face(fid)?;
         let wire = topo.wire(face.outer_wire())?;
@@ -1008,7 +1008,7 @@ pub fn compute_solid_bbox(
             points.push(start_pos);
             points.push(end_pos);
             // Curved edges can bulge beyond their endpoints
-            if !matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Line) {
+            if !matches!(edge.curve(), remus_topology::edge::EdgeCurve::Line) {
                 let (t0, t1) = edge.curve().domain_with_endpoints(start_pos, end_pos);
                 let t_mid = 0.5_f64.mul_add(t1 - t0, t0);
                 let mid = edge
@@ -1018,7 +1018,7 @@ pub fn compute_solid_bbox(
             }
         }
     }
-    brepkit_math::aabb::Aabb3::try_from_points(points)
+    remus_math::aabb::Aabb3::try_from_points(points)
         .ok_or_else(|| AlgoError::ClassificationFailed("solid has no boundary vertices".into()))
 }
 
@@ -1048,16 +1048,16 @@ mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
 
     use super::*;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::{Face, FaceSurface};
-    use brepkit_topology::shell::Shell;
-    use brepkit_topology::solid::Solid;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::{Face, FaceSurface};
+    use remus_topology::shell::Shell;
+    use remus_topology::solid::Solid;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     /// Build a degenerate solid where all faces have < 3 vertices
     /// (single-edge faces). This tests the empty polygon fallback.
-    fn make_degenerate_solid(topo: &mut Topology) -> brepkit_topology::solid::SolidId {
+    fn make_degenerate_solid(topo: &mut Topology) -> remus_topology::solid::SolidId {
         // Create a "solid" with a single face that has only 2 vertices
         // (a degenerate line edge). This will produce < 3 polygon vertices.
         let v0 = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 0.0), 1e-7));
@@ -1100,7 +1100,7 @@ mod tests {
         topo: &mut Topology,
         min: [f64; 3],
         max: [f64; 3],
-    ) -> brepkit_topology::solid::SolidId {
+    ) -> remus_topology::solid::SolidId {
         let [x0, y0, z0] = min;
         let [x1, y1, z1] = max;
         let v = [
@@ -1113,7 +1113,7 @@ mod tests {
             topo.add_vertex(Vertex::new(Point3::new(x1, y1, z1), 1e-7)),
             topo.add_vertex(Vertex::new(Point3::new(x0, y1, z1), 1e-7)),
         ];
-        let mut edge = |a: usize, b: usize| -> brepkit_topology::edge::EdgeId {
+        let mut edge = |a: usize, b: usize| -> remus_topology::edge::EdgeId {
             topo.add_edge(Edge::new(v[a], v[b], EdgeCurve::Line))
         };
         let e01 = edge(0, 1);

@@ -1,5 +1,11 @@
 # Changelog
 
+## Unreleased
+
+### Changed
+
+* Renamed the permanent fork from BrepKit to Remus. Remus is a fork of [brepkit](https://github.com/andymai/brepkit) by andymai.
+
 ## [2.129.0](https://github.com/esaueng/brepkit/compare/v2.128.5...v2.129.0) (2026-07-26)
 
 
@@ -22,7 +28,7 @@
 * **operations:** support non-planar profiles in loft ([#974](https://github.com/esaueng/brepkit/issues/974)) ([2f1b11d](https://github.com/esaueng/brepkit/commit/2f1b11de32a0e17f100ab4a9ad62097508007523))
 * **operations:** support non-planar profiles in revolve ([#979](https://github.com/esaueng/brepkit/issues/979)) ([4c708ad](https://github.com/esaueng/brepkit/commit/4c708ad6671432f8ba8f2ed2777d0dbad24a7b3d))
 * **operations:** support non-planar profiles in sweep and pipe ([#976](https://github.com/esaueng/brepkit/issues/976)) ([67cdd5e](https://github.com/esaueng/brepkit/commit/67cdd5e9c4acb18289a09043c4281cc18118c7dc))
-* **render:** brepkit-render M1 — offscreen wgpu renderer ([#1013](https://github.com/esaueng/brepkit/issues/1013)) ([f7d3000](https://github.com/esaueng/brepkit/commit/f7d30008e660d233acbd0727eeaa9f12c3f96c99))
+* **render:** remus-render M1 — offscreen wgpu renderer ([#1013](https://github.com/esaueng/brepkit/issues/1013)) ([f7d3000](https://github.com/esaueng/brepkit/commit/f7d30008e660d233acbd0727eeaa9f12c3f96c99))
 * **render:** compute-shader quadric mesher for cylinders (M2) ([#1017](https://github.com/esaueng/brepkit/issues/1017)) ([cf1dc6e](https://github.com/esaueng/brepkit/commit/cf1dc6e0c6c845f8e43f1f5a28e44bb936f3f5a1))
 * **render:** interactive viewer — orbit, pan, zoom, click-to-pick (M1.5) ([#1016](https://github.com/esaueng/brepkit/issues/1016)) ([362d8a7](https://github.com/esaueng/brepkit/commit/362d8a71c2edffb8d39d10404b4fdbcf01e169c6))
 * **sweep:** native multi-section sweep with RMF frame transport ([#814](https://github.com/esaueng/brepkit/issues/814)) ([#825](https://github.com/esaueng/brepkit/issues/825)) ([ec76f16](https://github.com/esaueng/brepkit/commit/ec76f16a1594ce1b387ce3048490abb0f72b72db))
@@ -792,7 +798,7 @@
 
 ### Features
 
-* **render:** brepkit-render M1 — offscreen wgpu renderer ([#1013](https://github.com/andymai/brepkit/issues/1013)) ([f7d3000](https://github.com/andymai/brepkit/commit/f7d30008e660d233acbd0727eeaa9f12c3f96c99))
+* **render:** remus-render M1 — offscreen wgpu renderer ([#1013](https://github.com/andymai/brepkit/issues/1013)) ([f7d3000](https://github.com/andymai/brepkit/commit/f7d30008e660d233acbd0727eeaa9f12c3f96c99))
 
 ## [2.121.0](https://github.com/andymai/brepkit/compare/v2.120.7...v2.121.0) (2026-06-26)
 
@@ -2399,22 +2405,22 @@
 
 ### Features
 
-* **offset:** add brepkit-offset crate — solid offset engine ([#333](https://github.com/andymai/brepkit/issues/333)) ([780435c](https://github.com/andymai/brepkit/commit/780435c2b84825909c4c16152855f5bde85d6bb9))
+* **offset:** add remus-offset crate — solid offset engine ([#333](https://github.com/andymai/brepkit/issues/333)) ([780435c](https://github.com/andymai/brepkit/commit/780435c2b84825909c4c16152855f5bde85d6bb9))
 
 ## [2.23.0](https://github.com/andymai/brepkit/compare/v2.22.0...v2.23.0) (2026-03-20)
 
 
 ### Features
 
-* **geometry:** add brepkit-geometry crate — sampling, extrema, conversion ([#329](https://github.com/andymai/brepkit/issues/329)) ([056ab0c](https://github.com/andymai/brepkit/commit/056ab0c44a2866807b8430390d2ab04860bafa58))
+* **geometry:** add remus-geometry crate — sampling, extrema, conversion ([#329](https://github.com/andymai/brepkit/issues/329)) ([056ab0c](https://github.com/andymai/brepkit/commit/056ab0c44a2866807b8430390d2ab04860bafa58))
 
 ## [2.22.0](https://github.com/andymai/brepkit/compare/v2.21.0...v2.22.0) (2026-03-20)
 
 
 ### Features
 
-* **check:** add brepkit-check crate — topology algorithms for classification, validation, properties, distance ([#327](https://github.com/andymai/brepkit/issues/327)) ([#327](https://github.com/andymai/brepkit/issues/327)) ([405c41b](https://github.com/andymai/brepkit/commit/405c41b93703b8c520304fcb51fc9447e62f2221))
-* **heal:** add brepkit-heal crate for comprehensive shape healing ([#326](https://github.com/andymai/brepkit/issues/326)) ([ab91cc7](https://github.com/andymai/brepkit/commit/ab91cc7e42c98211552dbbf08c17cdd0f2746a26))
+* **check:** add remus-check crate — topology algorithms for classification, validation, properties, distance ([#327](https://github.com/andymai/brepkit/issues/327)) ([#327](https://github.com/andymai/brepkit/issues/327)) ([405c41b](https://github.com/andymai/brepkit/commit/405c41b93703b8c520304fcb51fc9447e62f2221))
+* **heal:** add remus-heal crate for comprehensive shape healing ([#326](https://github.com/andymai/brepkit/issues/326)) ([ab91cc7](https://github.com/andymai/brepkit/commit/ab91cc7e42c98211552dbbf08c17cdd0f2746a26))
 
 ## [2.21.0](https://github.com/andymai/brepkit/compare/v2.20.0...v2.21.0) (2026-03-20)
 
@@ -2514,7 +2520,7 @@
 
 ### Features
 
-* **algo:** GFA boolean engine skeleton — brepkit-algo crate ([#301](https://github.com/andymai/brepkit/issues/301)) ([ca54aeb](https://github.com/andymai/brepkit/commit/ca54aebc5d68ccf54f5f0ce8d4db954302b8fec3))
+* **algo:** GFA boolean engine skeleton — remus-algo crate ([#301](https://github.com/andymai/brepkit/issues/301)) ([ca54aeb](https://github.com/andymai/brepkit/commit/ca54aebc5d68ccf54f5f0ce8d4db954302b8fec3))
 * **algo:** phase 6+7 — classifiers, operations integration, cleanup ([#302](https://github.com/andymai/brepkit/issues/302)) ([38b8485](https://github.com/andymai/brepkit/commit/38b8485b826d28b8acb46b21f561814c6b2942c7))
 
 ## [2.14.0](https://github.com/andymai/brepkit/compare/v2.13.0...v2.14.0) (2026-03-18)
@@ -2758,7 +2764,7 @@
 * add relative tolerance for scale-aware comparisons ([#122](https://github.com/andymai/brepkit/issues/122)) ([6c748cc](https://github.com/andymai/brepkit/commit/6c748cc48cab5a3542793c24c97afb7a59b31e38))
 * analytic ray-surface classify (Phase 4A) ([#200](https://github.com/andymai/brepkit/issues/200)) ([2f82ada](https://github.com/andymai/brepkit/commit/2f82ada334a0600380db5f87c080afbee1a523d8))
 * analytic sphere boolean with O(1) classification ([#89](https://github.com/andymai/brepkit/issues/89)) ([327d0f2](https://github.com/andymai/brepkit/commit/327d0f25227e6464ff086be236d1e253feb71d8a))
-* **bench:** add unified brepkit vs OCCT benchmark comparison ([fc436ac](https://github.com/andymai/brepkit/commit/fc436acf85578059db61ffdbeec30efc89313fa6))
+* **bench:** add unified remus vs OCCT benchmark comparison ([fc436ac](https://github.com/andymai/brepkit/commit/fc436acf85578059db61ffdbeec30efc89313fa6))
 * **boolean:** enable analytic-analytic surface intersection in booleans ([#28](https://github.com/andymai/brepkit/issues/28)) ([c320111](https://github.com/andymai/brepkit/commit/c3201112d486e7c5d2d9b3567c05fe3fa4cbb27f))
 * **boolean:** mixed-surface solid assembly (FaceSpec + assemble_solid_mixed) ([#19](https://github.com/andymai/brepkit/issues/19)) ([405236f](https://github.com/andymai/brepkit/commit/405236f2e119437c7ad1eef235d8259eb462ea48))
 * **boolean:** P2.1 boolean reliability campaign ([#42](https://github.com/andymai/brepkit/issues/42)) ([6f6afb8](https://github.com/andymai/brepkit/commit/6f6afb81c75f0c565666c7aa0401e4d7fc3cda31))
@@ -2774,7 +2780,7 @@
 * **heal,validate:** P2.4 healing & validation hardening ([#44](https://github.com/andymai/brepkit/issues/44)) ([72a9dbd](https://github.com/andymai/brepkit/commit/72a9dbd1078fe3b205fc234edf8c3299e543248b))
 * **heal:** comprehensive shape healing with wire gap closure and face cleanup ([#12](https://github.com/andymai/brepkit/issues/12)) ([a1b8e01](https://github.com/andymai/brepkit/commit/a1b8e01a63de1104be7c9980fce326828051e9ba))
 * implement Phase 1 roadmap items (P1.1, P1.3, P1.4, P1.6) ([#40](https://github.com/andymai/brepkit/issues/40)) ([4d14169](https://github.com/andymai/brepkit/commit/4d14169a05db7e70d886d0d05ea8e3195906d0a5))
-* initialize brepkit workspace ([e516477](https://github.com/andymai/brepkit/commit/e516477b9823748262e681c4679cbc72a9b2ff73))
+* initialize remus workspace ([e516477](https://github.com/andymai/brepkit/commit/e516477b9823748262e681c4679cbc72a9b2ff73))
 * **io,wasm:** add STL mesh import and WASM bindings for IO ([347fb69](https://github.com/andymai/brepkit/commit/347fb6901aa49dbfcef7de2b77552367eacc6ca5))
 * **io,wasm:** implement 3MF export with tessellation pipeline ([0557961](https://github.com/andymai/brepkit/commit/0557961288ee4451e813c7b5a139e612311ed826))
 * **io:** add glTF 2.0 binary (.glb) writer ([e292970](https://github.com/andymai/brepkit/commit/e292970411a5c095f21138065121d4870aa4e501))
@@ -2798,7 +2804,7 @@
 * **math:** add surface-surface and line-surface intersection ([4abc4ff](https://github.com/andymai/brepkit/commit/4abc4ff7e1142465ca30226ca25dfe1944427c69))
 * **math:** analytical cone/torus point projection + remove grid search fallback ([f520654](https://github.com/andymai/brepkit/commit/f5206549101a3aae42bc7b5c7b51994c35845d3b))
 * **math:** analytical cone/torus projection, ~1000x faster SSI marching ([4686b52](https://github.com/andymai/brepkit/commit/4686b5266bc48e350a93a8602ab0c8930f4206ce))
-* **math:** implement full brepkit-math foundation ([7accbc4](https://github.com/andymai/brepkit/commit/7accbc477c71cce0f75a77f8a94cf136e60cbe4e))
+* **math:** implement full remus-math foundation ([7accbc4](https://github.com/andymai/brepkit/commit/7accbc477c71cce0f75a77f8a94cf136e60cbe4e))
 * **math:** second-order curvature analysis for SSI tangential intersections ([#21](https://github.com/andymai/brepkit/issues/21)) ([b7b7a7a](https://github.com/andymai/brepkit/commit/b7b7a7a655097493d2bd3e9bb94fcc501f519465))
 * **nurbs_boolean:** CDT-based face splitting replaces polygon clipping ([#31](https://github.com/andymai/brepkit/issues/31)) ([5f8c937](https://github.com/andymai/brepkit/commit/5f8c937b01c9fa7bd4623ec772692ae394f19dda))
 * **nurbs_boolean:** correct CDT region extraction + adaptive SSI marching ([a9517d2](https://github.com/andymai/brepkit/commit/a9517d251895a12f5999328ddfd41ed12aa6fa3d))
@@ -3087,7 +3093,7 @@
 * add production GCS (Geometric Constraint Solver) ([#154](https://github.com/andymai/brepkit/issues/154)) ([9a48cb9](https://github.com/andymai/brepkit/commit/9a48cb943c460e8a6c65debc7cfc4dd9c483a8d4))
 * add relative tolerance for scale-aware comparisons ([#122](https://github.com/andymai/brepkit/issues/122)) ([6c748cc](https://github.com/andymai/brepkit/commit/6c748cc48cab5a3542793c24c97afb7a59b31e38))
 * analytic sphere boolean with O(1) classification ([#89](https://github.com/andymai/brepkit/issues/89)) ([327d0f2](https://github.com/andymai/brepkit/commit/327d0f25227e6464ff086be236d1e253feb71d8a))
-* **bench:** add unified brepkit vs OCCT benchmark comparison ([fc436ac](https://github.com/andymai/brepkit/commit/fc436acf85578059db61ffdbeec30efc89313fa6))
+* **bench:** add unified remus vs OCCT benchmark comparison ([fc436ac](https://github.com/andymai/brepkit/commit/fc436acf85578059db61ffdbeec30efc89313fa6))
 * **boolean:** enable analytic-analytic surface intersection in booleans ([#28](https://github.com/andymai/brepkit/issues/28)) ([c320111](https://github.com/andymai/brepkit/commit/c3201112d486e7c5d2d9b3567c05fe3fa4cbb27f))
 * **boolean:** mixed-surface solid assembly (FaceSpec + assemble_solid_mixed) ([#19](https://github.com/andymai/brepkit/issues/19)) ([405236f](https://github.com/andymai/brepkit/commit/405236f2e119437c7ad1eef235d8259eb462ea48))
 * **boolean:** P2.1 boolean reliability campaign ([#42](https://github.com/andymai/brepkit/issues/42)) ([6f6afb8](https://github.com/andymai/brepkit/commit/6f6afb81c75f0c565666c7aa0401e4d7fc3cda31))
@@ -3103,7 +3109,7 @@
 * **heal,validate:** P2.4 healing & validation hardening ([#44](https://github.com/andymai/brepkit/issues/44)) ([72a9dbd](https://github.com/andymai/brepkit/commit/72a9dbd1078fe3b205fc234edf8c3299e543248b))
 * **heal:** comprehensive shape healing with wire gap closure and face cleanup ([#12](https://github.com/andymai/brepkit/issues/12)) ([a1b8e01](https://github.com/andymai/brepkit/commit/a1b8e01a63de1104be7c9980fce326828051e9ba))
 * implement Phase 1 roadmap items (P1.1, P1.3, P1.4, P1.6) ([#40](https://github.com/andymai/brepkit/issues/40)) ([4d14169](https://github.com/andymai/brepkit/commit/4d14169a05db7e70d886d0d05ea8e3195906d0a5))
-* initialize brepkit workspace ([e516477](https://github.com/andymai/brepkit/commit/e516477b9823748262e681c4679cbc72a9b2ff73))
+* initialize remus workspace ([e516477](https://github.com/andymai/brepkit/commit/e516477b9823748262e681c4679cbc72a9b2ff73))
 * **io,wasm:** add STL mesh import and WASM bindings for IO ([347fb69](https://github.com/andymai/brepkit/commit/347fb6901aa49dbfcef7de2b77552367eacc6ca5))
 * **io,wasm:** implement 3MF export with tessellation pipeline ([0557961](https://github.com/andymai/brepkit/commit/0557961288ee4451e813c7b5a139e612311ed826))
 * **io:** add glTF 2.0 binary (.glb) writer ([e292970](https://github.com/andymai/brepkit/commit/e292970411a5c095f21138065121d4870aa4e501))
@@ -3127,7 +3133,7 @@
 * **math:** add surface-surface and line-surface intersection ([4abc4ff](https://github.com/andymai/brepkit/commit/4abc4ff7e1142465ca30226ca25dfe1944427c69))
 * **math:** analytical cone/torus point projection + remove grid search fallback ([f520654](https://github.com/andymai/brepkit/commit/f5206549101a3aae42bc7b5c7b51994c35845d3b))
 * **math:** analytical cone/torus projection, ~1000x faster SSI marching ([4686b52](https://github.com/andymai/brepkit/commit/4686b5266bc48e350a93a8602ab0c8930f4206ce))
-* **math:** implement full brepkit-math foundation ([7accbc4](https://github.com/andymai/brepkit/commit/7accbc477c71cce0f75a77f8a94cf136e60cbe4e))
+* **math:** implement full remus-math foundation ([7accbc4](https://github.com/andymai/brepkit/commit/7accbc477c71cce0f75a77f8a94cf136e60cbe4e))
 * **math:** second-order curvature analysis for SSI tangential intersections ([#21](https://github.com/andymai/brepkit/issues/21)) ([b7b7a7a](https://github.com/andymai/brepkit/commit/b7b7a7a655097493d2bd3e9bb94fcc501f519465))
 * **nurbs_boolean:** CDT-based face splitting replaces polygon clipping ([#31](https://github.com/andymai/brepkit/issues/31)) ([5f8c937](https://github.com/andymai/brepkit/commit/5f8c937b01c9fa7bd4623ec772692ae394f19dda))
 * **nurbs_boolean:** correct CDT region extraction + adaptive SSI marching ([a9517d2](https://github.com/andymai/brepkit/commit/a9517d251895a12f5999328ddfd41ed12aa6fa3d))

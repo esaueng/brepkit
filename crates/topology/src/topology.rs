@@ -337,7 +337,7 @@ impl Topology {
 mod tests {
     #![allow(clippy::unwrap_used)]
 
-    use brepkit_math::vec::Point3;
+    use remus_math::vec::Point3;
 
     use super::*;
 

@@ -37,13 +37,13 @@
 //! Roughly 80% of real-world fillets fit one of the analytic pairs, so
 //! these fast paths are high-impact optimizations.
 
-use brepkit_math::curves2d::{Curve2D, Line2D};
-use brepkit_math::nurbs::curve::NurbsCurve;
-use brepkit_math::surfaces::CylindricalSurface;
-use brepkit_math::traits::ParametricSurface;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::face::{FaceId, FaceSurface};
+use remus_math::curves2d::{Curve2D, Line2D};
+use remus_math::nurbs::curve::NurbsCurve;
+use remus_math::surfaces::CylindricalSurface;
+use remus_math::traits::ParametricSurface;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::face::{FaceId, FaceSurface};
 
 use crate::BlendError;
 use crate::section::CircSection;
@@ -429,7 +429,7 @@ fn plane_plane_fillet(
 
     // Guard against degenerate cases (parallel or antiparallel normals)
     if sin_half.abs() < 1e-10 {
-        return Err(BlendError::Math(brepkit_math::MathError::ZeroVector));
+        return Err(BlendError::Math(remus_math::MathError::ZeroVector));
     }
 
     let (bisector, _cross_dir) = section_basis(n1, n2, tangent);
@@ -460,8 +460,8 @@ fn plane_plane_fillet(
         let (u0, v0) = adapter.project_point(c1_start);
         let (u1, v1) = adapter.project_point(c1_end);
         Curve2D::Line(Line2D::new(
-            brepkit_math::vec::Point2::new(u0, v0),
-            brepkit_math::vec::Vec2::new(u1 - u0, v1 - v0),
+            remus_math::vec::Point2::new(u0, v0),
+            remus_math::vec::Vec2::new(u1 - u0, v1 - v0),
         )?)
     };
     let pcurve2 = {
@@ -469,8 +469,8 @@ fn plane_plane_fillet(
         let (u0, v0) = adapter.project_point(c2_start);
         let (u1, v1) = adapter.project_point(c2_end);
         Curve2D::Line(Line2D::new(
-            brepkit_math::vec::Point2::new(u0, v0),
-            brepkit_math::vec::Vec2::new(u1 - u0, v1 - v0),
+            remus_math::vec::Point2::new(u0, v0),
+            remus_math::vec::Vec2::new(u1 - u0, v1 - v0),
         )?)
     };
 
@@ -558,7 +558,7 @@ fn plane_plane_chamfer(
     let chamfer_normal_raw = tangent.cross(chamfer_span);
     let chamfer_normal = chamfer_normal_raw
         .normalize()
-        .map_err(|_| BlendError::Math(brepkit_math::MathError::ZeroVector))?;
+        .map_err(|_| BlendError::Math(remus_math::MathError::ZeroVector))?;
 
     let chamfer_d = chamfer_normal.dot(Vec3::new(c1_start.x(), c1_start.y(), c1_start.z()));
 
@@ -567,8 +567,8 @@ fn plane_plane_chamfer(
         let (u0, v0) = adapter.project_point(c1_start);
         let (u1, v1) = adapter.project_point(c1_end);
         Curve2D::Line(Line2D::new(
-            brepkit_math::vec::Point2::new(u0, v0),
-            brepkit_math::vec::Vec2::new(u1 - u0, v1 - v0),
+            remus_math::vec::Point2::new(u0, v0),
+            remus_math::vec::Vec2::new(u1 - u0, v1 - v0),
         )?)
     };
     let pcurve2 = {
@@ -576,8 +576,8 @@ fn plane_plane_chamfer(
         let (u0, v0) = adapter.project_point(c2_start);
         let (u1, v1) = adapter.project_point(c2_end);
         Curve2D::Line(Line2D::new(
-            brepkit_math::vec::Point2::new(u0, v0),
-            brepkit_math::vec::Vec2::new(u1 - u0, v1 - v0),
+            remus_math::vec::Point2::new(u0, v0),
+            remus_math::vec::Vec2::new(u1 - u0, v1 - v0),
         )?)
     };
 
@@ -677,14 +677,14 @@ fn plane_plane_chamfer(
 pub fn plane_cylinder_fillet(
     n_p_inward: Vec3,
     d_plane: f64,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    cyl: &remus_math::surfaces::CylindricalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face_plane: FaceId,
     face_cyl: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
 
     let tol_ang = ANALYTIC_TOL_ANG;
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -779,7 +779,7 @@ pub fn plane_cylinder_fillet(
         return Ok(None);
     }
     let cap_floor = {
-        let tol = brepkit_math::tolerance::Tolerance::new();
+        let tol = remus_math::tolerance::Tolerance::new();
         tol.linear.max(tol.relative * r_c)
     };
     let inward_convex = inward && convex;
@@ -879,7 +879,7 @@ pub fn plane_cylinder_fillet(
     //      cylinder axis on the spine plane.
     //    - On the cylinder: a circle of radius `r_c` at axial offset `r` along
     //      `z_axis_dir` (the height of the ball trajectory above the plane).
-    let contact_plane_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_plane_circle = remus_math::curves::Circle3D::with_axes(
         p_axis_on_plane,
         axis_c,
         major_radius,
@@ -887,7 +887,7 @@ pub fn plane_cylinder_fillet(
         cyl.y_axis(),
     )?;
     let contact_cyl_center = p_axis_on_plane + z_axis_dir * radius;
-    let contact_cyl_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cyl_circle = remus_math::curves::Circle3D::with_axes(
         contact_cyl_center,
         axis_c,
         r_c,
@@ -915,14 +915,14 @@ pub fn plane_cylinder_fillet(
     // closed-spine case (start and end project to the same point).
     let pcurve_plane = {
         let (cu, cv) = plane_adapter.project_point(p_axis_on_plane);
-        Curve2D::Circle(brepkit_math::curves2d::Circle2D::new(
-            brepkit_math::vec::Point2::new(cu, cv),
+        Curve2D::Circle(remus_math::curves2d::Circle2D::new(
+            remus_math::vec::Point2::new(cu, cv),
             major_radius,
         )?)
     };
     let pcurve_cyl = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v_cyl),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v_cyl),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // 11) Cross-sections at the spine endpoints. `uv1` is the plane contact
@@ -985,7 +985,7 @@ pub fn plane_cylinder_fillet(
 fn plane_is_bounded_disc(
     topo: &Topology,
     face_plane: FaceId,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    cyl: &remus_math::surfaces::CylindricalSurface,
     r_c: f64,
 ) -> Result<bool, BlendError> {
     let face = topo.face(face_plane)?;
@@ -1022,7 +1022,7 @@ fn plane_is_bounded_disc(
 
 /// Recover the cylinder's axial v-parameter for a 3D point known to lie on
 /// the cylinder lateral.
-fn cyl_v_at_point(cyl: &brepkit_math::surfaces::CylindricalSurface, p: Point3) -> f64 {
+fn cyl_v_at_point(cyl: &remus_math::surfaces::CylindricalSurface, p: Point3) -> f64 {
     let axis = cyl.axis();
     let to_p = p - cyl.origin();
     axis.dot(to_p)
@@ -1065,7 +1065,7 @@ fn cyl_v_at_point(cyl: &brepkit_math::surfaces::CylindricalSurface, p: Point3) -
 pub fn plane_cylinder_chamfer(
     n_p_inward: Vec3,
     d_plane: f64,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    cyl: &remus_math::surfaces::CylindricalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -1073,7 +1073,7 @@ pub fn plane_cylinder_chamfer(
     face_plane: FaceId,
     face_cyl: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_ang = ANALYTIC_TOL_ANG;
@@ -1147,7 +1147,7 @@ pub fn plane_cylinder_chamfer(
         return Ok(None);
     }
 
-    // 7) Build the chamfer cone. brepkit's `ConicalSurface` measures
+    // 7) Build the chamfer cone. remus's `ConicalSurface` measures
     //    `half_angle` from the AXIS to the generator, so the radial
     //    component per unit v is `cos(β)` and the axial is `sin(β)`.
     //    Generator slope `dr/dz = cos β / sin β = cot β`, matching our
@@ -1175,7 +1175,7 @@ pub fn plane_cylinder_chamfer(
 
     // 8) 3D contact curves: both are circles around the cylinder axis.
     let cone_y = cyl.y_axis();
-    let contact_plane_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_plane_circle = remus_math::curves::Circle3D::with_axes(
         p_axis_on_plane,
         axis_c,
         plate_contact_radius,
@@ -1184,7 +1184,7 @@ pub fn plane_cylinder_chamfer(
     )?;
     let cyl_contact_center = p_axis_on_plane + axis_toward_material * d2;
     let contact_cyl_circle =
-        brepkit_math::curves::Circle3D::with_axes(cyl_contact_center, axis_c, r_c, cyl_x, cone_y)?;
+        remus_math::curves::Circle3D::with_axes(cyl_contact_center, axis_c, r_c, cyl_x, cone_y)?;
 
     // 9) Spine angular range, derived from the cylinder's u-parameter
     //    projection of the endpoints.
@@ -1209,15 +1209,15 @@ pub fn plane_cylinder_chamfer(
     let plane_adapter = crate::builder_utils::PlaneAdapter::from_normal_and_d(n_p_inward, d_plane);
     let pcurve_plane = {
         let (cu, cv) = plane_adapter.project_point(p_axis_on_plane);
-        Curve2D::Circle(brepkit_math::curves2d::Circle2D::new(
-            brepkit_math::vec::Point2::new(cu, cv),
+        Curve2D::Circle(remus_math::curves2d::Circle2D::new(
+            remus_math::vec::Point2::new(cu, cv),
             r_c - d1,
         )?)
     };
     let v_cyl = cyl_v_at_point(cyl, cyl_contact_center);
     let pcurve_cyl = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v_cyl),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v_cyl),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // 11) Cross-sections at the spine endpoints. The chamfer "section"
@@ -1316,14 +1316,14 @@ pub fn plane_cylinder_chamfer(
 pub fn plane_cone_fillet(
     n_p_inward: Vec3,
     d_plane: f64,
-    cone: &brepkit_math::surfaces::ConicalSurface,
+    cone: &remus_math::surfaces::ConicalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face_plane: FaceId,
     face_cone: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
     use std::f64::consts::PI;
 
     let tol_ang = ANALYTIC_TOL_ANG;
@@ -1484,14 +1484,14 @@ pub fn plane_cone_fillet(
     let contact_cone_axial_magnitude = radius * (1.0 + alpha.cos());
     let cone_contact_center = p_axis_on_plane + (-n_p_inward) * contact_cone_axial_magnitude;
 
-    let contact_plane_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_plane_circle = remus_math::curves::Circle3D::with_axes(
         p_axis_on_plane,
         axis_dir,
         contact_plane_radius,
         cone_x,
         cone_y,
     )?;
-    let contact_cone_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cone_circle = remus_math::curves::Circle3D::with_axes(
         cone_contact_center,
         axis_dir,
         contact_cone_radius,
@@ -1510,15 +1510,15 @@ pub fn plane_cone_fillet(
     let plane_adapter = crate::builder_utils::PlaneAdapter::from_normal_and_d(n_p_inward, d_plane);
     let pcurve_plane = {
         let (cu, cv) = plane_adapter.project_point(p_axis_on_plane);
-        Curve2D::Circle(brepkit_math::curves2d::Circle2D::new(
-            brepkit_math::vec::Point2::new(cu, cv),
+        Curve2D::Circle(remus_math::curves2d::Circle2D::new(
+            remus_math::vec::Point2::new(cu, cv),
             major_radius,
         )?)
     };
     let v_cone = ParametricSurface::project_point(cone, cone_contact_center).1;
     let pcurve_cone = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v_cone),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v_cone),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // 12) Cross-sections at the spine endpoints.
@@ -1612,7 +1612,7 @@ pub fn plane_cone_fillet(
 pub fn plane_cone_chamfer(
     n_p_inward: Vec3,
     d_plane: f64,
-    cone: &brepkit_math::surfaces::ConicalSurface,
+    cone: &remus_math::surfaces::ConicalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -1620,7 +1620,7 @@ pub fn plane_cone_chamfer(
     face_plane: FaceId,
     face_cone: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_ang = ANALYTIC_TOL_ANG;
@@ -1703,7 +1703,7 @@ pub fn plane_cone_chamfer(
     if dr <= tol_lin {
         return Ok(None);
     }
-    // brepkit's `ConicalSurface` measures the half-angle from the AXIS to
+    // remus's `ConicalSurface` measures the half-angle from the AXIS to
     // the generator (so the radial component of `position(0, v)` per unit v
     // is `cos(β)`, the axial component is `sin(β)`, and the generator slope
     // in (r, z) is `cot β = cos β / sin β`). Matching that to our generator
@@ -1774,14 +1774,14 @@ pub fn plane_cone_chamfer(
     let cone_contact_axial_offset = d2 * sin_a;
     let cone_contact_center = p_axis_on_plane + axis_into_material * cone_contact_axial_offset;
 
-    let contact_plane_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_plane_circle = remus_math::curves::Circle3D::with_axes(
         p_axis_on_plane,
         axis_c,
         plate_contact_radius,
         cone_x,
         cone_y,
     )?;
-    let contact_cone_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cone_circle = remus_math::curves::Circle3D::with_axes(
         cone_contact_center,
         axis_c,
         cone_contact_radius,
@@ -1816,15 +1816,15 @@ pub fn plane_cone_chamfer(
     let plane_adapter = crate::builder_utils::PlaneAdapter::from_normal_and_d(n_p_inward, d_plane);
     let pcurve_plane = {
         let (cu, cv) = plane_adapter.project_point(p_axis_on_plane);
-        Curve2D::Circle(brepkit_math::curves2d::Circle2D::new(
-            brepkit_math::vec::Point2::new(cu, cv),
+        Curve2D::Circle(remus_math::curves2d::Circle2D::new(
+            remus_math::vec::Point2::new(cu, cv),
             plate_contact_radius,
         )?)
     };
     let v_cone = ParametricSurface::project_point(cone, cone_contact_center).1;
     let pcurve_cone = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v_cone),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v_cone),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // 13) Cross-sections at the spine endpoints.
@@ -1918,14 +1918,14 @@ pub fn plane_cone_chamfer(
 pub fn plane_sphere_fillet(
     n_p_inward: Vec3,
     d_plane: f64,
-    sphere: &brepkit_math::surfaces::SphericalSurface,
+    sphere: &remus_math::surfaces::SphericalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face_plane: FaceId,
     face_sphere: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -2024,7 +2024,7 @@ pub fn plane_sphere_fillet(
     //    torus is symmetric about the line from sphere center perpendicular
     //    to the plate, which IS the n_p_inward axis). Reference direction:
     //    inherit the sphere's u=0 frame so contact-circle parameterization
-    //    aligns with the sphere's u-coord. For brepkit's SphericalSurface
+    //    aligns with the sphere's u-coord. For remus's SphericalSurface
     //    `Frame3::from_normal(axis)` produces (x_axis, y_axis) consistent
     //    with the spine's u parameter when projected.
     let torus_axis = n_p_inward;
@@ -2093,14 +2093,14 @@ pub fn plane_sphere_fillet(
     let contact_sphere_axial = signed_offset * radius * (h_signed - big_r) / denom;
     let contact_sphere_center = p_axis_on_plane + n_p_inward * contact_sphere_axial;
 
-    let contact_plane_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_plane_circle = remus_math::curves::Circle3D::with_axes(
         p_axis_on_plane,
         torus_axis,
         major_radius,
         sphere_x,
         sphere_y,
     )?;
-    let contact_sphere_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_sphere_circle = remus_math::curves::Circle3D::with_axes(
         contact_sphere_center,
         torus_axis,
         contact_sphere_radial,
@@ -2114,20 +2114,20 @@ pub fn plane_sphere_fillet(
     let plane_adapter = crate::builder_utils::PlaneAdapter::from_normal_and_d(n_p_inward, d_plane);
     let pcurve_plane = {
         let (cu, cv) = plane_adapter.project_point(p_axis_on_plane);
-        Curve2D::Circle(brepkit_math::curves2d::Circle2D::new(
-            brepkit_math::vec::Point2::new(cu, cv),
+        Curve2D::Circle(remus_math::curves2d::Circle2D::new(
+            remus_math::vec::Point2::new(cu, cv),
             major_radius,
         )?)
     };
     // Sphere pcurve at constant v (latitude on sphere). Use
     // ParametricSurface::project_point to get the correct (u, v) for one
-    // point on the contact circle, then sweep u. For brepkit's
+    // point on the contact circle, then sweep u. For remus's
     // SphericalSurface the v-parameter is co-latitude from the +axis.
     let sample_p = contact_sphere_circle.evaluate(u_start);
     let v_sphere = ParametricSurface::project_point(sphere, sample_p).1;
     let pcurve_sphere = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v_sphere),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v_sphere),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // 11) Cross-sections at spine endpoints.
@@ -2221,7 +2221,7 @@ pub fn plane_sphere_fillet(
 pub fn plane_sphere_chamfer(
     n_p_inward: Vec3,
     d_plane: f64,
-    sphere: &brepkit_math::surfaces::SphericalSurface,
+    sphere: &remus_math::surfaces::SphericalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -2229,7 +2229,7 @@ pub fn plane_sphere_chamfer(
     face_plane: FaceId,
     face_sphere: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -2386,7 +2386,7 @@ pub fn plane_sphere_chamfer(
 
     // 9) 3D contact circles around the n_p_inward axis.
     let plate_axis = n_p_inward;
-    let contact_plane_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_plane_circle = remus_math::curves::Circle3D::with_axes(
         p_axis_on_plane,
         plate_axis,
         r_p + d1,
@@ -2394,7 +2394,7 @@ pub fn plane_sphere_chamfer(
         sphere_y,
     )?;
     let contact_sphere_center = p_axis_on_plane + n_p_inward * sphere_axial;
-    let contact_sphere_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_sphere_circle = remus_math::curves::Circle3D::with_axes(
         contact_sphere_center,
         plate_axis,
         sphere_radial,
@@ -2408,16 +2408,16 @@ pub fn plane_sphere_chamfer(
     let plane_adapter = crate::builder_utils::PlaneAdapter::from_normal_and_d(n_p_inward, d_plane);
     let pcurve_plane = {
         let (cu, cv) = plane_adapter.project_point(p_axis_on_plane);
-        Curve2D::Circle(brepkit_math::curves2d::Circle2D::new(
-            brepkit_math::vec::Point2::new(cu, cv),
+        Curve2D::Circle(remus_math::curves2d::Circle2D::new(
+            remus_math::vec::Point2::new(cu, cv),
             r_p + d1,
         )?)
     };
     let sample_p = contact_sphere_circle.evaluate(u_start);
     let v_sphere = ParametricSurface::project_point(sphere, sample_p).1;
     let pcurve_sphere = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v_sphere),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v_sphere),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // 11) Cross-sections at spine endpoints.
@@ -2500,15 +2500,15 @@ pub fn plane_sphere_chamfer(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn sphere_sphere_fillet(
-    s1: &brepkit_math::surfaces::SphericalSurface,
-    s2: &brepkit_math::surfaces::SphericalSurface,
+    s1: &remus_math::surfaces::SphericalSurface,
+    s2: &remus_math::surfaces::SphericalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face1: FaceId,
     face2: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -2650,7 +2650,7 @@ pub fn sphere_sphere_fillet(
     let s1_contact_axial = big_r1 * a_ball / q1;
     let s1_contact_radial = big_r1 * major_radius / q1;
     let s1_contact_center = c1 + axis * s1_contact_axial;
-    let contact1_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact1_circle = remus_math::curves::Circle3D::with_axes(
         s1_contact_center,
         axis,
         s1_contact_radial,
@@ -2661,7 +2661,7 @@ pub fn sphere_sphere_fillet(
     let s2_contact_axial_from_c2 = big_r2 * (a_ball - big_d) / q2;
     let s2_contact_radial = big_r2 * major_radius / q2;
     let s2_contact_center = c2 + axis * s2_contact_axial_from_c2;
-    let contact2_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact2_circle = remus_math::curves::Circle3D::with_axes(
         s2_contact_center,
         axis,
         s2_contact_radial,
@@ -2677,14 +2677,14 @@ pub fn sphere_sphere_fillet(
     let sample1 = contact1_circle.evaluate(u_start);
     let v1 = ParametricSurface::project_point(s1, sample1).1;
     let pcurve1 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v1),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v1),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample2 = contact2_circle.evaluate(u_start);
     let v2 = ParametricSurface::project_point(s2, sample2).1;
     let pcurve2 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v2),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v2),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p1_at = |u: f64| contact1_circle.evaluate(u);
@@ -2769,15 +2769,15 @@ pub fn sphere_sphere_fillet(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn sphere_cylinder_fillet(
-    sph: &brepkit_math::surfaces::SphericalSurface,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    sph: &remus_math::surfaces::SphericalSurface,
+    cyl: &remus_math::surfaces::CylindricalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face_sphere: FaceId,
     face_cyl: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -2914,7 +2914,7 @@ pub fn sphere_cylinder_fillet(
     let sph_contact_axial = big_r_s * a_ball / q_s;
     let sph_contact_radial = big_r_s * major_radius / q_s;
     let sph_contact_center = c_s + cyl_axis * sph_contact_axial;
-    let contact_sph_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_sph_circle = remus_math::curves::Circle3D::with_axes(
         sph_contact_center,
         cyl_axis,
         sph_contact_radial,
@@ -2925,7 +2925,7 @@ pub fn sphere_cylinder_fillet(
     // Cylinder contact: at axial = a_ball (along cyl axis from sphere
     // center; convert to cyl-origin frame), radial = r_c.
     let cyl_contact_axial_world = c_s + cyl_axis * a_ball; // same as torus_center
-    let contact_cyl_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cyl_circle = remus_math::curves::Circle3D::with_axes(
         cyl_contact_axial_world,
         cyl_axis,
         r_c,
@@ -2945,8 +2945,8 @@ pub fn sphere_cylinder_fillet(
     let sample_sph = contact_sph_circle.evaluate(u_start);
     let (u_sph_start, v_sph) = ParametricSurface::project_point(sph, sample_sph);
     let pcurve_sph = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_sph_start, v_sph),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_sph_start, v_sph),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     // Cylinder pcurve. Same frame-independence reasoning: derive the
     // cylinder's own u for the start sample.
@@ -2954,8 +2954,8 @@ pub fn sphere_cylinder_fillet(
     let u_cyl_start = ParametricSurface::project_point(cyl, sample_cyl).0;
     let v_cyl = cyl_v_at_point(cyl, sample_cyl);
     let pcurve_cyl = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_cyl_start, v_cyl),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_cyl_start, v_cyl),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     // Cross-sections. Section uv1/uv2 must use each surface's own u
@@ -3012,7 +3012,7 @@ pub fn sphere_cylinder_fillet(
 ///
 /// Place sphere center at origin, cone axis = +z, cone apex at
 /// `(0, 0, a_apex)`, half-angle β (radial plane to generator,
-/// brepkit convention). With `h = 0 − a_apex`, `Q_s = R_s + s_sph · r`,
+/// remus convention). With `h = 0 − a_apex`, `Q_s = R_s + s_sph · r`,
 /// `A = s_cone · r + h · cos β`. Tangency constraints
 ///   R_t · sin β − (z_b + h) · cos β = s_cone · r       (cone)
 ///   R_t² + z_b² = Q_s²                                  (sphere)
@@ -3043,15 +3043,15 @@ pub fn sphere_cylinder_fillet(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn sphere_cone_fillet(
-    sph: &brepkit_math::surfaces::SphericalSurface,
-    cone: &brepkit_math::surfaces::ConicalSurface,
+    sph: &remus_math::surfaces::SphericalSurface,
+    cone: &remus_math::surfaces::ConicalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face_sphere: FaceId,
     face_cone: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -3236,7 +3236,7 @@ pub fn sphere_cone_fillet(
     let sph_contact_axial = big_r_s * z_b / q_s;
     let sph_contact_radial = big_r_s * major_radius / q_s;
     let sph_contact_center = c_s + cone_axis * sph_contact_axial;
-    let contact_sph_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_sph_circle = remus_math::curves::Circle3D::with_axes(
         sph_contact_center,
         cone_axis,
         sph_contact_radial,
@@ -3266,7 +3266,7 @@ pub fn sphere_cone_fillet(
         return Ok(None);
     }
     let cone_contact_center = c_s + cone_axis * cone_contact_axial;
-    let contact_cone_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cone_circle = remus_math::curves::Circle3D::with_axes(
         cone_contact_center,
         cone_axis,
         cone_contact_radial,
@@ -3281,14 +3281,14 @@ pub fn sphere_cone_fillet(
     let sample_sph = contact_sph_circle.evaluate(u_start);
     let (u_sph_start, v_sph) = ParametricSurface::project_point(sph, sample_sph);
     let pcurve_sph = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_sph_start, v_sph),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_sph_start, v_sph),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample_cone = contact_cone_circle.evaluate(u_start);
     let (u_cone_start, v_cone) = ParametricSurface::project_point(cone, sample_cone);
     let pcurve_cone = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_cone_start, v_cone),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_cone_start, v_cone),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p_sph_at = |u: f64| contact_sph_circle.evaluate(u);
@@ -3372,8 +3372,8 @@ pub fn sphere_cone_fillet(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn sphere_sphere_chamfer(
-    s1: &brepkit_math::surfaces::SphericalSurface,
-    s2: &brepkit_math::surfaces::SphericalSurface,
+    s1: &remus_math::surfaces::SphericalSurface,
+    s2: &remus_math::surfaces::SphericalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -3381,7 +3381,7 @@ pub fn sphere_sphere_chamfer(
     face1: FaceId,
     face2: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -3539,10 +3539,10 @@ pub fn sphere_sphere_chamfer(
 
     let contact1_center = c1 + axis * p1_z_from_c1;
     let contact1_circle =
-        brepkit_math::curves::Circle3D::with_axes(contact1_center, axis, p1_r, ref_dir, perp_y)?;
+        remus_math::curves::Circle3D::with_axes(contact1_center, axis, p1_r, ref_dir, perp_y)?;
     let contact2_center = c1 + axis * p2_z_from_c1;
     let contact2_circle =
-        brepkit_math::curves::Circle3D::with_axes(contact2_center, axis, p2_r, ref_dir, perp_y)?;
+        remus_math::curves::Circle3D::with_axes(contact2_center, axis, p2_r, ref_dir, perp_y)?;
     let contact1 = circle_arc_to_nurbs(&contact1_circle, u_start, u_end)?;
     let contact2 = circle_arc_to_nurbs(&contact2_circle, u_start, u_end)?;
 
@@ -3550,14 +3550,14 @@ pub fn sphere_sphere_chamfer(
     let sample1 = contact1_circle.evaluate(u_start);
     let v1 = ParametricSurface::project_point(s1, sample1).1;
     let pcurve1 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v1),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v1),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample2 = contact2_circle.evaluate(u_start);
     let v2 = ParametricSurface::project_point(s2, sample2).1;
     let pcurve2 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_start, v2),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_start, v2),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p1_at = |u: f64| contact1_circle.evaluate(u);
@@ -3646,8 +3646,8 @@ pub fn sphere_sphere_chamfer(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn sphere_cylinder_chamfer(
-    sph: &brepkit_math::surfaces::SphericalSurface,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    sph: &remus_math::surfaces::SphericalSurface,
+    cyl: &remus_math::surfaces::CylindricalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -3655,7 +3655,7 @@ pub fn sphere_cylinder_chamfer(
     face_sphere: FaceId,
     face_cyl: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -3794,7 +3794,7 @@ pub fn sphere_cylinder_chamfer(
     };
 
     let sph_contact_center = c_s + cyl_axis * z_sph;
-    let contact_sph_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_sph_circle = remus_math::curves::Circle3D::with_axes(
         sph_contact_center,
         cyl_axis,
         r_sph,
@@ -3802,7 +3802,7 @@ pub fn sphere_cylinder_chamfer(
         perp_y,
     )?;
     let cyl_contact_center = c_s + cyl_axis * z_cyl;
-    let contact_cyl_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cyl_circle = remus_math::curves::Circle3D::with_axes(
         cyl_contact_center,
         cyl_axis,
         r_cyl,
@@ -3816,15 +3816,15 @@ pub fn sphere_cylinder_chamfer(
     let sample_sph = contact_sph_circle.evaluate(u_start);
     let (u_sph_start, v_sph) = ParametricSurface::project_point(sph, sample_sph);
     let pcurve_sph = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_sph_start, v_sph),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_sph_start, v_sph),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample_cyl = contact_cyl_circle.evaluate(u_start);
     let u_cyl_start = ParametricSurface::project_point(cyl, sample_cyl).0;
     let v_cyl = cyl_v_at_point(cyl, sample_cyl);
     let pcurve_cyl = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_cyl_start, v_cyl),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_cyl_start, v_cyl),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p_sph_at = |u: f64| contact_sph_circle.evaluate(u);
@@ -3912,8 +3912,8 @@ pub fn sphere_cylinder_chamfer(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn sphere_cone_chamfer(
-    sph: &brepkit_math::surfaces::SphericalSurface,
-    cone: &brepkit_math::surfaces::ConicalSurface,
+    sph: &remus_math::surfaces::SphericalSurface,
+    cone: &remus_math::surfaces::ConicalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -3921,7 +3921,7 @@ pub fn sphere_cone_chamfer(
     face_sphere: FaceId,
     face_cone: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -4100,7 +4100,7 @@ pub fn sphere_cone_chamfer(
     };
 
     let sph_contact_center = c_s + cone_axis * z_sph;
-    let contact_sph_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_sph_circle = remus_math::curves::Circle3D::with_axes(
         sph_contact_center,
         cone_axis,
         r_sph,
@@ -4108,7 +4108,7 @@ pub fn sphere_cone_chamfer(
         perp_y,
     )?;
     let cone_contact_center = c_s + cone_axis * z_cone;
-    let contact_cone_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact_cone_circle = remus_math::curves::Circle3D::with_axes(
         cone_contact_center,
         cone_axis,
         r_cone,
@@ -4122,14 +4122,14 @@ pub fn sphere_cone_chamfer(
     let sample_sph = contact_sph_circle.evaluate(u_start);
     let (u_sph_start, v_sph) = ParametricSurface::project_point(sph, sample_sph);
     let pcurve_sph = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_sph_start, v_sph),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_sph_start, v_sph),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample_cone = contact_cone_circle.evaluate(u_start);
     let (u_cone_start, v_cone) = ParametricSurface::project_point(cone, sample_cone);
     let pcurve_cone = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_cone_start, v_cone),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_cone_start, v_cone),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p_sph_at = |u: f64| contact_sph_circle.evaluate(u);
@@ -4214,15 +4214,15 @@ pub fn sphere_cone_chamfer(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cylinder_cylinder_fillet(
-    cyl1: &brepkit_math::surfaces::CylindricalSurface,
-    cyl2: &brepkit_math::surfaces::CylindricalSurface,
+    cyl1: &remus_math::surfaces::CylindricalSurface,
+    cyl2: &remus_math::surfaces::CylindricalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face1: FaceId,
     face2: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::CylindricalSurface;
+    use remus_math::surfaces::CylindricalSurface;
 
     let tol_lin = ANALYTIC_TOL_LIN;
     let tol_ang = ANALYTIC_TOL_ANG;
@@ -4377,15 +4377,15 @@ pub fn cylinder_cylinder_fillet(
     let v1_start = cyl_v_at_point(cyl1, c1_start);
     let v1_end = cyl_v_at_point(cyl1, c1_end);
     let pcurve1 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u1, v1_start),
-        brepkit_math::vec::Vec2::new(0.0, v1_end - v1_start),
+        remus_math::vec::Point2::new(u1, v1_start),
+        remus_math::vec::Vec2::new(0.0, v1_end - v1_start),
     )?);
     let u2 = ParametricSurface::project_point(cyl2, c2_start).0;
     let v2_start = cyl_v_at_point(cyl2, c2_start);
     let v2_end = cyl_v_at_point(cyl2, c2_end);
     let pcurve2 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u2, v2_start),
-        brepkit_math::vec::Vec2::new(0.0, v2_end - v2_start),
+        remus_math::vec::Point2::new(u2, v2_start),
+        remus_math::vec::Vec2::new(0.0, v2_end - v2_start),
     )?);
 
     let section_start = CircSection {
@@ -4467,15 +4467,15 @@ pub fn cylinder_cylinder_fillet(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cone_cone_coaxial_fillet(
-    cone1: &brepkit_math::surfaces::ConicalSurface,
-    cone2: &brepkit_math::surfaces::ConicalSurface,
+    cone1: &remus_math::surfaces::ConicalSurface,
+    cone2: &remus_math::surfaces::ConicalSurface,
     spine: &Spine,
     topo: &Topology,
     radius: f64,
     face1: FaceId,
     face2: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ToroidalSurface;
+    use remus_math::surfaces::ToroidalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -4622,7 +4622,7 @@ pub fn cone_cone_coaxial_fillet(
     }
 
     let cone1_contact_center = apex1 + a_cone * cone1_contact_axial;
-    let contact1_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact1_circle = remus_math::curves::Circle3D::with_axes(
         cone1_contact_center,
         a_cone,
         cone1_contact_radial,
@@ -4630,7 +4630,7 @@ pub fn cone_cone_coaxial_fillet(
         perp_y,
     )?;
     let cone2_contact_center = apex1 + a_cone * cone2_contact_axial;
-    let contact2_circle = brepkit_math::curves::Circle3D::with_axes(
+    let contact2_circle = remus_math::curves::Circle3D::with_axes(
         cone2_contact_center,
         a_cone,
         cone2_contact_radial,
@@ -4645,14 +4645,14 @@ pub fn cone_cone_coaxial_fillet(
     let sample_c1 = contact1_circle.evaluate(u_start);
     let (u_c1_start, v_c1) = ParametricSurface::project_point(cone1, sample_c1);
     let pcurve1 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_c1_start, v_c1),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_c1_start, v_c1),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample_c2 = contact2_circle.evaluate(u_start);
     let (u_c2_start, v_c2) = ParametricSurface::project_point(cone2, sample_c2);
     let pcurve2 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_c2_start, v_c2),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_c2_start, v_c2),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p1_at = |u: f64| contact1_circle.evaluate(u);
@@ -4735,8 +4735,8 @@ pub fn cone_cone_coaxial_fillet(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cone_cone_coaxial_chamfer(
-    cone1: &brepkit_math::surfaces::ConicalSurface,
-    cone2: &brepkit_math::surfaces::ConicalSurface,
+    cone1: &remus_math::surfaces::ConicalSurface,
+    cone2: &remus_math::surfaces::ConicalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -4744,7 +4744,7 @@ pub fn cone_cone_coaxial_chamfer(
     face1: FaceId,
     face2: FaceId,
 ) -> Result<Option<StripeResult>, BlendError> {
-    use brepkit_math::surfaces::ConicalSurface;
+    use remus_math::surfaces::ConicalSurface;
     use std::f64::consts::PI;
 
     let tol_lin = ANALYTIC_TOL_LIN;
@@ -4854,7 +4854,7 @@ pub fn cone_cone_coaxial_chamfer(
     let r_avg = 0.5 * (r_c1 + r_c2);
     let cone_half_angle = ((mid_z - z_apex_chamfer).abs() / r_avg).atan();
     // Reject near-degenerate cone (close to flat disk or needle).
-    // brepkit's `ConicalSurface::new` rejects β ≤ 0 or β ≥ π/2; the
+    // remus's `ConicalSurface::new` rejects β ≤ 0 or β ≥ π/2; the
     // 1e-3 rad ≈ 0.057° margin is a project-wide convention used by all
     // analytic chamfer helpers (plane-cone, sphere-cone, cyl-cyl-fillet)
     // for the same purpose — see `plane_cone_chamfer` for context.
@@ -4888,10 +4888,10 @@ pub fn cone_cone_coaxial_chamfer(
 
     let c1_center = apex1 + a_cone * z_c1;
     let contact1_circle =
-        brepkit_math::curves::Circle3D::with_axes(c1_center, a_cone, r_c1, ref_dir, perp_y)?;
+        remus_math::curves::Circle3D::with_axes(c1_center, a_cone, r_c1, ref_dir, perp_y)?;
     let c2_center = apex1 + a_cone * z_c2;
     let contact2_circle =
-        brepkit_math::curves::Circle3D::with_axes(c2_center, a_cone, r_c2, ref_dir, perp_y)?;
+        remus_math::curves::Circle3D::with_axes(c2_center, a_cone, r_c2, ref_dir, perp_y)?;
     let contact1 = circle_arc_to_nurbs(&contact1_circle, u_start, u_end)?;
     let contact2 = circle_arc_to_nurbs(&contact2_circle, u_start, u_end)?;
 
@@ -4899,14 +4899,14 @@ pub fn cone_cone_coaxial_chamfer(
     let sample_c1 = contact1_circle.evaluate(u_start);
     let (u_c1_start, v_c1) = ParametricSurface::project_point(cone1, sample_c1);
     let pcurve1 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_c1_start, v_c1),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_c1_start, v_c1),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
     let sample_c2 = contact2_circle.evaluate(u_start);
     let (u_c2_start, v_c2) = ParametricSurface::project_point(cone2, sample_c2);
     let pcurve2 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u_c2_start, v_c2),
-        brepkit_math::vec::Vec2::new(u_end - u_start, 0.0),
+        remus_math::vec::Point2::new(u_c2_start, v_c2),
+        remus_math::vec::Vec2::new(u_end - u_start, 0.0),
     )?);
 
     let p1_at = |u: f64| contact1_circle.evaluate(u);
@@ -4990,8 +4990,8 @@ pub fn cone_cone_coaxial_chamfer(
 /// Returns `BlendError` if topology lookups or NURBS construction fails.
 #[allow(clippy::too_many_arguments, clippy::too_many_lines)]
 pub fn cylinder_cylinder_chamfer(
-    cyl1: &brepkit_math::surfaces::CylindricalSurface,
-    cyl2: &brepkit_math::surfaces::CylindricalSurface,
+    cyl1: &remus_math::surfaces::CylindricalSurface,
+    cyl2: &remus_math::surfaces::CylindricalSurface,
     spine: &Spine,
     topo: &Topology,
     d1: f64,
@@ -5122,7 +5122,7 @@ pub fn cylinder_cylinder_chamfer(
     let chamfer_normal_raw = a_cyl.cross(chamfer_span_v);
     let chamfer_normal = chamfer_normal_raw
         .normalize()
-        .map_err(|_| BlendError::Math(brepkit_math::MathError::ZeroVector))?;
+        .map_err(|_| BlendError::Math(remus_math::MathError::ZeroVector))?;
     let chamfer_d = chamfer_normal.dot(Vec3::new(c1_start.x(), c1_start.y(), c1_start.z()));
 
     let contact1 = nurbs_line(c1_start, c1_end)?;
@@ -5134,15 +5134,15 @@ pub fn cylinder_cylinder_chamfer(
     let v1_start = cyl_v_at_point(cyl1, c1_start);
     let v1_end = cyl_v_at_point(cyl1, c1_end);
     let pcurve1 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u1, v1_start),
-        brepkit_math::vec::Vec2::new(0.0, v1_end - v1_start),
+        remus_math::vec::Point2::new(u1, v1_start),
+        remus_math::vec::Vec2::new(0.0, v1_end - v1_start),
     )?);
     let u2 = ParametricSurface::project_point(cyl2, c2_start).0;
     let v2_start = cyl_v_at_point(cyl2, c2_start);
     let v2_end = cyl_v_at_point(cyl2, c2_end);
     let pcurve2 = Curve2D::Line(Line2D::new(
-        brepkit_math::vec::Point2::new(u2, v2_start),
-        brepkit_math::vec::Vec2::new(0.0, v2_end - v2_start),
+        remus_math::vec::Point2::new(u2, v2_start),
+        remus_math::vec::Vec2::new(0.0, v2_end - v2_start),
     )?);
 
     let chamfer_radius = (c1_start - c2_start).length() * 0.5;
@@ -5195,19 +5195,19 @@ pub fn cylinder_cylinder_chamfer(
 /// arcs).
 ///
 /// Inlined here to keep `crates/blend` from picking up a dependency on
-/// `brepkit-geometry`. The geometry crate has the same algorithm in
+/// `remus-geometry`. The geometry crate has the same algorithm in
 /// `convert::curve_to_nurbs::circle_to_nurbs`; consolidating both into the
 /// math layer is a follow-up.
 fn circle_arc_to_nurbs(
-    circle: &brepkit_math::curves::Circle3D,
+    circle: &remus_math::curves::Circle3D,
     t_start: f64,
     t_end: f64,
-) -> Result<brepkit_math::nurbs::curve::NurbsCurve, BlendError> {
+) -> Result<remus_math::nurbs::curve::NurbsCurve, BlendError> {
     use std::f64::consts::FRAC_PI_2;
 
     let span = t_end - t_start;
     if span.abs() < 1e-15 {
-        return Err(BlendError::Math(brepkit_math::MathError::ZeroVector));
+        return Err(BlendError::Math(remus_math::MathError::ZeroVector));
     }
 
     let n_arcs = ((span.abs() / FRAC_PI_2).ceil() as usize).max(1);
@@ -5258,7 +5258,7 @@ fn circle_arc_to_nurbs(
         weights.push(1.0);
     }
 
-    Ok(brepkit_math::nurbs::curve::NurbsCurve::new(
+    Ok(remus_math::nurbs::curve::NurbsCurve::new(
         2, knots, cps, weights,
     )?)
 }
