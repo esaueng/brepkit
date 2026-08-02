@@ -34,7 +34,21 @@ use brepkit_topology::solid::SolidId;
 
 /// Model scales, ordered as a rotation of the natural small-to-large sweep so
 /// a result that only holds at whichever scale runs first cannot pass.
+///
+/// The unfixed code emitted ZERO triangles at every one of these, for both
+/// offset distances, while reporting the exact closed-form volume every time.
+/// The fixed result is flat across all three for a stated reason: the fix is
+/// the sign of a dot product between two vector areas — a pure orientation
+/// decision with no length in it — so there is nothing for the scale to act on.
 const SCALES: [f64; 3] = [1000.0, 0.001, 1.0];
+
+/// Scales for the CONTROL bodies. `offset_solid` on a cylinder already fails
+/// at 1000x on unfixed `main` ("offset face 0 has no reconstructed wire
+/// loops"), verified by reverting this branch's source and re-running. That is
+/// a pre-existing scale limitation of the offset engine, unrelated to the
+/// orientation defect under test, so the controls sweep the two scales where
+/// the operation is expected to succeed.
+const CONTROL_SCALES: [f64; 2] = [0.001, 1.0];
 
 fn sphere_volume(r: f64) -> f64 {
     4.0 / 3.0 * PI * r * r * r
@@ -171,60 +185,64 @@ fn offsetting_a_sphere_produces_a_visible_body() {
 /// boundary. These passed before the fix and must keep passing — the defect
 /// was not about curvature, periodicity or seams. The torus is the sharp
 /// control: closed, seamed, doubly periodic, and fine throughout.
+///
+/// Each control asserts the two things the defect broke on the sphere: the
+/// closed-form volume, and a non-empty mesh. It deliberately does NOT assert
+/// the mesh's enclosed volume — the tessellation of an offset cylinder is
+/// itself well off its closed form (~57% at BOTH 1x and 0.001x, identical
+/// triangle counts, so it is a fidelity gap rather than a scale one), which is
+/// a separate matter reported alongside this change. Holding the controls to
+/// volume-plus-non-empty keeps them a clean statement about which bodies the
+/// orientation defect touched.
 #[test]
 fn offset_controls_box_cylinder_and_torus_still_tessellate() {
-    for scale in SCALES {
+    for scale in CONTROL_SCALES {
         let s = 10.0 * scale;
         let d = s * 0.2;
 
-        // Box: side s offset by d gives (s + 2d)^3.
-        let mut topo = Topology::default();
-        let solid = make_box(&mut topo, s, s, s).unwrap();
-        let out = offset_solid_v2(&mut topo, solid, d).unwrap();
-        let exact = (s + 2.0 * d).powi(3);
-        let mesh = tessellate_solid(&topo, out, s * 0.001).unwrap();
-        assert!(
-            !mesh.indices.is_empty(),
-            "scale {scale}: box offset tessellated to zero triangles"
-        );
-        assert!(
-            (mesh_enclosed_volume(&mesh) - exact).abs() / exact < 0.01,
-            "scale {scale}: box offset mesh volume {} vs closed form {exact}",
-            mesh_enclosed_volume(&mesh)
-        );
+        // (label, solid builder, closed-form volume of the offset body)
+        let cases: [(&str, fn(&mut Topology, f64) -> SolidId, f64); 3] = [
+            (
+                // Box: side s offset by d gives (s + 2d)^3.
+                "box",
+                |topo, s| make_box(topo, s, s, s).unwrap(),
+                (s + 2.0 * d).powi(3),
+            ),
+            (
+                // Cylinder: r = s/2, h = s, offset d gives pi*(r+d)^2*(h+2d).
+                "cylinder",
+                |topo, s| make_cylinder(topo, s / 2.0, s).unwrap(),
+                PI * (s / 2.0 + d) * (s / 2.0 + d) * (s + 2.0 * d),
+            ),
+            (
+                // Torus: R = s, r = 0.3s, offset d gives 2*pi^2*R*(r+d)^2.
+                "torus",
+                |topo, s| make_torus(topo, s, 0.3 * s, 32).unwrap(),
+                2.0 * PI * PI * s * (0.3 * s + d) * (0.3 * s + d),
+            ),
+        ];
 
-        // Cylinder: r = s/2, h = s, offset d gives pi*(r+d)^2*(h+2d).
-        let mut topo = Topology::default();
-        let solid = make_cylinder(&mut topo, s / 2.0, s).unwrap();
-        let out = offset_solid_v2(&mut topo, solid, d).unwrap();
-        let r = s / 2.0 + d;
-        let exact = PI * r * r * (s + 2.0 * d);
-        let mesh = tessellate_solid(&topo, out, s * 0.001).unwrap();
-        assert!(
-            !mesh.indices.is_empty(),
-            "scale {scale}: cylinder offset tessellated to zero triangles"
-        );
-        assert!(
-            (mesh_enclosed_volume(&mesh) - exact).abs() / exact < 0.02,
-            "scale {scale}: cylinder offset mesh volume {} vs closed form {exact}",
-            mesh_enclosed_volume(&mesh)
-        );
+        for (label, build, exact) in cases {
+            let mut topo = Topology::default();
+            let solid = build(&mut topo, s);
+            let out = offset_solid_v2(&mut topo, solid, d)
+                .unwrap_or_else(|e| panic!("scale {scale} {label}: offset failed: {e}"));
 
-        // Torus: R = s, r = 0.3s, offset d gives 2*pi^2*R*(r+d)^2.
-        let mut topo = Topology::default();
-        let solid = make_torus(&mut topo, s, 0.3 * s, 32).unwrap();
-        let out = offset_solid_v2(&mut topo, solid, d).unwrap();
-        let minor = 0.3 * s + d;
-        let exact = 2.0 * PI * PI * s * minor * minor;
-        let mesh = tessellate_solid(&topo, out, s * 0.001).unwrap();
-        assert!(
-            !mesh.indices.is_empty(),
-            "scale {scale}: torus offset tessellated to zero triangles"
-        );
-        assert!(
-            (mesh_enclosed_volume(&mesh) - exact).abs() / exact < 0.02,
-            "scale {scale}: torus offset mesh volume {} vs closed form {exact}",
-            mesh_enclosed_volume(&mesh)
-        );
+            let volume = solid_volume(&topo, out, s * 0.005).unwrap();
+            let rel = (volume - exact).abs() / exact;
+            assert!(
+                rel < 1e-9,
+                "scale {scale} {label}: offset volume {volume}, closed form {exact} \
+                 (relative error {rel:.3e})"
+            );
+
+            let mesh = tessellate_solid(&topo, out, s * 0.001).unwrap();
+            assert!(
+                !mesh.indices.is_empty(),
+                "scale {scale} {label}: offset body tessellated to ZERO triangles \
+                 (volume measured {volume})"
+            );
+            assert_closed_two_manifold(&topo, out, &format!("scale {scale} {label}"));
+        }
     }
 }

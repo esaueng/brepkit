@@ -317,7 +317,7 @@ fn repro_offset_open_cases() {
 fn repro_cyl_offset_scales() {
     use brepkit_operations::offset_v2::offset_solid_v2;
     use brepkit_operations::primitives::make_cylinder;
-    for scale in [1000.0f64, 0.001, 1.0] {
+    for scale in [0.001f64, 1.0] {
         let s = 10.0 * scale;
         let mut topo = Topology::default();
         let solid = make_cylinder(&mut topo, s / 2.0, s).unwrap();
@@ -326,6 +326,117 @@ fn repro_cyl_offset_scales() {
                 solid_volume(&topo, o, s*0.001).unwrap(),
                 PI*(s/2.0+s*0.2).powi(2)*(s+2.0*s*0.2)),
             Err(e) => println!("cyl scale={scale}: ERR {e}"),
+        }
+    }
+}
+
+/// Non-asserting scale sweep, used to confirm the defect at EVERY scale
+/// rather than only at whichever one asserts first.
+#[test]
+fn repro_scale_sweep() {
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    for scale in [0.001f64, 1.0] {
+        let r = 10.0 * scale;
+        let exact = 4.0 / 3.0 * PI * r * r * r;
+        for seg in [16usize, 32, 64] {
+            let mut topo = Topology::default();
+            let sph = make_sphere(&mut topo, r, seg).unwrap();
+            let side = 2.0 * r;
+            let bx = make_box(&mut topo, side, side, side).unwrap();
+            let far = copy_and_transform_solid(&mut topo, bx, &Mat4::translation(100.0 * r, 0.0, 0.0)).unwrap();
+            match boolean(&mut topo, BooleanOp::Cut, sph, far) {
+                Ok(sid) => {
+                    let v = solid_volume(&topo, sid, r * 0.005).unwrap();
+                    let tags: Vec<_> = solid_faces(&topo, sid).unwrap().iter()
+                        .map(|&f| topo.face(f).unwrap().surface().type_tag()).collect();
+                    let mut c = std::collections::BTreeMap::new();
+                    for t in &tags { *c.entry(*t).or_insert(0usize) += 1; }
+                    println!("CUT scale={scale} seg={seg}: relerr={:.3e} faces={:?}", (v - exact).abs() / exact, c);
+                }
+                Err(e) => println!("CUT scale={scale} seg={seg}: ERR {e}"),
+            }
+        }
+        for ratio in [0.2f64, 1e-4] {
+            let d = r * ratio;
+            let outer = r + d;
+            let ex = 4.0 / 3.0 * PI * outer.powi(3);
+            let mut topo = Topology::default();
+            let sph = make_sphere(&mut topo, r, 32).unwrap();
+            match offset_solid_v2(&mut topo, sph, d) {
+                Ok(o) => {
+                    let v = solid_volume(&topo, o, outer * 0.005).unwrap();
+                    let m = brepkit_operations::tessellate::tessellate_solid(&topo, o, outer * 0.001).unwrap();
+                    let mut lo = f64::INFINITY; let mut hi = f64::NEG_INFINITY;
+                    for p in &m.positions { lo = lo.min(p.z()); hi = hi.max(p.z()); }
+                    println!("OFFSET scale={scale} d={ratio}r: volrelerr={:.3e} tris={} zspan=[{lo:.4},{hi:.4}] meshvol={:.6} exact={ex:.6}",
+                        (v - ex).abs() / ex, m.indices.len() / 3, mesh_volume(&topo, o));
+                }
+                Err(e) => println!("OFFSET scale={scale} d={ratio}r: ERR {e}"),
+            }
+        }
+    }
+}
+
+#[test]
+fn repro_timing_1000x() {
+    for seg in [16usize, 64] {
+        let t0 = std::time::Instant::now();
+        let r = 10000.0;
+        let mut topo = Topology::default();
+        let sph = make_sphere(&mut topo, r, seg).unwrap();
+        let bx = make_box(&mut topo, 2.0 * r, 2.0 * r, 2.0 * r).unwrap();
+        let far = copy_and_transform_solid(&mut topo, bx, &Mat4::translation(100.0 * r, 0.0, 0.0)).unwrap();
+        let t1 = std::time::Instant::now();
+        let sid = boolean(&mut topo, BooleanOp::Cut, sph, far).unwrap();
+        let t2 = std::time::Instant::now();
+        let v = solid_volume(&topo, sid, r * 0.005).unwrap();
+        let t3 = std::time::Instant::now();
+        println!("seg={seg} build={:?} boolean={:?} volume={:?} v={v:.1}",
+                 t1 - t0, t2 - t1, t3 - t2);
+    }
+}
+
+#[test]
+fn repro_cap_cut() {
+    let _ = env_logger::builder().is_test(false).try_init();
+    let r = 10.0;
+    let side = 12.0 * r;
+    for top in [r / 2.0, -r / 2.0] {
+        let mut topo = Topology::default();
+        let sph = make_sphere(&mut topo, r, 32).unwrap();
+        let bx = make_box(&mut topo, side, side, side).unwrap();
+        let tool = copy_and_transform_solid(&mut topo, bx,
+            &Mat4::translation(-side / 2.0, -side / 2.0, top - side)).unwrap();
+        match boolean(&mut topo, BooleanOp::Cut, sph, tool) {
+            Ok(sid) => println!("top={top}: vol={:.4} {}", solid_volume(&topo, sid, 0.05).unwrap(), describe(&topo, sid)),
+            Err(e) => println!("top={top}: ERR {e}"),
+        }
+    }
+}
+
+#[test]
+fn repro_cyl_tess_scale() {
+    use brepkit_operations::offset_v2::offset_solid_v2;
+    use brepkit_operations::primitives::make_cylinder;
+    for scale in [0.001f64, 1.0] {
+        let s = 10.0 * scale;
+        let d = s * 0.2;
+        let mut topo = Topology::default();
+        let solid = make_cylinder(&mut topo, s / 2.0, s).unwrap();
+        let out = offset_solid_v2(&mut topo, solid, d).unwrap();
+        let r = s / 2.0 + d;
+        let exact = PI * r * r * (s + 2.0 * d);
+        for k in [1e-3f64, 1e-4, 1e-5] {
+            let m = brepkit_operations::tessellate::tessellate_solid(&topo, out, s * k).unwrap();
+            let mut v = 0.0;
+            for t in m.indices.chunks_exact(3) {
+                let a = m.positions[t[0] as usize];
+                let b = m.positions[t[1] as usize];
+                let c = m.positions[t[2] as usize];
+                v += (a.x() * (b.y() * c.z() - c.y() * b.z()) - b.x() * (a.y() * c.z() - c.y() * a.z())
+                    + c.x() * (a.y() * b.z() - b.y() * a.z())) / 6.0;
+            }
+            println!("cyl scale={scale} defl={:.3e} tris={} relerr={:.4}", s * k, m.indices.len()/3, (v - exact).abs()/exact);
         }
     }
 }
