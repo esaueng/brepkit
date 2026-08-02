@@ -25,15 +25,15 @@ pub enum WasmError {
 
     /// An error from a modeling operation.
     #[error(transparent)]
-    Operations(#[from] brepkit_operations::OperationsError),
+    Operations(#[from] remus_operations::OperationsError),
 
     /// An error from topology lookup.
     #[error(transparent)]
-    Topology(#[from] brepkit_topology::TopologyError),
+    Topology(#[from] remus_topology::TopologyError),
 
     /// A math error (e.g. singular matrix).
     #[error(transparent)]
-    Math(#[from] brepkit_math::MathError),
+    Math(#[from] remus_math::MathError),
 }
 
 /// Validate that a `f64` value is finite (not NaN or infinite).

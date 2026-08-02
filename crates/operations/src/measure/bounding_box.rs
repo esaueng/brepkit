@@ -2,11 +2,11 @@
 
 use std::collections::HashSet;
 
-use brepkit_math::aabb::Aabb3;
-use brepkit_math::vec::Point3;
-use brepkit_topology::Topology;
-use brepkit_topology::face::{FaceId, FaceSurface};
-use brepkit_topology::solid::SolidId;
+use remus_math::aabb::Aabb3;
+use remus_math::vec::Point3;
+use remus_topology::Topology;
+use remus_topology::face::{FaceId, FaceSurface};
+use remus_topology::solid::SolidId;
 
 use super::helpers::collect_solid_vertex_points;
 
@@ -112,7 +112,7 @@ fn aabb_include(aabb: &mut Aabb3, p: Point3) {
 fn expand_aabb_for_face(
     topo: &Topology,
     aabb: &mut Aabb3,
-    face_id: brepkit_topology::face::FaceId,
+    face_id: remus_topology::face::FaceId,
     surface: &FaceSurface,
 ) {
     // Always sample wire midpoints — captures curvature of curved boundary
@@ -192,7 +192,7 @@ fn expand_aabb_for_face(
 fn sample_face_wire_midpoints(
     topo: &Topology,
     aabb: &mut Aabb3,
-    face_id: brepkit_topology::face::FaceId,
+    face_id: remus_topology::face::FaceId,
 ) -> bool {
     let Ok(face) = topo.face(face_id) else {
         return false;
@@ -205,7 +205,7 @@ fn sample_face_wire_midpoints(
         let Ok(edge) = topo.edge(oe.edge()) else {
             continue;
         };
-        if !matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Line) {
+        if !matches!(edge.curve(), remus_topology::edge::EdgeCurve::Line) {
             has_curved = true;
         }
         let Ok(sv) = topo.vertex(edge.start()) else {
@@ -231,8 +231,8 @@ fn sample_face_wire_midpoints(
 fn expand_cylinder_at_vertices(
     topo: &Topology,
     aabb: &mut Aabb3,
-    face_id: brepkit_topology::face::FaceId,
-    cyl: &brepkit_math::surfaces::CylindricalSurface,
+    face_id: remus_topology::face::FaceId,
+    cyl: &remus_math::surfaces::CylindricalSurface,
 ) {
     let Ok(face) = topo.face(face_id) else {
         return;
@@ -254,7 +254,7 @@ fn expand_cylinder_at_vertices(
             let Ok(v) = topo.vertex(vid) else {
                 continue;
             };
-            let rel = brepkit_math::vec::Vec3::new(
+            let rel = remus_math::vec::Vec3::new(
                 v.point().x() - origin.x(),
                 v.point().y() - origin.y(),
                 v.point().z() - origin.z(),
@@ -277,10 +277,10 @@ fn expand_cylinder_at_vertices(
 fn expand_cone_at_vertices(
     topo: &Topology,
     aabb: &mut Aabb3,
-    face_id: brepkit_topology::face::FaceId,
-    cone: &brepkit_math::surfaces::ConicalSurface,
+    face_id: remus_topology::face::FaceId,
+    cone: &remus_math::surfaces::ConicalSurface,
 ) {
-    use brepkit_math::vec::Vec3;
+    use remus_math::vec::Vec3;
     let Ok(face) = topo.face(face_id) else {
         return;
     };

@@ -7,17 +7,17 @@
 
 use std::f64::consts::{FRAC_PI_2, PI};
 
-use brepkit_math::nurbs::curve::NurbsCurve;
-use brepkit_math::nurbs::surface::NurbsSurface;
-use brepkit_math::tolerance::Tolerance;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve};
-use brepkit_topology::face::{Face, FaceId, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::{Solid, SolidId};
-use brepkit_topology::vertex::{Vertex, VertexId};
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use remus_math::nurbs::curve::NurbsCurve;
+use remus_math::nurbs::surface::NurbsSurface;
+use remus_math::tolerance::Tolerance;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve};
+use remus_topology::face::{Face, FaceId, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::{Solid, SolidId};
+use remus_topology::vertex::{Vertex, VertexId};
+use remus_topology::wire::{OrientedEdge, Wire};
 
 use crate::dot_normal_point;
 
@@ -102,7 +102,7 @@ fn make_arc_curve(
     origin: Point3,
     axis: Vec3,
     angle: f64,
-) -> Result<NurbsCurve, brepkit_math::MathError> {
+) -> Result<NurbsCurve, remus_math::MathError> {
     let half = angle / 2.0;
     let w_mid = half.cos();
     let mid_ctrl = arc_mid_control_point(start, origin, axis, half, w_mid);
@@ -129,7 +129,7 @@ fn make_revolution_surface(
     origin: Point3,
     axis: Vec3,
     seg_angle: f64,
-) -> Result<NurbsSurface, brepkit_math::MathError> {
+) -> Result<NurbsSurface, remus_math::MathError> {
     let half = seg_angle / 2.0;
     let w_mid = half.cos();
 
@@ -182,7 +182,7 @@ fn revolution_band_surface(
     axis_origin: Point3,
     axis: Vec3,
     seg_angle: f64,
-) -> Result<(FaceSurface, bool), brepkit_math::MathError> {
+) -> Result<(FaceSurface, bool), remus_math::MathError> {
     let nurbs = make_revolution_surface(
         p0_start,
         p0_end,
@@ -240,7 +240,7 @@ fn revolution_band_surface(
 
     // Axis-parallel edge (Δr ≈ 0, radius > 0) → cylinder wall.
     if dr.abs() < tol {
-        let surface = brepkit_math::surfaces::CylindricalSurface::new(axis_origin, axis, r0)?;
+        let surface = remus_math::surfaces::CylindricalSurface::new(axis_origin, axis, r0)?;
         return Ok((FaceSurface::Cylinder(surface), outward_reversed));
     }
 
@@ -276,7 +276,7 @@ fn revolution_band_surface(
     let wide_z = if r1 >= r0 { z1 } else { z0 };
     let apex_z = axis.dot(apex - axis_origin);
     let cone_axis = if wide_z >= apex_z { axis } else { -axis };
-    let surface = brepkit_math::surfaces::ConicalSurface::new(apex, cone_axis, half_angle)?;
+    let surface = remus_math::surfaces::ConicalSurface::new(apex, cone_axis, half_angle)?;
     Ok((FaceSurface::Cone(surface), outward_reversed))
 }
 
@@ -313,8 +313,8 @@ fn profile_arc_center_radius(
         EdgeCurve::NurbsCurve(nc) => {
             let scale = (p_end - p_start).length().max(1.0);
             let tol = Tolerance::new().linear * 100.0 * scale;
-            match brepkit_geometry::convert::recognize_curve(nc, tol) {
-                brepkit_geometry::convert::RecognizedCurve::Circle { center, radius, .. } => {
+            match remus_geometry::convert::recognize_curve(nc, tol) {
+                remus_geometry::convert::RecognizedCurve::Circle { center, radius, .. } => {
                     Some((center, radius))
                 }
                 _ => None,
@@ -345,7 +345,7 @@ fn revolution_torus_band(
     axis: Vec3,
     nurbs: &NurbsSurface,
     seg_angle: f64,
-) -> Result<Option<(FaceSurface, bool)>, brepkit_math::MathError> {
+) -> Result<Option<(FaceSurface, bool)>, remus_math::MathError> {
     let tol = ANALYTIC_BAND_TOL_MM;
     // Decompose the arc centre into its axial position and radial offset.
     let to_center = arc_center - axis_origin;
@@ -359,13 +359,13 @@ fn revolution_torus_band(
     }
     let torus_center = axis_origin + axial;
     let surface =
-        brepkit_math::surfaces::ToroidalSurface::with_axis(torus_center, major, arc_radius, axis)?;
+        remus_math::surfaces::ToroidalSurface::with_axis(torus_center, major, arc_radius, axis)?;
     // Match the band's winding to the NURBS band normal (consistent winding
     // across all faces; the volume integrator uses the absolute total). Compare
     // the toroidal surface's natural normal to the NURBS one at the SAME 3D
     // point — the band centre, projected onto the torus for its (u, v).
     let _ = seg_angle;
-    let band_center = brepkit_math::traits::ParametricSurface::evaluate(nurbs, 0.5, 0.5);
+    let band_center = remus_math::traits::ParametricSurface::evaluate(nurbs, 0.5, 0.5);
     let band_normal = nurbs.normal(0.5, 0.5)?;
     let (tu, tv) = surface.project_point(band_center);
     let outward = surface.normal(tu, tv);
@@ -388,8 +388,8 @@ const fn next_ring_index(seg: usize, num_segs: usize, is_full: bool) -> usize {
 /// Data produced by revolving a single wire (outer or inner).
 struct WireRevolveData {
     ring_verts: Vec<Vec<VertexId>>,
-    arc_edges: Vec<Vec<brepkit_topology::edge::EdgeId>>,
-    ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>>,
+    arc_edges: Vec<Vec<remus_topology::edge::EdgeId>>,
+    ring_edges: Vec<Vec<remus_topology::edge::EdgeId>>,
     input_oriented: Vec<OrientedEdge>,
     n: usize,
 }
@@ -427,7 +427,7 @@ struct ProfileEdge {
     /// The traversal-start vertex — reused as the rim-circle seam vertex so
     /// walls can reuse the original profile edge as their seam.
     sv: VertexId,
-    edge: brepkit_topology::edge::EdgeId,
+    edge: remus_topology::edge::EdgeId,
     forward: bool,
     class: RevEdge,
     /// Traversal-ordered interior samples (quarter/mid/three-quarter) for arc
@@ -666,7 +666,7 @@ fn build_analytic_revolution(
     ccw: bool,
     profile: &[ProfileEdge],
 ) -> Result<SolidId, crate::OperationsError> {
-    use brepkit_topology::edge::EdgeId;
+    use remus_topology::edge::EdgeId;
     let lin = Tolerance::new().linear;
     let n = profile.len();
     let s = if ccw { 1.0 } else { -1.0 };
@@ -688,7 +688,7 @@ fn build_analytic_revolution(
             continue;
         }
         let center = axis_origin + axis * z;
-        let circle = brepkit_math::curves::Circle3D::new(center, axis, r)
+        let circle = remus_math::curves::Circle3D::new(center, axis, r)
             .map_err(crate::OperationsError::Math)?;
         rim_circle[i] = Some(topo.add_edge(Edge::new(pe.sv, pe.sv, EdgeCurve::Circle(circle))));
     }
@@ -828,7 +828,7 @@ fn revolution_wall_surface(
 ) -> Result<(FaceSurface, bool), crate::OperationsError> {
     match class {
         RevEdge::Cylinder { r } => {
-            let sfc = brepkit_math::surfaces::CylindricalSurface::new(axis_origin, axis, *r)
+            let sfc = remus_math::surfaces::CylindricalSurface::new(axis_origin, axis, *r)
                 .map_err(crate::OperationsError::Math)?;
             let (u, v) = sfc.project_point(probe);
             let nat = sfc.normal(u, v);
@@ -840,7 +840,7 @@ fn revolution_wall_surface(
             let apex_z = axis.dot(*apex - axis_origin);
             let probe_z = axis.dot(probe - axis_origin);
             let cone_axis = if probe_z >= apex_z { axis } else { -axis };
-            let sfc = brepkit_math::surfaces::ConicalSurface::new(*apex, cone_axis, *half_angle)
+            let sfc = remus_math::surfaces::ConicalSurface::new(*apex, cone_axis, *half_angle)
                 .map_err(crate::OperationsError::Math)?;
             let (u, v) = sfc.project_point(probe);
             let nat = sfc.normal(u, v);
@@ -853,7 +853,7 @@ fn revolution_wall_surface(
         } => {
             let to_c = *center - axis_origin;
             let torus_center = axis_origin + axis * to_c.dot(axis);
-            let sfc = brepkit_math::surfaces::ToroidalSurface::with_axis(
+            let sfc = remus_math::surfaces::ToroidalSurface::with_axis(
                 torus_center,
                 *major,
                 *minor,
@@ -932,13 +932,9 @@ fn try_circle_revolution_torus(
     }
 
     let torus_center = axis_origin + axis * along;
-    let surface = brepkit_math::surfaces::ToroidalSurface::with_axis(
-        torus_center,
-        major_radius,
-        radius,
-        axis,
-    )
-    .map_err(crate::OperationsError::Math)?;
+    let surface =
+        remus_math::surfaces::ToroidalSurface::with_axis(torus_center, major_radius, radius, axis)
+            .map_err(crate::OperationsError::Math)?;
 
     if is_full {
         // One doubly-periodic torus face, like `primitives::make_torus`: a
@@ -978,12 +974,11 @@ fn try_circle_revolution_torus(
     let v1 = topo.add_vertex(Vertex::new(p1, tol.linear));
     let end_center = rotate_point(center, axis_origin, axis, angle);
     let end_normal = rotate_vec(circ_normal, axis, angle);
-    let end_circle = brepkit_math::curves::Circle3D::new(end_center, end_normal, radius)
+    let end_circle = remus_math::curves::Circle3D::new(end_center, end_normal, radius)
         .map_err(crate::OperationsError::Math)?;
     let end_eid = topo.add_edge(Edge::new(v1, v1, EdgeCurve::Circle(end_circle)));
-    let seam_circle =
-        brepkit_math::curves::Circle3D::new(axis_origin + axis * seam_z, axis, seam_r)
-            .map_err(crate::OperationsError::Math)?;
+    let seam_circle = remus_math::curves::Circle3D::new(axis_origin + axis * seam_z, axis, seam_r)
+        .map_err(crate::OperationsError::Math)?;
     let seam_eid = topo.add_edge(Edge::new(profile_vid, v1, EdgeCurve::Circle(seam_circle)));
 
     let wall_wire = Wire::new(
@@ -1117,7 +1112,7 @@ pub fn revolve(
         | FaceSurface::Nurbs(_) => None,
     };
     let input_wire_id = face_data.outer_wire();
-    let inner_wire_ids: Vec<brepkit_topology::wire::WireId> = face_data.inner_wires().to_vec();
+    let inner_wire_ids: Vec<remus_topology::wire::WireId> = face_data.inner_wires().to_vec();
 
     // Fast exact path: a revolution of a single circular profile that clears
     // the axis is a torus (full turn: one doubly-periodic face; partial turn:
@@ -1204,7 +1199,7 @@ pub fn revolve(
     let num_boundaries = if is_full { num_segs } else { num_segs + 1 };
 
     let revolve_wire = |topo: &mut Topology,
-                        wire_id: brepkit_topology::wire::WireId|
+                        wire_id: remus_topology::wire::WireId|
      -> Result<WireRevolveData, crate::OperationsError> {
         let wire = topo.wire(wire_id)?;
         let original_oriented: Vec<_> = wire.edges().to_vec();
@@ -1231,10 +1226,7 @@ pub fn revolve(
 
         let input_positions: Vec<Point3> = input_verts
             .iter()
-            .map(|&vid| {
-                topo.vertex(vid)
-                    .map(brepkit_topology::vertex::Vertex::point)
-            })
+            .map(|&vid| topo.vertex(vid).map(remus_topology::vertex::Vertex::point))
             .collect::<Result<_, _>>()?;
 
         let mut ring_verts: Vec<Vec<VertexId>> = Vec::with_capacity(num_boundaries);
@@ -1253,7 +1245,7 @@ pub fn revolve(
             ring_verts.push(ring);
         }
 
-        let mut arc_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> = Vec::with_capacity(num_segs);
+        let mut arc_edges: Vec<Vec<remus_topology::edge::EdgeId>> = Vec::with_capacity(num_segs);
 
         for seg in 0..num_segs {
             let next = next_ring_index(seg, num_segs, is_full);
@@ -1273,10 +1265,10 @@ pub fn revolve(
 
         let input_edge_ids: Vec<_> = input_oriented
             .iter()
-            .map(brepkit_topology::wire::OrientedEdge::edge)
+            .map(remus_topology::wire::OrientedEdge::edge)
             .collect();
 
-        let mut ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
+        let mut ring_edges: Vec<Vec<remus_topology::edge::EdgeId>> =
             Vec::with_capacity(num_boundaries);
         ring_edges.push(input_edge_ids);
 
@@ -1309,10 +1301,7 @@ pub fn revolve(
     // Collect input positions for outer wire (needed for cap face normals).
     let input_positions: Vec<Point3> = outer.ring_verts[0]
         .iter()
-        .map(|&vid| {
-            topo.vertex(vid)
-                .map(brepkit_topology::vertex::Vertex::point)
-        })
+        .map(|&vid| topo.vertex(vid).map(remus_topology::vertex::Vertex::point))
         .collect::<Result<_, _>>()?;
 
     let mut all_faces = Vec::new();
@@ -1518,10 +1507,10 @@ mod tests {
 
     use std::f64::consts::PI;
 
-    use brepkit_math::tolerance::Tolerance;
-    use brepkit_topology::Topology;
-    use brepkit_topology::face::FaceSurface;
-    use brepkit_topology::test_utils::make_unit_square_face;
+    use remus_math::tolerance::Tolerance;
+    use remus_topology::Topology;
+    use remus_topology::face::FaceSurface;
+    use remus_topology::test_utils::make_unit_square_face;
 
     use crate::test_helpers::{assert_euler_genus0, euler_characteristic};
 
@@ -1610,7 +1599,7 @@ mod tests {
         // gh #968: revolving a circle (r=2, center x=10) a full turn around the
         // Y axis is a torus (R=10, r=2). It must be one analytic Torus face with
         // the exact analytic volume 2π²Rr², not a faceted ~2%-low approximation.
-        use brepkit_topology::builder::make_circle_edge;
+        use remus_topology::builder::make_circle_edge;
 
         let mut topo = Topology::new();
         let circle = make_circle_edge(
@@ -1673,7 +1662,7 @@ mod tests {
         // cylinders (the inner wall reversed, facing the hole) and perpendicular
         // top/bottom edges that become annular `Plane` discs. With the analytic
         // disc-area volume the whole washer is exact (no disc-cap chording).
-        use brepkit_topology::builder::make_polygon_wire;
+        use remus_topology::builder::make_polygon_wire;
 
         let mut topo = Topology::new();
         let wire = make_polygon_wire(
@@ -1771,8 +1760,8 @@ mod tests {
         // A full revolution of a fully-analytic frustum profile builds ONE
         // periodic cone wall + two planar disc caps — exactly matching
         // `make_cone` — instead of the segmented NURBS bands. Volume is exact.
-        use brepkit_topology::builder::make_polygon_wire;
-        use brepkit_topology::explorer::solid_faces;
+        use remus_topology::builder::make_polygon_wire;
+        use remus_topology::explorer::solid_faces;
 
         let mut topo = Topology::new();
         let (r_bot, r_top, h) = (6.0_f64, 2.0_f64, 12.0_f64);
@@ -1854,7 +1843,7 @@ mod tests {
         // band. A half-disc profile (semicircle arc bulging away from the axis,
         // closed by its diameter on an axis-parallel line) makes the arc bands
         // `Torus`; Pappus gives the exact revolved volume.
-        use brepkit_math::curves::Circle3D;
+        use remus_math::curves::Circle3D;
         use std::f64::consts::PI;
 
         let mut topo = Topology::new();
@@ -2003,14 +1992,13 @@ mod tests {
         // it, so the torus band's doubled SEAM edge is a `NurbsCurve` — the
         // two-rim band tessellator must accept that seam instead of falling
         // back to the crack-prone CDT/snap path.
-        use brepkit_math::curves::Circle3D;
+        use remus_math::curves::Circle3D;
         use std::f64::consts::FRAC_PI_2;
 
         let mut topo = Topology::new();
         let (d, rho) = (10.0_f64, 3.0_f64);
         let circ = Circle3D::new(Point3::new(d, 0.0, 0.0), Vec3::new(0.0, 1.0, 0.0), rho).unwrap();
-        let nurbs =
-            brepkit_geometry::convert::circle_to_nurbs(&circ, -FRAC_PI_2, FRAC_PI_2).unwrap();
+        let nurbs = remus_geometry::convert::circle_to_nurbs(&circ, -FRAC_PI_2, FRAC_PI_2).unwrap();
         let p_bot = circ.evaluate(-FRAC_PI_2);
         let p_top = circ.evaluate(FRAC_PI_2);
         let v_bot = topo.add_vertex(Vertex::new(p_bot, 1e-7));
@@ -2086,7 +2074,7 @@ mod tests {
         // natural direction and are flipped to traversal order — sampling with
         // traversal endpoints directly would pick the complementary arc and
         // invert the winding.
-        use brepkit_math::curves::Circle3D;
+        use remus_math::curves::Circle3D;
         use std::f64::consts::PI;
 
         let mut topo = Topology::new();
@@ -2157,7 +2145,7 @@ mod tests {
         // in `analytic_cone_signed_volume`: the apex vertex has no defined angular
         // parameter, so a per-segment band touching it must not corrupt the
         // band's angular range (which would 2× the lateral integral, +50% volume).
-        use brepkit_topology::builder::make_polygon_wire;
+        use remus_topology::builder::make_polygon_wire;
 
         let mut topo = Topology::new();
         let (r, h) = (5.0_f64, 12.0_f64);
@@ -2230,7 +2218,7 @@ mod tests {
         // A circle profile clearing the axis, revolved a PARTIAL turn, is one
         // trimmed `Torus` band + two planar disc caps — not segmented patches.
         // Exact sector volume: `V = π·R·ρ²·Δu`.
-        use brepkit_math::curves::Circle3D;
+        use remus_math::curves::Circle3D;
 
         let (big_r, rho, angle) = (6.0_f64, 2.0_f64, 2.0 * PI / 3.0);
         let mut topo = Topology::new();
@@ -2473,7 +2461,7 @@ mod tests {
             Point3::new(1.0, 1.0, 0.0),
         ];
         let outer_wire =
-            brepkit_topology::builder::make_polygon_wire(topo, &outer_pts, 1e-7).unwrap();
+            remus_topology::builder::make_polygon_wire(topo, &outer_pts, 1e-7).unwrap();
 
         // Inner: small 0.5×0.5 hole (CW winding).
         let inner_pts = vec![
@@ -2483,7 +2471,7 @@ mod tests {
             Point3::new(2.5, 0.25, 0.0),
         ];
         let inner_wire =
-            brepkit_topology::builder::make_polygon_wire(topo, &inner_pts, 1e-7).unwrap();
+            remus_topology::builder::make_polygon_wire(topo, &inner_pts, 1e-7).unwrap();
 
         let normal = Vec3::new(0.0, 0.0, 1.0);
         let d = 0.0;
@@ -2670,11 +2658,11 @@ mod tests {
             Point3::new(4.0, 3.0, 0.0),
             Point3::new(2.0, 3.0, 0.0),
         ];
-        let wire = brepkit_topology::builder::make_polygon_wire(&mut topo, &pts, 1e-7).unwrap();
-        let face = topo.add_face(brepkit_topology::face::Face::new(
+        let wire = remus_topology::builder::make_polygon_wire(&mut topo, &pts, 1e-7).unwrap();
+        let face = topo.add_face(remus_topology::face::Face::new(
             wire,
             vec![],
-            brepkit_topology::face::FaceSurface::Plane {
+            remus_topology::face::FaceSurface::Plane {
                 normal: Vec3::new(0.0, 0.0, 1.0),
                 d: 0.0,
             },
@@ -2703,11 +2691,11 @@ mod tests {
     /// Revolve a CW-wound profile and verify the result has correct volume.
     #[test]
     fn revolve_cw_profile_produces_correct_solid() {
-        use brepkit_math::vec::Vec3;
-        use brepkit_topology::edge::{Edge, EdgeCurve};
-        use brepkit_topology::face::Face;
-        use brepkit_topology::vertex::Vertex;
-        use brepkit_topology::wire::{OrientedEdge, Wire};
+        use remus_math::vec::Vec3;
+        use remus_topology::edge::{Edge, EdgeCurve};
+        use remus_topology::face::Face;
+        use remus_topology::vertex::Vertex;
+        use remus_topology::wire::{OrientedEdge, Wire};
 
         let mut topo = Topology::new();
         let tol_val = 1e-7;
@@ -2740,7 +2728,7 @@ mod tests {
         let face = topo.add_face(Face::new(
             wid,
             vec![],
-            brepkit_topology::face::FaceSurface::Plane {
+            remus_topology::face::FaceSurface::Plane {
                 normal: Vec3::new(0.0, 0.0, -1.0),
                 d: 0.0,
             },
@@ -2777,14 +2765,14 @@ mod tests {
             Point3::new(4.0, 3.0, 0.0),
             Point3::new(2.0, 3.0, 0.0),
         ];
-        let wire = brepkit_topology::builder::make_polygon_wire(topo, &pts, 1e-7).unwrap();
-        let cyl = brepkit_math::surfaces::CylindricalSurface::new(
+        let wire = remus_topology::builder::make_polygon_wire(topo, &pts, 1e-7).unwrap();
+        let cyl = remus_math::surfaces::CylindricalSurface::new(
             Point3::new(0.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, 1.0),
             1.0,
         )
         .unwrap();
-        topo.add_face(brepkit_topology::face::Face::new(
+        topo.add_face(remus_topology::face::Face::new(
             wire,
             vec![],
             FaceSurface::Cylinder(cyl),
@@ -2850,14 +2838,14 @@ mod tests {
             Point3::new(4.0, 3.0, 0.0),
             Point3::new(2.0, 3.0, 0.6),
         ];
-        let wire = brepkit_topology::builder::make_polygon_wire(&mut topo, &pts, 1e-7).unwrap();
-        let cyl = brepkit_math::surfaces::CylindricalSurface::new(
+        let wire = remus_topology::builder::make_polygon_wire(&mut topo, &pts, 1e-7).unwrap();
+        let cyl = remus_math::surfaces::CylindricalSurface::new(
             Point3::new(0.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, 1.0),
             1.0,
         )
         .unwrap();
-        let face = topo.add_face(brepkit_topology::face::Face::new(
+        let face = topo.add_face(remus_topology::face::Face::new(
             wire,
             vec![],
             FaceSurface::Cylinder(cyl),
@@ -2887,14 +2875,14 @@ mod tests {
             Point3::new(4.0, 3.0, 0.0),
             Point3::new(2.0, 3.0, 0.6),
         ];
-        let wire = brepkit_topology::builder::make_polygon_wire(&mut topo, &pts, 1e-7).unwrap();
-        let cyl = brepkit_math::surfaces::CylindricalSurface::new(
+        let wire = remus_topology::builder::make_polygon_wire(&mut topo, &pts, 1e-7).unwrap();
+        let cyl = remus_math::surfaces::CylindricalSurface::new(
             Point3::new(0.0, 0.0, 0.0),
             Vec3::new(0.0, 0.0, 1.0),
             1.0,
         )
         .unwrap();
-        let face = topo.add_face(brepkit_topology::face::Face::new(
+        let face = topo.add_face(remus_topology::face::Face::new(
             wire,
             vec![],
             FaceSurface::Cylinder(cyl),

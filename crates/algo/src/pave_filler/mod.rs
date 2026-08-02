@@ -26,9 +26,9 @@ pub mod phase_vv;
 #[cfg(test)]
 mod tests;
 
-use brepkit_math::tolerance::Tolerance;
-use brepkit_topology::Topology;
-use brepkit_topology::solid::SolidId;
+use remus_math::tolerance::Tolerance;
+use remus_topology::Topology;
+use remus_topology::solid::SolidId;
 
 use crate::ds::GfaArena;
 use crate::error::AlgoError;
@@ -106,7 +106,7 @@ impl<'a> PaveFiller<'a> {
     /// Initialize pave blocks for all edges of both solids.
     fn init_pave_blocks(&self, arena: &mut GfaArena) -> Result<(), AlgoError> {
         for &solid in &[self.solid_a, self.solid_b] {
-            let edges = brepkit_topology::explorer::solid_edges(self.topo, solid)?;
+            let edges = remus_topology::explorer::solid_edges(self.topo, solid)?;
             for edge_id in edges {
                 // Skip if already initialized (shared edges between solids)
                 if arena.edge_pave_blocks.contains_key(&edge_id) {
@@ -248,7 +248,7 @@ fn init_pave_blocks_n(
     arena: &mut GfaArena,
 ) -> Result<(), AlgoError> {
     for &solid in sources {
-        for edge_id in brepkit_topology::explorer::solid_edges(topo, solid)? {
+        for edge_id in remus_topology::explorer::solid_edges(topo, solid)? {
             if arena.edge_pave_blocks.contains_key(&edge_id) {
                 continue;
             }
@@ -263,12 +263,12 @@ fn init_pave_blocks_n(
 }
 
 /// Axis-aligned bounding box of a solid from its vertices.
-fn solid_aabb(topo: &Topology, solid: SolidId) -> Option<brepkit_math::aabb::Aabb3> {
+fn solid_aabb(topo: &Topology, solid: SolidId) -> Option<remus_math::aabb::Aabb3> {
     let mut pts = Vec::new();
-    for vid in brepkit_topology::explorer::solid_vertices(topo, solid).ok()? {
+    for vid in remus_topology::explorer::solid_vertices(topo, solid).ok()? {
         pts.push(topo.vertex(vid).ok()?.point());
     }
-    brepkit_math::aabb::Aabb3::try_from_points(pts)
+    remus_math::aabb::Aabb3::try_from_points(pts)
 }
 
 /// Source-index pairs `(i, j)` with `i < j` whose bounding boxes overlap (each
@@ -277,7 +277,7 @@ fn solid_aabb(topo: &Topology, solid: SolidId) -> Option<brepkit_math::aabb::Aab
 /// A solid without a computable box is treated as interacting with all others
 /// (conservative — never drops a real interaction).
 fn interacting_pairs(topo: &Topology, sources: &[SolidId], tol: Tolerance) -> Vec<(usize, usize)> {
-    let boxes: Vec<Option<brepkit_math::aabb::Aabb3>> =
+    let boxes: Vec<Option<remus_math::aabb::Aabb3>> =
         sources.iter().map(|&s| solid_aabb(topo, s)).collect();
     let mut pairs = Vec::new();
     for i in 0..sources.len() {

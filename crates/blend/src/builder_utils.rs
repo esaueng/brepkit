@@ -4,14 +4,14 @@
 //! and [`ChamferBuilder`](crate::chamfer_builder::ChamferBuilder) for creating
 //! blend faces and sampling contact curves.
 
-use brepkit_math::nurbs::curve::NurbsCurve;
-use brepkit_math::traits::ParametricSurface;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve};
-use brepkit_topology::face::{Face, FaceId, FaceSurface};
-use brepkit_topology::vertex::Vertex;
-use brepkit_topology::wire::{OrientedEdge, Wire, WireId};
+use remus_math::nurbs::curve::NurbsCurve;
+use remus_math::traits::ParametricSurface;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve};
+use remus_topology::face::{Face, FaceId, FaceSurface};
+use remus_topology::vertex::Vertex;
+use remus_topology::wire::{OrientedEdge, Wire, WireId};
 
 use crate::BlendError;
 use crate::stripe::Stripe;

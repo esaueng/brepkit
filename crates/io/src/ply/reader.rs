@@ -1,10 +1,10 @@
 //! PLY file reader (ASCII and binary little-endian).
 
 use crate::limits::{ImportLimits, ensure_input_size, ensure_limit};
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_operations::tessellate::TriangleMesh;
-use brepkit_topology::Topology;
-use brepkit_topology::solid::SolidId;
+use remus_math::vec::{Point3, Vec3};
+use remus_operations::tessellate::TriangleMesh;
+use remus_topology::Topology;
+use remus_topology::solid::SolidId;
 
 /// Read a PLY file from bytes and return a triangle mesh.
 ///
@@ -384,8 +384,8 @@ mod tests {
 
     #[test]
     fn roundtrip_ascii() {
-        let mut topo = brepkit_topology::Topology::new();
-        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let mut topo = remus_topology::Topology::new();
+        let solid = remus_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
 
         let ply_data =
             crate::ply::write_ply(&topo, &[solid], 0.1, crate::ply::writer::PlyFormat::Ascii)
@@ -399,8 +399,8 @@ mod tests {
 
     #[test]
     fn roundtrip_binary() {
-        let mut topo = brepkit_topology::Topology::new();
-        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let mut topo = remus_topology::Topology::new();
+        let solid = remus_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
 
         let ply_data = crate::ply::write_ply(
             &topo,
@@ -423,14 +423,14 @@ mod tests {
 
     #[test]
     fn read_ply_solid_returns_solid_id() {
-        let mut topo = brepkit_topology::Topology::new();
-        let solid = brepkit_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        let mut topo = remus_topology::Topology::new();
+        let solid = remus_operations::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
 
         let ply_data =
             crate::ply::write_ply(&topo, &[solid], 0.1, crate::ply::writer::PlyFormat::Ascii)
                 .unwrap();
 
-        let mut import_topo = brepkit_topology::Topology::new();
+        let mut import_topo = remus_topology::Topology::new();
         let result = read_ply_solid(&mut import_topo, &ply_data, 1e-6);
         assert!(
             result.is_ok(),

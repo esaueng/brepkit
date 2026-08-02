@@ -33,7 +33,7 @@
 ### Features
 
 * add Phase 1 foundation for OCCT feature parity ([41aca1d](https://github.com/andymai/brepkit/commit/41aca1df884e4940ab1b64cbfc20dc7142a1f69f))
-* initialize brepkit workspace ([e516477](https://github.com/andymai/brepkit/commit/e516477b9823748262e681c4679cbc72a9b2ff73))
+* initialize remus workspace ([e516477](https://github.com/andymai/brepkit/commit/e516477b9823748262e681c4679cbc72a9b2ff73))
 * **io,wasm:** add STL mesh import and WASM bindings for IO ([347fb69](https://github.com/andymai/brepkit/commit/347fb6901aa49dbfcef7de2b77552367eacc6ca5))
 * **io,wasm:** implement 3MF export with tessellation pipeline ([0557961](https://github.com/andymai/brepkit/commit/0557961288ee4451e813c7b5a139e612311ed826))
 * **io:** add glTF 2.0 binary (.glb) writer ([e292970](https://github.com/andymai/brepkit/commit/e292970411a5c095f21138065121d4870aa4e501))

@@ -5,13 +5,13 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use brepkit_math::tolerance::Tolerance;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{EdgeCurve, EdgeId};
-use brepkit_topology::face::{FaceId, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::{Solid, SolidId};
+use remus_math::tolerance::Tolerance;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{EdgeCurve, EdgeId};
+use remus_topology::face::{FaceId, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::{Solid, SolidId};
 
 use crate::OperationsError;
 use crate::boolean::{FaceSpec, assemble_solid_mixed};
@@ -745,7 +745,7 @@ fn intersect_three_planes(a: Plane, b: Plane, c: Plane) -> Option<Point3> {
 /// corners that collapsed onto their neighbour.
 fn substitute_wire(
     topo: &Topology,
-    wire: brepkit_topology::wire::WireId,
+    wire: remus_topology::wire::WireId,
     moved: &BTreeMap<usize, Point3>,
 ) -> Result<Vec<Point3>, OperationsError> {
     let tol = Tolerance::new();

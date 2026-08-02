@@ -11,14 +11,14 @@
 
 use std::f64::consts::PI;
 
-use brepkit_math::mat::Mat4;
-use brepkit_math::surfaces::CylindricalSurface;
-use brepkit_math::tolerance::Tolerance;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::explorer::solid_faces;
-use brepkit_topology::face::{FaceId, FaceSurface};
-use brepkit_topology::solid::SolidId;
+use remus_math::mat::Mat4;
+use remus_math::surfaces::CylindricalSurface;
+use remus_math::tolerance::Tolerance;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::explorer::solid_faces;
+use remus_topology::face::{FaceId, FaceSurface};
+use remus_topology::solid::SolidId;
 
 use crate::boolean::{BooleanOp, boolean};
 use crate::copy::copy_face;
@@ -369,8 +369,8 @@ fn ensure_closed_shell(
     solid: SolidId,
     what: &str,
 ) -> Result<(), crate::OperationsError> {
-    use brepkit_check::validate::checks::{CheckId, Severity};
-    use brepkit_check::validate::{ValidateOptions, validate_solid};
+    use remus_check::validate::checks::{CheckId, Severity};
+    use remus_check::validate::{ValidateOptions, validate_solid};
 
     let report = validate_solid(topo, solid, &ValidateOptions::default())?;
     let open: Vec<&str> = report
@@ -474,7 +474,7 @@ mod tests {
     use std::collections::HashMap;
     use std::f64::consts::PI;
 
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     use super::*;
     use crate::measure::solid_volume;

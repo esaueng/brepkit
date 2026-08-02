@@ -2,17 +2,17 @@
 
 #![allow(clippy::unwrap_used, deprecated)]
 
-use brepkit_math::det_hash::{DetHashMap, DetHashSet};
-use brepkit_math::nurbs::surface::NurbsSurface;
-use brepkit_math::vec::{Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::{Edge, EdgeCurve};
-use brepkit_topology::face::{Face, FaceSurface};
-use brepkit_topology::shell::Shell;
-use brepkit_topology::solid::Solid;
-use brepkit_topology::test_utils::{make_unit_square_face, make_unit_triangle_face};
-use brepkit_topology::vertex::Vertex;
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use remus_math::det_hash::{DetHashMap, DetHashSet};
+use remus_math::nurbs::surface::NurbsSurface;
+use remus_math::vec::{Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::{Edge, EdgeCurve};
+use remus_topology::face::{Face, FaceSurface};
+use remus_topology::shell::Shell;
+use remus_topology::solid::Solid;
+use remus_topology::test_utils::{make_unit_square_face, make_unit_triangle_face};
+use remus_topology::vertex::Vertex;
+use remus_topology::wire::{OrientedEdge, Wire};
 
 use super::nurbs::tessellate_nurbs;
 use super::*;
@@ -303,11 +303,11 @@ fn tessellate_plain_cylinder_watertight() {
 /// Regression for issue #696: dovetail-style fuse where a small tongue protrudes
 /// into two adjacent slabs. The downstream consumer (gridfinity-layout-tool)
 /// adds a TONGUE_PROTRUSION specifically to avoid coplanar fuse residue, but
-/// brepkit's pipeline produced non-manifold tessellation output. This
+/// remus's pipeline produced non-manifold tessellation output. This
 /// minimal case exercises the same topological pattern.
 #[test]
 fn tessellate_dovetail_fuse_manifold_issue_696() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let slab_a = crate::primitives::make_box(&mut topo, 10.0, 10.0, 1.0).unwrap();
@@ -343,7 +343,7 @@ fn tessellate_dovetail_fuse_manifold_issue_696() {
 /// failing 4x4 / 5x4 dovetail baseplates.
 #[test]
 fn tessellate_dovetail_multi_tile_hollow_issue_696() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let slab_a = crate::primitives::make_box(&mut topo, 10.0, 10.0, 1.0).unwrap();
@@ -395,8 +395,8 @@ fn tessellate_dovetail_multi_tile_hollow_issue_696() {
 /// meets the slabs, which is where coplanar fuse residue tends to appear.
 #[test]
 fn tessellate_dovetail_trapezoidal_tongue_issue_696() {
-    use brepkit_math::mat::Mat4;
-    use brepkit_topology::builder::{make_face_from_wire, make_polygon_wire};
+    use remus_math::mat::Mat4;
+    use remus_topology::builder::{make_face_from_wire, make_polygon_wire};
 
     let mut topo = Topology::new();
     let slab_a = crate::primitives::make_box(&mut topo, 10.0, 10.0, 1.0).unwrap();
@@ -546,7 +546,7 @@ fn dedupe_preserves_thin_plate_geometry() {
 
 #[test]
 fn tessellate_boolean_cut_cylinder_watertight() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let cyl = crate::primitives::make_cylinder(&mut topo, 1.0, 4.0).unwrap();
@@ -579,7 +579,7 @@ fn tessellate_boolean_cut_cylinder_watertight() {
 /// making them watertight by construction.
 #[test]
 fn tessellate_drilled_hole_watertight_across_radii() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     for &r in &[2.5_f64, 3.0, 3.25, 3.5, 4.0, 5.0] {
         for &defl in &[0.05_f64, 0.1] {
@@ -610,7 +610,7 @@ fn tessellate_drilled_hole_watertight_across_radii() {
 #[test]
 fn tessellate_gridfinity_magnet_tile_watertight() {
     use crate::boolean::{BooleanOp, boolean};
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let slab = crate::primitives::make_box(&mut topo, 42.0, 42.0, 8.0).unwrap();
@@ -637,7 +637,7 @@ fn tessellate_gridfinity_magnet_tile_watertight() {
 
 #[test]
 fn tessellate_boolean_cut_cone_watertight() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let cone = crate::primitives::make_cone(&mut topo, 1.5, 0.5, 4.0).unwrap();
@@ -667,7 +667,7 @@ fn tessellate_boolean_cut_cone_watertight() {
 /// sphere pole (|z| stays at the rim's z, ~5.196, well below the radius 6).
 #[test]
 fn bored_sphere_band_area_and_watertight() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let sphere = crate::primitives::make_sphere(&mut topo, 6.0, 24).unwrap();
@@ -753,7 +753,7 @@ fn bored_sphere_band_area_and_watertight() {
 /// edges) and its area must match the analytic box∩sphere boundary.
 #[test]
 fn box_centered_sphere_collar_tessellates_watertight() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let bx = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
@@ -796,7 +796,7 @@ fn box_centered_sphere_collar_tessellates_watertight() {
 
 #[test]
 fn torus_box_notch_band_tessellates_watertight() {
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let tor = crate::primitives::make_torus(&mut topo, 10.0, 3.0, 32).unwrap();
@@ -860,7 +860,7 @@ fn tessellate_solid_cylinder_shared_topology() {
     let mut topo = Topology::new();
     let solid = crate::primitives::make_cylinder(&mut topo, 1.0, 2.0).unwrap();
 
-    let edge_map = brepkit_topology::explorer::edge_to_face_map(&topo, solid).unwrap();
+    let edge_map = remus_topology::explorer::edge_to_face_map(&topo, solid).unwrap();
     let shared_count = edge_map.values().filter(|faces| faces.len() >= 2).count();
     assert!(
         shared_count >= 2,
@@ -1057,7 +1057,7 @@ fn sample_solid_edges_cylinder() {
         &topo,
         solid,
         0.1,
-        brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+        remus_math::chord::DEFAULT_ANGULAR_TOL,
         false,
     )
     .unwrap();
@@ -1073,7 +1073,7 @@ fn sample_solid_edges_angular_tolerance_densifies_curves() {
     // A tighter angular tolerance must refine curved edges (the cylinder's two
     // circle rims) even with the linear deflection held fixed. Regression guard:
     // meshEdges() previously hardcoded DEFAULT_ANGULAR_TOL, so the caller's
-    // angular tolerance had no effect (brepkit#952).
+    // angular tolerance had no effect (remus#952).
     let mut topo = Topology::new();
     let solid = crate::primitives::make_cylinder(&mut topo, 1.0, 3.0).unwrap();
 
@@ -1098,7 +1098,7 @@ fn sample_solid_edges_boolean_filters_coplanar() {
     // fragments when unify_faces is off (make_box puts y=0 at the front). The seams
     // between those three same-plane fragment pairs are exactly the smooth edges
     // sample_solid_edges should drop.
-    use brepkit_math::mat::Mat4;
+    use remus_math::mat::Mat4;
     let mut topo = Topology::new();
     let a = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
     let b = crate::primitives::make_box(&mut topo, 10.0, 6.0, 10.0).unwrap();
@@ -1121,7 +1121,7 @@ fn sample_solid_edges_boolean_filters_coplanar() {
         &topo,
         fused,
         0.1,
-        brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+        remus_math::chord::DEFAULT_ANGULAR_TOL,
         false,
     )
     .unwrap();
@@ -1368,7 +1368,7 @@ fn test_no_t_junctions_box() {
     let mesh = tessellate_solid(&topo, solid, 0.1).unwrap();
 
     let snap = |v: f64| -> i64 { (v * 1_000_000.0).round() as i64 };
-    let unique: brepkit_math::det_hash::DetHashSet<(i64, i64, i64)> = mesh
+    let unique: remus_math::det_hash::DetHashSet<(i64, i64, i64)> = mesh
         .positions
         .iter()
         .map(|p| (snap(p.x()), snap(p.y()), snap(p.z())))
@@ -1409,7 +1409,7 @@ fn test_tessellate_boolean_result_watertight() {
     crate::transform::transform_solid(
         &mut topo,
         b,
-        &brepkit_math::mat::Mat4::translation(0.5, 0.5, 0.5),
+        &remus_math::mat::Mat4::translation(0.5, 0.5, 0.5),
     )
     .unwrap();
 
@@ -1478,14 +1478,14 @@ fn signed_volume_raw(mesh: &TriangleMesh) -> f64 {
 
 #[test]
 fn reversed_sphere_face_tessellation_correct_winding() {
-    use brepkit_topology::face::Face;
-    use brepkit_topology::shell::Shell;
-    use brepkit_topology::solid::Solid;
+    use remus_topology::face::Face;
+    use remus_topology::shell::Shell;
+    use remus_topology::solid::Solid;
 
     let mut topo = Topology::new();
     let sphere = crate::primitives::make_sphere(&mut topo, 3.0, 32).unwrap();
 
-    let mat = brepkit_math::mat::Mat4::translation(5.0, 5.0, 5.0);
+    let mat = remus_math::mat::Mat4::translation(5.0, 5.0, 5.0);
     crate::transform::transform_solid(&mut topo, sphere, &mat).unwrap();
 
     let mesh_normal = tessellate_solid(&topo, sphere, 0.05).unwrap();
@@ -1539,7 +1539,7 @@ fn boolean_cut_result_has_positive_signed_volume() {
     let mut topo = Topology::new();
     let bx = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
     let sp = crate::primitives::make_sphere(&mut topo, 3.0, 32).unwrap();
-    let mat = brepkit_math::mat::Mat4::translation(5.0, 5.0, 5.0);
+    let mat = remus_math::mat::Mat4::translation(5.0, 5.0, 5.0);
     crate::transform::transform_solid(&mut topo, sp, &mat).unwrap();
 
     let cut_result =
@@ -1599,7 +1599,7 @@ fn tessellate_box_with_hole_from_boolean() {
     crate::transform::transform_solid(
         &mut topo,
         hole,
-        &brepkit_math::mat::Mat4::translation(5.0, 5.0, -1.0),
+        &remus_math::mat::Mat4::translation(5.0, 5.0, -1.0),
     )
     .unwrap();
 
@@ -1647,7 +1647,7 @@ fn fillet_box_triangle_count() {
     let box_mesh = tessellate_solid(&topo, solid, 0.1).unwrap();
     let box_tris = box_mesh.indices.len() / 3;
 
-    let edges = brepkit_topology::explorer::solid_edges(&topo, solid).unwrap();
+    let edges = remus_topology::explorer::solid_edges(&topo, solid).unwrap();
     let filleted = crate::fillet::fillet_rolling_ball(&mut topo, solid, &edges[..1], 1.0);
     if let Ok(filleted_id) = filleted {
         let fillet_mesh = tessellate_solid(&topo, filleted_id, 0.1).unwrap();
@@ -1664,7 +1664,7 @@ fn fillet_box_triangle_count() {
 fn fillet_small_radius_tessellation() {
     let mut topo = Topology::new();
     let solid = crate::primitives::make_box(&mut topo, 20.0, 20.0, 10.0).unwrap();
-    let edges = brepkit_topology::explorer::solid_edges(&topo, solid).unwrap();
+    let edges = remus_topology::explorer::solid_edges(&topo, solid).unwrap();
     let filleted = crate::fillet::fillet_rolling_ball(&mut topo, solid, &edges[..1], 0.5);
     if let Ok(filleted_id) = filleted {
         let mesh = tessellate_solid(&topo, filleted_id, 0.1).unwrap();
@@ -1790,7 +1790,7 @@ fn small_radius_cylinder_watertight_with_angular_tol() {
 fn fillet_cylinder_triangle_count() {
     let mut topo = Topology::new();
     let solid = crate::primitives::make_cylinder(&mut topo, 5.0, 10.0).unwrap();
-    let edges = brepkit_topology::explorer::solid_edges(&topo, solid).unwrap();
+    let edges = remus_topology::explorer::solid_edges(&topo, solid).unwrap();
     let filleted = crate::fillet::fillet_rolling_ball(&mut topo, solid, &edges[..1], 0.5);
     if let Ok(filleted_id) = filleted {
         let mesh = tessellate_solid(&topo, filleted_id, 0.1).unwrap();
@@ -1810,11 +1810,11 @@ fn extrude_ellipse(
     semi_major: f64,
     semi_minor: f64,
     height: f64,
-) -> brepkit_topology::solid::SolidId {
+) -> remus_topology::solid::SolidId {
     let center = Point3::new(0.0, 0.0, 0.0);
     let normal = Vec3::new(0.0, 0.0, 1.0);
     let ellipse =
-        brepkit_math::curves::Ellipse3D::new(center, normal, semi_major, semi_minor).unwrap();
+        remus_math::curves::Ellipse3D::new(center, normal, semi_major, semi_minor).unwrap();
 
     // A single closed edge (start == end) at the major-axis vertex (t = 0).
     let seam = ellipse.evaluate(0.0);
@@ -1944,8 +1944,8 @@ fn quantized_edge_defects(mesh: &TriangleMesh) -> (usize, usize) {
 /// Box(21^3) cut by a through-cylinder(r=3.75) at (6,6): the canonical
 /// boolean-result solid that the wasm `tessellateSolidGrouped` path exported
 /// with T-junctions.
-fn make_box_with_through_hole(topo: &mut Topology) -> brepkit_topology::solid::SolidId {
-    use brepkit_math::mat::Mat4;
+fn make_box_with_through_hole(topo: &mut Topology) -> remus_topology::solid::SolidId {
+    use remus_math::mat::Mat4;
     let bx = crate::primitives::make_box(topo, 21.0, 21.0, 21.0).unwrap();
     let cyl = crate::primitives::make_cylinder(topo, 3.75, 30.0).unwrap();
     crate::transform::transform_solid(topo, cyl, &Mat4::translation(6.0, 6.0, -5.0)).unwrap();
@@ -1963,13 +1963,9 @@ fn grouped_tessellation_watertight_box_cut_cylinder() {
     let solid = make_box_with_through_hole(&mut topo);
 
     // The watertight ungrouped path is the reference: it must pass.
-    let watertight = tessellate_solid_with_tolerance(
-        &topo,
-        solid,
-        0.1,
-        brepkit_math::chord::DEFAULT_ANGULAR_TOL,
-    )
-    .unwrap();
+    let watertight =
+        tessellate_solid_with_tolerance(&topo, solid, 0.1, remus_math::chord::DEFAULT_ANGULAR_TOL)
+            .unwrap();
     let (wb, wn) = quantized_edge_defects(&watertight);
     assert_eq!(
         wb, 0,
@@ -1984,7 +1980,7 @@ fn grouped_tessellation_watertight_box_cut_cylinder() {
         &topo,
         solid,
         0.1,
-        brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+        remus_math::chord::DEFAULT_ANGULAR_TOL,
     )
     .unwrap();
     let (gb, gn) = quantized_edge_defects(&mesh);
@@ -2006,13 +2002,13 @@ fn grouped_tessellation_watertight_box_cut_cylinder() {
 fn grouped_tessellation_offsets_invariants() {
     let mut topo = Topology::new();
     let solid = make_box_with_through_hole(&mut topo);
-    let faces = brepkit_topology::explorer::solid_faces(&topo, solid).unwrap();
+    let faces = remus_topology::explorer::solid_faces(&topo, solid).unwrap();
 
     let (mesh, offsets) = tessellate_solid_grouped_with_tolerance(
         &topo,
         solid,
         0.1,
-        brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+        remus_math::chord::DEFAULT_ANGULAR_TOL,
     )
     .unwrap();
 
@@ -2041,13 +2037,13 @@ fn grouped_tessellation_offsets_invariants() {
 fn grouped_tessellation_triangles_lie_on_their_face() {
     let mut topo = Topology::new();
     let solid = make_box_with_through_hole(&mut topo);
-    let faces = brepkit_topology::explorer::solid_faces(&topo, solid).unwrap();
+    let faces = remus_topology::explorer::solid_faces(&topo, solid).unwrap();
 
     let (mesh, offsets) = tessellate_solid_grouped_with_tolerance(
         &topo,
         solid,
         0.1,
-        brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+        remus_math::chord::DEFAULT_ANGULAR_TOL,
     )
     .unwrap();
 
@@ -2092,9 +2088,9 @@ fn build_prism(
     poly2d: &[(f64, f64)],
     z0: f64,
     z1: f64,
-) -> brepkit_topology::solid::SolidId {
-    use brepkit_topology::shell::Shell;
-    use brepkit_topology::solid::Solid;
+) -> remus_topology::solid::SolidId {
+    use remus_topology::shell::Shell;
+    use remus_topology::solid::Solid;
     let n = poly2d.len();
     let tol = 1e-7;
     let top_v: Vec<_> = poly2d
@@ -2296,8 +2292,8 @@ fn pinched_ledge_prism_is_watertight() {
 /// through its side at mid-height. Equal radii keep the cut analytic: the two
 /// cylinders meet in a pair of plane ellipses, and each becomes an inner wire
 /// on the shaft wall.
-fn cross_drilled_shaft() -> (Topology, brepkit_topology::solid::SolidId) {
-    use brepkit_math::mat::Mat4;
+fn cross_drilled_shaft() -> (Topology, remus_topology::solid::SolidId) {
+    use remus_math::mat::Mat4;
 
     let mut topo = Topology::new();
     let shaft = crate::primitives::make_cylinder(&mut topo, 3.0, 30.0).unwrap();
@@ -2319,8 +2315,8 @@ fn cross_drilled_shaft() -> (Topology, brepkit_topology::solid::SolidId) {
 /// The one cylindrical face of the cut result that carries inner wires.
 fn holed_cylindrical_face(
     topo: &Topology,
-    solid: brepkit_topology::solid::SolidId,
-) -> brepkit_topology::face::FaceId {
+    solid: remus_topology::solid::SolidId,
+) -> remus_topology::face::FaceId {
     let shell = topo
         .shell(topo.solid(solid).unwrap().outer_shell())
         .unwrap();
@@ -2343,7 +2339,7 @@ fn holed_cylindrical_face(
 }
 
 /// Summed triangle area of a face's mesh.
-fn tessellated_area(topo: &Topology, face: brepkit_topology::face::FaceId, deflection: f64) -> f64 {
+fn tessellated_area(topo: &Topology, face: remus_topology::face::FaceId, deflection: f64) -> f64 {
     let mesh = crate::tessellate::tessellate(topo, face, deflection).unwrap();
     mesh.indices
         .chunks_exact(3)

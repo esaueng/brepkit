@@ -2249,7 +2249,7 @@ export class BrepKernel {
     /**
      * Get the orientation of a shape.
      *
-     * Returns `"forward"` for all faces (brepkit faces don't have an
+     * Returns `"forward"` for all faces (remus faces don't have an
      * independent orientation flag; the normal direction is canonical).
      * @param {number} _id
      * @returns {string}
@@ -4026,7 +4026,7 @@ export class BrepKernel {
     /**
      * Offset all faces of a solid outward or inward (V2 pipeline).
      *
-     * Uses the new `brepkit-offset` engine with intersection-based joints.
+     * Uses the new `remus-offset` engine with intersection-based joints.
      *
      * # Errors
      *
@@ -4548,7 +4548,7 @@ export class BrepKernel {
      * and replaying them in a native Rust harness to reproduce
      * sub-ULP-sensitive boolean behavior.
      *
-     * Returns a `Uint8Array` consumable by `brepkit_io::arena_io::deserialize_solid`.
+     * Returns a `Uint8Array` consumable by `remus_io::arena_io::deserialize_solid`.
      *
      * # Errors
      *
@@ -5126,7 +5126,7 @@ export class BrepKernel {
      * Export a solid as a JSON-encoded BREP representation.
      *
      * Returns a JSON string with vertices, edges (with curve parameters),
-     * and faces (with surface parameters). This is a brepkit-specific format
+     * and faces (with surface parameters). This is a remus-specific format
      * that preserves all analytic geometry types.
      * @param {number} solid
      * @returns {any}
@@ -5758,7 +5758,7 @@ export function lastPanicMessage() {
 }
 
 /**
- * Route brepkit's Rust `log::*` calls to JavaScript `console.{log, warn,
+ * Route remus's Rust `log::*` calls to JavaScript `console.{log, warn,
  * error}`. Without this every `log::warn!` in the engine is silently
  * dropped under wasm-pack.
  *
@@ -5805,13 +5805,13 @@ export function __wbg___wbindgen_string_get_b0ca35b86a603356(arg0, arg1) {
 export function __wbg___wbindgen_throw_344f42d3211c4765(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_error_e07dd184a6ea68d9(arg0, arg1) {
+export function __wbg_error_d8bc2a1845895646(arg0, arg1) {
     console.error(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_log_a27d0e78be23f4f0(arg0, arg1) {
+export function __wbg_log_c780db908f563739(arg0, arg1) {
     console.log(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_warn_fab2c6da0dbeb591(arg0, arg1) {
+export function __wbg_warn_8c558bba5026315f(arg0, arg1) {
     console.warn(getStringFromWasm0(arg0, arg1));
 }
 export function __wbindgen_cast_0000000000000001(arg0, arg1) {

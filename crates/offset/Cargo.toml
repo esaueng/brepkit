@@ -1,24 +1,24 @@
 [package]
-description = "Solid offset engine for brepkit"
+description = "Solid offset engine for remus"
 edition.workspace = true
 license.workspace = true
-name = "brepkit-offset"
+name = "remus-offset"
 repository.workspace = true
 rust-version.workspace = true
 version = "0.1.0"
 
 [dependencies]
-brepkit-geometry.workspace = true
-brepkit-math.workspace = true
-brepkit-topology.workspace = true
+remus-geometry.workspace = true
+remus-math.workspace = true
+remus-topology.workspace = true
 
 log.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
-brepkit-check.workspace = true
-brepkit-operations.workspace = true
-brepkit-topology = {workspace = true, features = ["test-utils"]}
+remus-check.workspace = true
+remus-operations.workspace = true
+remus-topology = {workspace = true, features = ["test-utils"]}
 
 [lints]
 workspace = true

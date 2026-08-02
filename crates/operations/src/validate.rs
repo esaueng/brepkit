@@ -2,11 +2,11 @@
 //!
 //! Performs structural and geometric validation on solids.
 
-use brepkit_math::tolerance::Tolerance;
-use brepkit_topology::Topology;
-use brepkit_topology::TopologyError;
-use brepkit_topology::explorer;
-use brepkit_topology::solid::SolidId;
+use remus_math::tolerance::Tolerance;
+use remus_topology::Topology;
+use remus_topology::TopologyError;
+use remus_topology::explorer;
+use remus_topology::solid::SolidId;
 
 /// A validation issue found in a solid.
 #[derive(Debug, Clone)]
@@ -107,13 +107,13 @@ pub fn euler_characteristic(
 /// Returns `true` if every edge in the face is a straight line.
 fn face_all_edges_straight(
     topo: &Topology,
-    face: &brepkit_topology::face::Face,
+    face: &remus_topology::face::Face,
 ) -> Result<bool, TopologyError> {
     for wire_id in std::iter::once(face.outer_wire()).chain(face.inner_wires().iter().copied()) {
         let wire = topo.wire(wire_id)?;
         for oe in wire.edges() {
             let edge = topo.edge(oe.edge())?;
-            if !matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Line) {
+            if !matches!(edge.curve(), remus_topology::edge::EdgeCurve::Line) {
                 return Ok(false);
             }
         }
@@ -250,7 +250,7 @@ pub fn validate_solid_with_options(
         let face_data = topo.face(*fid)?;
         let is_planar = matches!(
             face_data.surface(),
-            brepkit_topology::face::FaceSurface::Plane { .. }
+            remus_topology::face::FaceSurface::Plane { .. }
         );
 
         if is_planar && face_all_edges_straight(topo, face_data)? {
@@ -275,7 +275,7 @@ pub fn validate_solid_with_options(
     };
     for fid in &faces {
         let face = topo.face(*fid)?;
-        if let brepkit_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
+        if let remus_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
             let len = normal.length();
             if !scaled_tol.approx_eq(len, 1.0) {
                 issues.push(ValidationIssue {
@@ -297,7 +297,7 @@ pub fn validate_solid_with_options(
 
         for wire_id in wire_ids {
             let wire = topo.wire(wire_id)?;
-            if let Err(_e) = brepkit_topology::validation::validate_wire_closed(wire, topo) {
+            if let Err(_e) = remus_topology::validation::validate_wire_closed(wire, topo) {
                 issues.push(ValidationIssue {
                     severity: Severity::Error,
                     description: format!(
@@ -322,7 +322,7 @@ pub fn validate_solid_with_options(
         // area formula is only meaningful for planar faces with straight edges.
         if !matches!(
             face.surface(),
-            brepkit_topology::face::FaceSurface::Plane { .. }
+            remus_topology::face::FaceSurface::Plane { .. }
         ) {
             continue;
         }
@@ -539,7 +539,7 @@ pub fn validate_solid_relaxed_with_options(
         let face_data = topo.face(*fid)?;
         let is_planar = matches!(
             face_data.surface(),
-            brepkit_topology::face::FaceSurface::Plane { .. }
+            remus_topology::face::FaceSurface::Plane { .. }
         );
 
         if is_planar && face_all_edges_straight(topo, face_data)? {
@@ -564,7 +564,7 @@ pub fn validate_solid_relaxed_with_options(
     };
     for fid in &faces {
         let face = topo.face(*fid)?;
-        if let brepkit_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
+        if let remus_topology::face::FaceSurface::Plane { normal, .. } = face.surface() {
             let len = normal.length();
             if !scaled_tol.approx_eq(len, 1.0) {
                 issues.push(ValidationIssue {
@@ -590,7 +590,7 @@ pub fn validate_solid_relaxed_with_options(
 
         for wire_id in wire_ids {
             let wire = topo.wire(wire_id)?;
-            if let Err(_e) = brepkit_topology::validation::validate_wire_closed(wire, topo) {
+            if let Err(_e) = remus_topology::validation::validate_wire_closed(wire, topo) {
                 // Demoted to Warning: boolean operations can produce
                 // micro-gaps in wires from edge splitting that don't affect
                 // downstream tessellation or volume. Strict checking would
@@ -613,7 +613,7 @@ pub fn validate_solid_relaxed_with_options(
 
         if !matches!(
             face.surface(),
-            brepkit_topology::face::FaceSurface::Plane { .. }
+            remus_topology::face::FaceSurface::Plane { .. }
         ) {
             continue;
         }
@@ -739,8 +739,8 @@ pub fn validate_solid_relaxed_with_options(
 ///
 /// For a planar polygon with vertices `p0, p1, ..., pN`, the area is
 /// half the magnitude of the sum of cross products `(p[i] - p[0]) × (p[i+1] - p[0])`.
-fn polygon_area_3d(positions: &[brepkit_math::vec::Point3]) -> f64 {
-    use brepkit_math::vec::Vec3;
+fn polygon_area_3d(positions: &[remus_math::vec::Point3]) -> f64 {
+    use remus_math::vec::Vec3;
 
     if positions.len() < 3 {
         return 0.0;

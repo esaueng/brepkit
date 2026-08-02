@@ -13,10 +13,10 @@ pub(in crate::builder) use special_cases::cylinder_cone_remainder_interior;
 
 pub use conversion::collect_wire_points;
 
-use brepkit_math::vec::{Point2, Point3, Vec3};
-use brepkit_topology::Topology;
-use brepkit_topology::edge::EdgeCurve;
-use brepkit_topology::face::{FaceId, FaceSurface};
+use remus_math::vec::{Point2, Point3, Vec3};
+use remus_topology::Topology;
+use remus_topology::edge::EdgeCurve;
+use remus_topology::face::{FaceId, FaceSurface};
 
 use super::classify_2d::{sample_interior_point, signed_area_2d};
 use super::pcurve_compute::{
@@ -615,8 +615,8 @@ fn integrate_holes_plane(
 
     let mk_line =
         |s_uv: Point2, e_uv: Point2, s3: Point3, e3: Point3, fwd: bool, src: Option<usize>| {
-            use brepkit_math::curves2d::{Curve2D, Line2D};
-            use brepkit_math::vec::Vec2;
+            use remus_math::curves2d::{Curve2D, Line2D};
+            use remus_math::vec::Vec2;
             let d = Vec2::new(e_uv.x() - s_uv.x(), e_uv.y() - s_uv.y());
             let len = (d.x() * d.x() + d.y() * d.y()).sqrt();
             let dir = if len > 1e-12 {
@@ -964,7 +964,7 @@ fn split_loop_at_pinch_vertices(
     }
     let qscale = 1.0 / tol.max(1e-12);
     #[allow(clippy::cast_possible_truncation)]
-    let qkey = |p: brepkit_math::vec::Point2| -> (i64, i64) {
+    let qkey = |p: remus_math::vec::Point2| -> (i64, i64) {
         (
             (p.x() * qscale).round() as i64,
             (p.y() * qscale).round() as i64,
@@ -1021,7 +1021,7 @@ fn split_loop_at_pinch_vertices(
 /// would add cost without changing any outcome.
 fn wire_loops_self_cross(loops: &[Vec<OrientedPCurveEdge>], tol: f64) -> bool {
     let qscale = 1.0 / tol.max(1e-12);
-    let qkey = |p: brepkit_math::vec::Point2| -> (i64, i64) {
+    let qkey = |p: remus_math::vec::Point2| -> (i64, i64) {
         (
             (p.x() * qscale).round() as i64,
             (p.y() * qscale).round() as i64,
@@ -1346,8 +1346,8 @@ fn arrangement_regions_from_inputs(
     // section curve pre-split at identical points.
     mut split_registry: Option<&mut std::collections::HashMap<usize, Vec<Point3>>>,
 ) -> Option<Vec<SplitSubFace>> {
-    use brepkit_math::curves2d::{Curve2D, Line2D};
-    use brepkit_math::vec::Vec2;
+    use remus_math::curves2d::{Curve2D, Line2D};
+    use remus_math::vec::Vec2;
 
     // Drop degenerate (zero-length) inputs.
     inputs.retain(|i| (i.a - i.b).length() > tol);
@@ -2350,9 +2350,9 @@ fn split_cylinder_band_by_arrangement(
     use std::collections::HashMap;
     use std::f64::consts::TAU;
 
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::curves2d::{Curve2D, Line2D};
-    use brepkit_math::vec::Vec2;
+    use remus_math::curves::Circle3D;
+    use remus_math::curves2d::{Curve2D, Line2D};
+    use remus_math::vec::Vec2;
 
     // A vertical generator has |Δu| below this; a horizontal ring |Δv| below.
     // Generators have Δu exactly 0 and rings Δv exactly 0, so a straight line
@@ -3296,12 +3296,12 @@ pub fn split_face_2d(
     face_id: FaceId,
     sections: &[SectionEdge],
     rank: Rank,
-    tol: &brepkit_math::tolerance::Tolerance,
+    tol: &remus_math::tolerance::Tolerance,
     frame: Option<&PlaneFrame>,
     info: Option<&SurfaceInfo>,
     edge_images: &std::collections::HashMap<
-        brepkit_topology::edge::EdgeId,
-        Vec<brepkit_topology::edge::EdgeId>,
+        remus_topology::edge::EdgeId,
+        Vec<remus_topology::edge::EdgeId>,
         impl std::hash::BuildHasher,
     >,
     split_registry: Option<&mut std::collections::HashMap<usize, Vec<Point3>>>,
@@ -3425,7 +3425,7 @@ const CAP_INTERIORITY_MARGIN: f64 = 1.05;
 /// Containment tests need the traversal-ordered outline, so they use this.
 fn collect_wire_points_oriented(
     topo: &Topology,
-    wire_id: brepkit_topology::wire::WireId,
+    wire_id: remus_topology::wire::WireId,
 ) -> Vec<Point3> {
     let Ok(wire) = topo.wire(wire_id) else {
         return Vec::new();
@@ -3540,12 +3540,12 @@ fn split_face_2d_impl(
     face_id: FaceId,
     sections: &[SectionEdge],
     rank: Rank,
-    tol: &brepkit_math::tolerance::Tolerance,
+    tol: &remus_math::tolerance::Tolerance,
     frame: Option<&PlaneFrame>,
     info: Option<&SurfaceInfo>,
     edge_images: &std::collections::HashMap<
-        brepkit_topology::edge::EdgeId,
-        Vec<brepkit_topology::edge::EdgeId>,
+        remus_topology::edge::EdgeId,
+        Vec<remus_topology::edge::EdgeId>,
         impl std::hash::BuildHasher,
     >,
     mut split_registry: Option<&mut std::collections::HashMap<usize, Vec<Point3>>>,
@@ -3635,7 +3635,7 @@ fn split_face_2d_impl(
                 }
                 let mut out: Vec<OrientedPCurveEdge> = Vec::new();
                 for oe in wire.edges() {
-                    let pieces: Vec<brepkit_topology::edge::EdgeId> =
+                    let pieces: Vec<remus_topology::edge::EdgeId> =
                         match edge_images.get(&oe.edge()) {
                             Some(imgs) if imgs.len() > 1 => {
                                 let mut v = imgs.clone();
@@ -4380,8 +4380,8 @@ fn split_face_2d_impl(
                     let s0 = frame.project(sct.start);
                     let s1 = frame.project(sct.end);
                     let mk = |su: Point2, eu: Point2, s3: Point3, e3: Point3, fwd: bool| {
-                        use brepkit_math::curves2d::{Curve2D, Line2D};
-                        use brepkit_math::vec::Vec2;
+                        use remus_math::curves2d::{Curve2D, Line2D};
+                        use remus_math::vec::Vec2;
                         let d = Vec2::new(eu.x() - su.x(), eu.y() - su.y());
                         let len = (d.x() * d.x() + d.y() * d.y()).sqrt();
                         let dir = if len > 1e-12 {
@@ -4837,7 +4837,7 @@ fn split_face_2d_impl(
                 // and are kept. Probe nine points along the chord — a
                 // splitter across a concave region keeps interior evidence
                 // at some interior fraction.
-                if !matches!(e.pcurve, brepkit_math::curves2d::Curve2D::Line(_)) {
+                if !matches!(e.pcurve, remus_math::curves2d::Curve2D::Line(_)) {
                     return true;
                 }
                 let (s, t) = (e.start_uv, e.end_uv);
@@ -5625,7 +5625,7 @@ fn split_face_2d_impl(
 /// finds no contained point, the analytic split must abort to mesh rather than
 /// classify the wall from inside the removed region.
 pub fn face_has_curved_lens_holes(topo: &Topology, face_id: FaceId) -> bool {
-    use brepkit_topology::edge::EdgeCurve;
+    use remus_topology::edge::EdgeCurve;
     let Ok(face) = topo.face(face_id) else {
         return false;
     };
@@ -6054,12 +6054,12 @@ fn plane_internal_line_loops(
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
     use super::*;
-    use brepkit_math::curves2d::Line2D;
-    use brepkit_math::vec::Vec2;
-    use brepkit_topology::test_utils::make_unit_square_face;
+    use remus_math::curves2d::Line2D;
+    use remus_math::vec::Vec2;
+    use remus_topology::test_utils::make_unit_square_face;
 
-    fn dummy_pcurve() -> brepkit_math::curves2d::Curve2D {
-        brepkit_math::curves2d::Curve2D::Line(
+    fn dummy_pcurve() -> remus_math::curves2d::Curve2D {
+        remus_math::curves2d::Curve2D::Line(
             Line2D::new(Point2::new(0.0, 0.0), Vec2::new(1.0, 0.0)).unwrap(),
         )
     }
@@ -6113,7 +6113,7 @@ mod tests {
             Point3::new(0.87, 0.315, 0.0),
             Point3::new(1.0, 0.25, 0.0),
         ];
-        let nurbs = brepkit_math::nurbs::fitting::interpolate(&pts, 3).unwrap();
+        let nurbs = remus_math::nurbs::fitting::interpolate(&pts, 3).unwrap();
         let s_arc = SectionEdge {
             curve_3d: EdgeCurve::NurbsCurve(nurbs),
             pcurve_a: dummy_pcurve(),
@@ -6191,8 +6191,8 @@ mod tests {
     /// wire in UV.
     #[test]
     fn cylinder_band_partial_notch_splits_into_comb_and_rectangle() {
-        use brepkit_math::curves::Circle3D;
-        use brepkit_math::surfaces::CylindricalSurface;
+        use remus_math::curves::Circle3D;
+        use remus_math::surfaces::CylindricalSurface;
 
         let cyl =
             CylindricalSurface::new(Point3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 1.0)
@@ -6313,8 +6313,8 @@ mod tests {
     /// function must defer (`None`) and let the greedy path keep the face.
     #[test]
     fn cylinder_band_arrangement_defers_on_non_rectilinear_section() {
-        use brepkit_math::curves::Circle3D;
-        use brepkit_math::surfaces::CylindricalSurface;
+        use remus_math::curves::Circle3D;
+        use remus_math::surfaces::CylindricalSurface;
 
         let cyl =
             CylindricalSurface::new(Point3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 1.0)
@@ -6381,8 +6381,8 @@ mod tests {
     /// while a genuine cap over material is carved into disc + remainder.
     #[test]
     fn distribute_cap_circles_drops_caps_inside_holes() {
-        use brepkit_math::curves::Circle3D;
-        use brepkit_math::curves2d::{Circle2D, Curve2D};
+        use remus_math::curves::Circle3D;
+        use remus_math::curves2d::{Circle2D, Curve2D};
 
         let mut topo = Topology::new();
         let face_id = make_unit_square_face(&mut topo);

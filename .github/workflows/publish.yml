@@ -30,8 +30,8 @@ jobs:
     # `secrets` is not a valid context in a step-level `if`, so surface the
     # app credentials as env vars and branch on those instead.
     env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      APP_ID: ${{ secrets.REMUS_BOT_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.REMUS_BOT_PRIVATE_KEY }}
     outputs:
       release_created: ${{ steps.release.outputs['release_created'] }}
       tag_name: ${{ steps.release.outputs['tag_name'] }}
@@ -71,8 +71,8 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      APP_ID: ${{ secrets.REMUS_BOT_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.REMUS_BOT_PRIVATE_KEY }}
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
@@ -95,7 +95,7 @@ jobs:
 
   # The committed package directory is a real distribution channel, not a
   # build leftover: OpenZCAD installs this repo as
-  #   "brepkit-wasm": "github:esaueng/brepkit#main&path:/crates/wasm/pkg"
+  #   "remus-wasm": "github:esaueng/brepkit#main&path:/crates/wasm/pkg"
   # so npm/pnpm fetches whatever `crates/wasm/pkg` holds on main. Nothing
   # rebuilt it after a merge, so that directory drifted far behind the source
   # (2.126.20 committed vs 2.128.5 in Cargo.toml) and every consumer silently
@@ -119,8 +119,8 @@ jobs:
     permissions:
       contents: write
     env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      APP_ID: ${{ secrets.REMUS_BOT_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.REMUS_BOT_PRIVATE_KEY }}
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
@@ -179,7 +179,7 @@ jobs:
           # Land on top of anything that merged while the build was running.
           git pull --rebase --autostash origin "${GITHUB_REF_NAME}"
           git push origin "HEAD:${GITHUB_REF_NAME}"
-          echo "::notice::Committed brepkit-wasm ${VERSION}; consumers on #main pick it up on the next install."
+          echo "::notice::Committed remus-wasm ${VERSION}; consumers on #main pick it up on the next install."
 
   # Publish triggers on three events:
   # 1. release:created — fired when release-please creates a GitHub release
@@ -233,7 +233,7 @@ jobs:
             echo "::error::Version mismatch: package.json=$PKG_VERSION tag=$TAG_VERSION"
             exit 1
           fi
-          echo "Publishing brepkit-wasm@$PKG_VERSION"
+          echo "Publishing remus-wasm@$PKG_VERSION"
         env:
           TAG_NAME: ${{ github.event.release.tag_name || needs.release-please.outputs.tag_name || format('v{0}', github.event.inputs.publish_version) }}
 
@@ -249,14 +249,14 @@ jobs:
             exit 0
           fi
           PKG_VERSION=$(jq -r .version package.json)
-          if npm view "brepkit-wasm@$PKG_VERSION" version 2>/dev/null; then
-            echo "brepkit-wasm@$PKG_VERSION already published — skipping"
+          if npm view "remus-wasm@$PKG_VERSION" version 2>/dev/null; then
+            echo "remus-wasm@$PKG_VERSION already published — skipping"
             exit 0
           fi
           npm publish --provenance --access public 2>&1 || {
             # Handle race condition: concurrent run published between our check and publish
-            if npm view "brepkit-wasm@$PKG_VERSION" version 2>/dev/null; then
-              echo "brepkit-wasm@$PKG_VERSION published by concurrent run — skipping"
+            if npm view "remus-wasm@$PKG_VERSION" version 2>/dev/null; then
+              echo "remus-wasm@$PKG_VERSION published by concurrent run — skipping"
               exit 0
             fi
             exit 1

@@ -1,10 +1,10 @@
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
 
 use super::*;
-use brepkit_topology::edge::{Edge, EdgeCurve};
-use brepkit_topology::face::Face;
-use brepkit_topology::vertex::Vertex;
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use remus_topology::edge::{Edge, EdgeCurve};
+use remus_topology::face::Face;
+use remus_topology::vertex::Vertex;
+use remus_topology::wire::{OrientedEdge, Wire};
 
 /// Create a spine along a single edge from `a` to `b`, plus two dummy faces.
 fn make_spine(topo: &mut Topology, a: Point3, b: Point3) -> (Spine, FaceId, FaceId) {
@@ -191,7 +191,7 @@ fn non_analytic_returns_none() {
 
     // One NURBS surface — should return None
     let nurbs_surf = FaceSurface::Nurbs(
-        brepkit_math::nurbs::surface::NurbsSurface::new(
+        remus_math::nurbs::surface::NurbsSurface::new(
             1,
             1,
             vec![0.0, 0.0, 1.0, 1.0],
@@ -233,12 +233,12 @@ fn non_analytic_returns_none() {
 /// tessellate the cylinder lateral and yield a polygonal hole.
 #[test]
 fn plane_cylinder_fillet_concave_emits_torus_with_smaller_major() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r_c: f64 = 2.0;
@@ -335,12 +335,12 @@ fn plane_cylinder_fillet_concave_emits_torus_with_smaller_major() {
 /// that configuration is not modelled by a bare disc.)
 #[test]
 fn plane_cylinder_fillet_rim_emits_torus_with_smaller_major() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r_c: f64 = 2.0;
@@ -423,12 +423,12 @@ fn plane_cylinder_fillet_rim_emits_torus_with_smaller_major() {
 /// independently wrong, and that bound is the only thing limiting the reach.
 #[test]
 fn plane_cylinder_fillet_inward_is_bounded_by_the_cylinder_radius() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let r_c: f64 = 2.0;
 
@@ -534,12 +534,12 @@ fn plane_cylinder_fillet_inward_is_bounded_by_the_cylinder_radius() {
 /// plane-cylinder concave coverage.
 #[test]
 fn plane_cone_fillet_concave_emits_torus_with_smaller_major() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     // Apex 6 units above the plate, half-angle α = atan2(6, 3) so the
@@ -628,12 +628,12 @@ fn plane_cone_fillet_concave_emits_torus_with_smaller_major() {
 /// `r ≥ r_p/2`, matching the plane-cylinder bound.
 #[test]
 fn plane_cone_fillet_concave_rejects_spindle_radius() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     // Same cone setup as the previous test.
@@ -726,12 +726,12 @@ fn plane_cone_fillet_concave_rejects_spindle_radius() {
 /// at axial `−d2` along the hole wall going into the plate.
 #[test]
 fn plane_cylinder_chamfer_concave_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r_c: f64 = 2.0;
@@ -843,12 +843,12 @@ fn plane_cylinder_chamfer_concave_emits_cone() {
 ///     z = +r(R − h_signed)/(R + r) ≈ +0.391 (above plate)
 #[test]
 fn plane_sphere_fillet_convex_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r: f64 = 2.0;
@@ -976,12 +976,12 @@ fn plane_sphere_fillet_convex_emits_torus() {
 ///     internal tangency lands on the right portion of sphere)
 #[test]
 fn plane_sphere_fillet_concave_emits_torus_with_smaller_major() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r: f64 = 2.0;
@@ -1102,12 +1102,12 @@ fn plane_sphere_fillet_concave_emits_torus_with_smaller_major() {
 /// must still accept those same radii (its `+2r(R−h)` term grows).
 #[test]
 fn plane_sphere_fillet_concave_rejects_spindle_radius() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r: f64 = 2.0;
@@ -1214,12 +1214,12 @@ fn plane_sphere_fillet_concave_rejects_spindle_radius() {
 ///   - Cone apex at z = (r_p+d1)·tan β ≈ 3.230
 #[test]
 fn plane_sphere_chamfer_convex_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r: f64 = 2.0;
@@ -1349,12 +1349,12 @@ fn plane_sphere_chamfer_convex_emits_cone() {
 ///   - cone β = atan(|z_apex|/(r_p+d)) ≈ 57.8° (same magnitude as convex)
 #[test]
 fn plane_sphere_chamfer_concave_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r: f64 = 2.0;
@@ -1496,12 +1496,12 @@ fn plane_sphere_chamfer_concave_emits_cone() {
 ///     R_t ≈ 2.154
 #[test]
 fn sphere_sphere_fillet_convex_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r1: f64 = 2.0;
@@ -1509,7 +1509,7 @@ fn sphere_sphere_fillet_convex_emits_torus() {
     let big_d: f64 = 3.0;
     let r_fillet: f64 = 0.4;
 
-    // Place spheres along +z (brepkit's `SphericalSurface::new` uses
+    // Place spheres along +z (remus's `SphericalSurface::new` uses
     // Frame3::from_normal with default z-axis = +z, which our
     // axisymmetry guard requires to be aligned with the C1→C2 line).
     // Sphere 1 at origin, sphere 2 at (0, 0, D); spine in the
@@ -1619,12 +1619,12 @@ fn sphere_sphere_fillet_convex_emits_torus() {
 ///                    confirming the internal-tangency reduction)
 #[test]
 fn sphere_sphere_fillet_both_concave_emits_smaller_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r1: f64 = 2.0;
@@ -1734,12 +1734,12 @@ fn sphere_sphere_fillet_both_concave_emits_smaller_torus() {
 /// center). Convex at the same r is still valid.
 #[test]
 fn sphere_sphere_fillet_concave_rejects_collapsing_q() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r: f64 = 2.0;
@@ -1812,12 +1812,12 @@ fn sphere_sphere_fillet_concave_rejects_collapsing_q() {
 /// concave-concave R_t ≈ 1.067, which is what we'd expect.)
 #[test]
 fn sphere_sphere_fillet_mixed_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r1: f64 = 2.0;
@@ -1934,12 +1934,12 @@ fn sphere_sphere_fillet_mixed_emits_torus() {
 ///   - Cone axis = +z (opens upward toward both contacts)
 #[test]
 fn sphere_sphere_chamfer_convex_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r1: f64 = 2.0;
@@ -2053,12 +2053,12 @@ fn sphere_sphere_chamfer_convex_emits_cone() {
 ///   - major = Q_c = 2.4
 #[test]
 fn sphere_cylinder_fillet_convex_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{CylindricalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{CylindricalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -2169,12 +2169,12 @@ fn sphere_cylinder_fillet_convex_emits_torus() {
 ///   - apex z = z_sph − r_sph·Δz/Δr ≈ 5.94 (above contacts)
 #[test]
 fn sphere_cylinder_chamfer_convex_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{CylindricalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{CylindricalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -2287,12 +2287,12 @@ fn sphere_cylinder_chamfer_convex_emits_cone() {
 ///     (BELOW spine, opposite convex)
 #[test]
 fn sphere_sphere_chamfer_both_concave_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r1: f64 = 2.0;
@@ -2396,12 +2396,12 @@ fn sphere_sphere_chamfer_both_concave_emits_cone() {
 /// sign).
 #[test]
 fn sphere_sphere_chamfer_mixed_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::SphericalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::SphericalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let big_r1: f64 = 2.0;
     let big_r2: f64 = 2.5;
@@ -2522,12 +2522,12 @@ fn sphere_sphere_chamfer_mixed_emits_cone() {
 ///   - Apex z ≈ 7.54 (still above contacts, but at different position)
 #[test]
 fn sphere_cylinder_chamfer_both_concave_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{CylindricalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{CylindricalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -2620,12 +2620,12 @@ fn sphere_cylinder_chamfer_both_concave_emits_cone() {
 /// symmetric cases where apex is always above.
 #[test]
 fn sphere_cylinder_chamfer_mixed_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{CylindricalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{CylindricalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -2719,12 +2719,12 @@ fn sphere_cylinder_chamfer_mixed_emits_cone() {
 /// surface ordering. Confirms the swap path is wired correctly.
 #[test]
 fn try_analytic_chamfer_cylinder_sphere_dispatch_swaps_correctly() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{CylindricalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{CylindricalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -2817,12 +2817,12 @@ fn try_analytic_chamfer_cylinder_sphere_dispatch_swaps_correctly() {
 ///   - R_t = (r + (c+h)·cos β)/sin β ≈ 2.642
 #[test]
 fn sphere_cone_fillet_convex_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{ConicalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{ConicalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -2952,12 +2952,12 @@ fn sphere_cone_fillet_convex_emits_torus() {
 ///     the cone region instead of outside).
 #[test]
 fn sphere_cone_fillet_concave_cone_emits_smaller_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{ConicalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{ConicalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -3092,12 +3092,12 @@ fn sphere_cone_fillet_concave_cone_emits_smaller_torus() {
 ///     concave-cone-only 2.219 — confirms BOTH flips compose)
 #[test]
 fn sphere_cone_fillet_both_concave_emits_smaller_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{ConicalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{ConicalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -3231,12 +3231,12 @@ fn sphere_cone_fillet_both_concave_emits_smaller_torus() {
 ///   - Δr ≈ +0.056, Δz ≈ −0.478 ⇒ apex z ≈ 19.86 (well above contacts)
 #[test]
 fn sphere_cone_chamfer_convex_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{ConicalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{ConicalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -3373,12 +3373,12 @@ fn sphere_cone_chamfer_convex_emits_cone() {
 ///     the convex case
 #[test]
 fn sphere_cone_chamfer_both_concave_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{ConicalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{ConicalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -3502,12 +3502,12 @@ fn sphere_cone_chamfer_both_concave_emits_cone() {
 ///     z_cone = spine_z + d·sin β ≈ 2.209 (above spine, toward sphere)
 #[test]
 fn sphere_cone_chamfer_mixed_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{ConicalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{ConicalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -3627,11 +3627,11 @@ fn sphere_cone_chamfer_mixed_emits_cone() {
 ///   - Fillet cylinder axis +z at (1.058, 2.154, *), radius 0.4
 #[test]
 fn cylinder_cylinder_fillet_parallel_axes_emits_cylinder() {
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r1: f64 = 2.0;
@@ -3654,7 +3654,7 @@ fn cylinder_cylinder_fillet_parallel_axes_emits_cylinder() {
     let p_end = Point3::new(x_spine, y_spine, z_hi);
     let v_start = topo.add_vertex(Vertex::new(p_start, 1e-7));
     let v_end = topo.add_vertex(Vertex::new(p_end, 1e-7));
-    let line = brepkit_math::nurbs::curve::NurbsCurve::new(
+    let line = remus_math::nurbs::curve::NurbsCurve::new(
         1,
         vec![0.0, 0.0, 1.0, 1.0],
         vec![p_start, p_end],
@@ -3743,11 +3743,11 @@ fn cylinder_cylinder_fillet_parallel_axes_emits_cylinder() {
 ///     cyl1 axis (different from convex case)
 #[test]
 fn cylinder_cylinder_fillet_both_concave_emits_cylinder() {
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r1: f64 = 2.0;
@@ -3768,7 +3768,7 @@ fn cylinder_cylinder_fillet_both_concave_emits_cylinder() {
     let p_end = Point3::new(x_spine, y_spine, z_hi);
     let v_start = topo.add_vertex(Vertex::new(p_start, 1e-7));
     let v_end = topo.add_vertex(Vertex::new(p_end, 1e-7));
-    let line = brepkit_math::nurbs::curve::NurbsCurve::new(
+    let line = remus_math::nurbs::curve::NurbsCurve::new(
         1,
         vec![0.0, 0.0, 1.0, 1.0],
         vec![p_start, p_end],
@@ -3882,11 +3882,11 @@ fn cylinder_cylinder_fillet_both_concave_emits_cylinder() {
 /// (both `− r`) cases.
 #[test]
 fn cylinder_cylinder_fillet_mixed_emits_cylinder() {
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let r1: f64 = 2.0;
     let r2: f64 = 2.5;
@@ -3909,7 +3909,7 @@ fn cylinder_cylinder_fillet_mixed_emits_cylinder() {
         let p_end = Point3::new(x_spine, y_spine, z_hi);
         let v_start = topo.add_vertex(Vertex::new(p_start, 1e-7));
         let v_end = topo.add_vertex(Vertex::new(p_end, 1e-7));
-        let line = brepkit_math::nurbs::curve::NurbsCurve::new(
+        let line = remus_math::nurbs::curve::NurbsCurve::new(
             1,
             vec![0.0, 0.0, 1.0, 1.0],
             vec![p_start, p_end],
@@ -4030,12 +4030,12 @@ fn cylinder_cylinder_fillet_mixed_emits_cylinder() {
 ///   - R_t ≈ 2.974 (slightly larger than r_spine — fillet outside both cones)
 #[test]
 fn cone_cone_coaxial_fillet_convex_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let beta1: f64 = std::f64::consts::PI / 3.0;
@@ -4174,12 +4174,12 @@ fn cone_cone_coaxial_fillet_convex_emits_torus() {
 /// vanishes when both signs match.
 #[test]
 fn cone_cone_coaxial_fillet_both_concave_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let beta1: f64 = std::f64::consts::PI / 3.0;
@@ -4330,12 +4330,12 @@ fn cone_cone_coaxial_fillet_both_concave_emits_torus() {
 /// internal tangency).
 #[test]
 fn cone_cone_coaxial_fillet_mixed_emits_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let beta1: f64 = std::f64::consts::PI / 3.0;
     let beta2: f64 = std::f64::consts::PI / 4.0;
@@ -4468,11 +4468,11 @@ fn cone_cone_coaxial_fillet_mixed_emits_torus() {
 ///   - Chamfer plane through both contact lines
 #[test]
 fn cylinder_cylinder_chamfer_convex_emits_plane() {
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r1: f64 = 2.0;
@@ -4493,7 +4493,7 @@ fn cylinder_cylinder_chamfer_convex_emits_plane() {
     let p_end = Point3::new(x_spine, y_spine, z_hi);
     let v_start = topo.add_vertex(Vertex::new(p_start, 1e-7));
     let v_end = topo.add_vertex(Vertex::new(p_end, 1e-7));
-    let line = brepkit_math::nurbs::curve::NurbsCurve::new(
+    let line = remus_math::nurbs::curve::NurbsCurve::new(
         1,
         vec![0.0, 0.0, 1.0, 1.0],
         vec![p_start, p_end],
@@ -4585,11 +4585,11 @@ fn cylinder_cylinder_chamfer_convex_emits_plane() {
 /// exercising both the y_sign and s_i flip branches.
 #[test]
 fn cylinder_cylinder_chamfer_both_concave_negative_y_emits_plane() {
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let r1: f64 = 2.0;
@@ -4610,7 +4610,7 @@ fn cylinder_cylinder_chamfer_both_concave_negative_y_emits_plane() {
     let p_end = Point3::new(x_spine, y_spine, z_hi);
     let v_start = topo.add_vertex(Vertex::new(p_start, 1e-7));
     let v_end = topo.add_vertex(Vertex::new(p_end, 1e-7));
-    let line = brepkit_math::nurbs::curve::NurbsCurve::new(
+    let line = remus_math::nurbs::curve::NurbsCurve::new(
         1,
         vec![0.0, 0.0, 1.0, 1.0],
         vec![p_start, p_end],
@@ -4719,11 +4719,11 @@ fn cylinder_cylinder_chamfer_both_concave_negative_y_emits_plane() {
 /// plane (residual against `n · p − d` < tol).
 #[test]
 fn cylinder_cylinder_chamfer_mixed_emits_plane() {
-    use brepkit_math::surfaces::CylindricalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::surfaces::CylindricalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let r1: f64 = 2.0;
     let r2: f64 = 2.5;
@@ -4746,7 +4746,7 @@ fn cylinder_cylinder_chamfer_mixed_emits_plane() {
         let p_end = Point3::new(x_spine, y_spine, z_hi);
         let v_start = topo.add_vertex(Vertex::new(p_start, 1e-7));
         let v_end = topo.add_vertex(Vertex::new(p_end, 1e-7));
-        let line = brepkit_math::nurbs::curve::NurbsCurve::new(
+        let line = remus_math::nurbs::curve::NurbsCurve::new(
             1,
             vec![0.0, 0.0, 1.0, 1.0],
             vec![p_start, p_end],
@@ -4848,12 +4848,12 @@ fn cylinder_cylinder_chamfer_mixed_emits_plane() {
 ///   - chamfer cone apex on axis at line P1−P2 extrapolated to r=0
 #[test]
 fn cone_cone_coaxial_chamfer_convex_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let beta1: f64 = std::f64::consts::PI / 3.0;
@@ -4984,12 +4984,12 @@ fn cone_cone_coaxial_chamfer_convex_emits_cone() {
 /// extending away).
 #[test]
 fn cone_cone_coaxial_chamfer_both_concave_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let beta1: f64 = std::f64::consts::PI / 3.0;
@@ -5134,12 +5134,12 @@ fn cone_cone_coaxial_chamfer_both_concave_emits_cone() {
 /// trivially satisfy via `r = (z − z_apex)·cot β`).
 #[test]
 fn cone_cone_coaxial_chamfer_mixed_emits_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let beta1: f64 = std::f64::consts::PI / 3.0;
     let beta2: f64 = std::f64::consts::PI / 4.0;
@@ -5277,12 +5277,12 @@ fn cone_cone_coaxial_chamfer_mixed_emits_cone() {
 ///     confirms internal-tangency reduction.
 #[test]
 fn sphere_cylinder_fillet_both_concave_emits_smaller_torus() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::{CylindricalSurface, SphericalSurface};
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::{CylindricalSurface, SphericalSurface};
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let big_r_s: f64 = 3.0;
@@ -5420,12 +5420,12 @@ fn sphere_cylinder_fillet_both_concave_emits_smaller_torus() {
 ///   cone-side contact at radius r_p + d2·cos α ≈ 4.707, z = −d2·sin α ≈ −0.707
 #[test]
 fn plane_cone_chamfer_concave_emits_chamfer_cone() {
-    use brepkit_math::curves::Circle3D;
-    use brepkit_math::surfaces::ConicalSurface;
-    use brepkit_topology::edge::{Edge, EdgeCurve};
-    use brepkit_topology::face::Face;
-    use brepkit_topology::vertex::Vertex;
-    use brepkit_topology::wire::{OrientedEdge, Wire};
+    use remus_math::curves::Circle3D;
+    use remus_math::surfaces::ConicalSurface;
+    use remus_topology::edge::{Edge, EdgeCurve};
+    use remus_topology::face::Face;
+    use remus_topology::vertex::Vertex;
+    use remus_topology::wire::{OrientedEdge, Wire};
 
     let mut topo = Topology::new();
     let alpha: f64 = std::f64::consts::FRAC_PI_4;

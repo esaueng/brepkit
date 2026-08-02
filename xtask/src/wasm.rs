@@ -1,4 +1,4 @@
-use anyhow::{bail, Context, Result};
+use anyhow::{Context, Result, bail};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -53,8 +53,12 @@ fn run_cmd_output(cmd: &mut Command) -> Result<String> {
 }
 
 fn command_exists(name: &str) -> bool {
-    // Use `which` — standard on Linux/macOS where WASM builds run.
-    Command::new("which")
+    #[cfg(windows)]
+    let locator = "where.exe";
+    #[cfg(not(windows))]
+    let locator = "which";
+
+    Command::new(locator)
         .arg(name)
         .output()
         .is_ok_and(|o| o.status.success())
@@ -78,9 +82,7 @@ pub fn check_tools() -> Result<()> {
 
     // wasm-bindgen-cli version check
     if command_exists("wasm-bindgen") {
-        let version = run_cmd_output(
-            Command::new("wasm-bindgen").arg("--version"),
-        )?;
+        let version = run_cmd_output(Command::new("wasm-bindgen").arg("--version"))?;
         // Output is like "wasm-bindgen 0.2.126"
         let installed = version.split_whitespace().last().unwrap_or("");
         if installed != WASM_BINDGEN_VERSION {
@@ -119,7 +121,14 @@ pub fn build_both_targets(simd: bool) -> Result<()> {
     println!("\nBuilding WASM (bundler target)...");
     run_cmd(
         Command::new("wasm-pack")
-            .args(["build", "--target", "bundler", "--release", "--out-dir", "pkg"])
+            .args([
+                "build",
+                "--target",
+                "bundler",
+                "--release",
+                "--out-dir",
+                "pkg",
+            ])
             .current_dir(&wasm_crate)
             .env("RUSTFLAGS", &rustflags),
     )
@@ -128,7 +137,14 @@ pub fn build_both_targets(simd: bool) -> Result<()> {
     println!("\nBuilding WASM (nodejs target)...");
     run_cmd(
         Command::new("wasm-pack")
-            .args(["build", "--target", "nodejs", "--release", "--out-dir", "pkg-node"])
+            .args([
+                "build",
+                "--target",
+                "nodejs",
+                "--release",
+                "--out-dir",
+                "pkg-node",
+            ])
             .current_dir(&wasm_crate)
             .env("RUSTFLAGS", &rustflags),
     )
@@ -144,7 +160,7 @@ pub fn run_wasm_opt() -> Result<()> {
         return Ok(());
     }
 
-    let wasm_file = pkg_dir()?.join("brepkit_wasm_bg.wasm");
+    let wasm_file = pkg_dir()?.join("remus_wasm_bg.wasm");
     if !wasm_file.exists() {
         bail!("WASM file not found: {}", wasm_file.display());
     }
@@ -207,8 +223,8 @@ fn merge_at(pkg: &Path, pkg_node: &Path) -> Result<()> {
 
     // Copy nodejs entry point, renamed to .cjs so Node treats it as CommonJS
     // even when package.json has "type": "module" (set by bundler target).
-    let node_src = pkg_node.join("brepkit_wasm.js");
-    let node_dst = pkg.join("brepkit_wasm_node.cjs");
+    let node_src = pkg_node.join("remus_wasm.js");
+    let node_dst = pkg.join("remus_wasm_node.cjs");
     fs::copy(&node_src, &node_dst).with_context(|| {
         format!(
             "copying nodejs entry: {} -> {}",
@@ -244,19 +260,19 @@ fn patch_package_json(pkg_json: &mut serde_json::Value) -> Result<()> {
         .as_object_mut()
         .context("package.json is not an object")?;
 
-    obj.insert("name".into(), serde_json::json!("brepkit-wasm"));
-    obj.insert("main".into(), serde_json::json!("brepkit_wasm_node.cjs"));
-    obj.insert("module".into(), serde_json::json!("brepkit_wasm.js"));
+    obj.insert("name".into(), serde_json::json!("remus-wasm"));
+    obj.insert("main".into(), serde_json::json!("remus_wasm_node.cjs"));
+    obj.insert("module".into(), serde_json::json!("remus_wasm.js"));
 
     obj.insert(
         "exports".into(),
         serde_json::json!({
             ".": {
-                "node": "./brepkit_wasm_node.cjs",
-                "import": "./brepkit_wasm.js",
-                "default": "./brepkit_wasm.js"
+                "node": "./remus_wasm_node.cjs",
+                "import": "./remus_wasm.js",
+                "default": "./remus_wasm.js"
             },
-            "./brepkit_wasm_bg.wasm": "./brepkit_wasm_bg.wasm"
+            "./remus_wasm_bg.wasm": "./remus_wasm_bg.wasm"
         }),
     );
 
@@ -267,7 +283,7 @@ fn patch_package_json(pkg_json: &mut serde_json::Value) -> Result<()> {
         .as_array_mut()
         .context("package.json files is not an array")?;
 
-    for entry in ["brepkit_wasm_node.cjs", "LICENSE-MIT", "LICENSE-APACHE"] {
+    for entry in ["remus_wasm_node.cjs", "LICENSE-MIT", "LICENSE-APACHE"] {
         let entry = serde_json::json!(entry);
         if !files.contains(&entry) {
             files.push(entry);
@@ -290,10 +306,10 @@ fn validate_at(pkg: &Path) -> Result<()> {
 
     // 1. Required files exist
     let required_files = [
-        "brepkit_wasm_bg.wasm",
-        "brepkit_wasm.js",
-        "brepkit_wasm_node.cjs",
-        "brepkit_wasm.d.ts",
+        "remus_wasm_bg.wasm",
+        "remus_wasm.js",
+        "remus_wasm_node.cjs",
+        "remus_wasm.d.ts",
         "package.json",
         "LICENSE-MIT",
         "LICENSE-APACHE",
@@ -308,7 +324,7 @@ fn validate_at(pkg: &Path) -> Result<()> {
     }
 
     // 2. WASM binary size
-    let wasm_path = pkg.join("brepkit_wasm_bg.wasm");
+    let wasm_path = pkg.join("remus_wasm_bg.wasm");
     if wasm_path.exists() {
         let size = fs::metadata(&wasm_path)?.len();
         if size < MIN_WASM_SIZE {
@@ -325,7 +341,7 @@ fn validate_at(pkg: &Path) -> Result<()> {
     }
 
     // 3. Type completeness
-    let dts_path = pkg.join("brepkit_wasm.d.ts");
+    let dts_path = pkg.join("remus_wasm.d.ts");
     if dts_path.exists() {
         let dts = fs::read_to_string(&dts_path)?;
         if !dts.contains("export class BrepKernel") {
@@ -390,16 +406,18 @@ fn validate_package_json(pkg_json: &serde_json::Value, errors: &mut Vec<String>)
     let get_str = |key: &str| pkg_json.get(key).and_then(|v| v.as_str()).unwrap_or("");
 
     let name = get_str("name");
-    if name != "brepkit-wasm" {
-        errors.push(format!("package.json name is '{name}', expected 'brepkit-wasm'"));
+    if name != "remus-wasm" {
+        errors.push(format!(
+            "package.json name is '{name}', expected 'remus-wasm'"
+        ));
     } else {
         println!("  ok name: {name}");
     }
 
     let main = get_str("main");
-    if main != "brepkit_wasm_node.cjs" {
+    if main != "remus_wasm_node.cjs" {
         errors.push(format!(
-            "package.json main is '{main}', expected 'brepkit_wasm_node.cjs'"
+            "package.json main is '{main}', expected 'remus_wasm_node.cjs'"
         ));
     } else {
         println!("  ok main: {main}");
@@ -421,7 +439,7 @@ fn validate_package_json(pkg_json: &serde_json::Value, errors: &mut Vec<String>)
     }
 
     if let Some(files) = pkg_json.get("files").and_then(|v| v.as_array()) {
-        for required in ["brepkit_wasm_node.cjs", "LICENSE-MIT", "LICENSE-APACHE"] {
+        for required in ["remus_wasm_node.cjs", "LICENSE-MIT", "LICENSE-APACHE"] {
             if !files.iter().any(|v| v.as_str() == Some(required)) {
                 errors.push(format!("files array missing '{required}'"));
             } else {
@@ -452,8 +470,8 @@ pub fn run_smoke_test() -> Result<()> {
 pub fn publish(dry_run: bool) -> Result<()> {
     let pkg = pkg_dir()?;
 
-    let tag_name = std::env::var("TAG_NAME")
-        .context("TAG_NAME env var not set — required for publish")?;
+    let tag_name =
+        std::env::var("TAG_NAME").context("TAG_NAME env var not set — required for publish")?;
     let tag_version = tag_name.strip_prefix('v').unwrap_or(&tag_name);
 
     let pkg_json: serde_json::Value = serde_json::from_str(
@@ -469,7 +487,7 @@ pub fn publish(dry_run: bool) -> Result<()> {
         bail!("Version mismatch: package.json={pkg_version}, tag={tag_version}");
     }
 
-    println!("\nPublishing brepkit-wasm@{pkg_version}...");
+    println!("\nPublishing remus-wasm@{pkg_version}...");
 
     let mut cmd = Command::new("npm");
     cmd.args(["publish", "--provenance", "--access", "public"]);
@@ -483,7 +501,7 @@ pub fn publish(dry_run: bool) -> Result<()> {
     if dry_run {
         println!("  Dry run complete (nothing published)");
     } else {
-        println!("  Published brepkit-wasm@{pkg_version}");
+        println!("  Published remus-wasm@{pkg_version}");
     }
 
     Ok(())
@@ -518,33 +536,33 @@ mod tests {
         let mut pkg = json!({
             "name": "wasm-pack-default",
             "version": "0.5.3",
-            "files": ["brepkit_wasm_bg.wasm", "brepkit_wasm.js", "brepkit_wasm.d.ts"],
-            "module": "brepkit_wasm.js",
-            "types": "brepkit_wasm.d.ts",
+            "files": ["remus_wasm_bg.wasm", "remus_wasm.js", "remus_wasm.d.ts"],
+            "module": "remus_wasm.js",
+            "types": "remus_wasm.d.ts",
             "sideEffects": ["./snippets/*"]
         });
 
         patch_package_json(&mut pkg).unwrap();
 
-        assert_eq!(pkg["name"], "brepkit-wasm");
-        assert_eq!(pkg["main"], "brepkit_wasm_node.cjs");
-        assert_eq!(pkg["module"], "brepkit_wasm.js");
-        assert_eq!(pkg["exports"]["."]["node"], "./brepkit_wasm_node.cjs");
-        assert_eq!(pkg["exports"]["."]["import"], "./brepkit_wasm.js");
-        assert_eq!(pkg["exports"]["."]["default"], "./brepkit_wasm.js");
+        assert_eq!(pkg["name"], "remus-wasm");
+        assert_eq!(pkg["main"], "remus_wasm_node.cjs");
+        assert_eq!(pkg["module"], "remus_wasm.js");
+        assert_eq!(pkg["exports"]["."]["node"], "./remus_wasm_node.cjs");
+        assert_eq!(pkg["exports"]["."]["import"], "./remus_wasm.js");
+        assert_eq!(pkg["exports"]["."]["default"], "./remus_wasm.js");
 
         let files = pkg["files"].as_array().unwrap();
-        assert!(files.contains(&json!("brepkit_wasm_node.cjs")));
+        assert!(files.contains(&json!("remus_wasm_node.cjs")));
         assert!(files.contains(&json!("LICENSE-MIT")));
         assert!(files.contains(&json!("LICENSE-APACHE")));
         // Original files preserved
-        assert!(files.contains(&json!("brepkit_wasm_bg.wasm")));
+        assert!(files.contains(&json!("remus_wasm_bg.wasm")));
     }
 
     #[test]
     fn patch_does_not_duplicate_node_entry() {
         let mut pkg = json!({
-            "files": ["brepkit_wasm_node.cjs", "other.js"]
+            "files": ["remus_wasm_node.cjs", "other.js"]
         });
 
         patch_package_json(&mut pkg).unwrap();
@@ -560,7 +578,7 @@ mod tests {
 
         let files = pkg["files"].as_array().unwrap();
         assert_eq!(files.len(), 3);
-        assert_eq!(files[0], "brepkit_wasm_node.cjs");
+        assert_eq!(files[0], "remus_wasm_node.cjs");
     }
 
     // -- validate_package_json tests --------------------------------------
@@ -569,9 +587,9 @@ mod tests {
     fn validate_detects_wrong_name() {
         let pkg = json!({
             "name": "wrong-name",
-            "main": "brepkit_wasm_node.cjs",
+            "main": "remus_wasm_node.cjs",
             "exports": { ".": { "node": "x", "import": "x", "default": "x" } },
-            "files": ["brepkit_wasm_node.cjs"]
+            "files": ["remus_wasm_node.cjs"]
         });
         let mut errors = Vec::new();
         validate_package_json(&pkg, &mut errors);
@@ -582,9 +600,9 @@ mod tests {
     #[test]
     fn validate_detects_missing_exports() {
         let pkg = json!({
-            "name": "brepkit-wasm",
-            "main": "brepkit_wasm_node.cjs",
-            "files": ["brepkit_wasm_node.cjs"]
+            "name": "remus-wasm",
+            "main": "remus_wasm_node.cjs",
+            "files": ["remus_wasm_node.cjs"]
         });
         let mut errors = Vec::new();
         validate_package_json(&pkg, &mut errors);
@@ -597,7 +615,7 @@ mod tests {
         let mut pkg = json!({
             "name": "wasm-pack-default",
             "version": "0.5.3",
-            "files": ["brepkit_wasm_bg.wasm"]
+            "files": ["remus_wasm_bg.wasm"]
         });
         patch_package_json(&mut pkg).unwrap();
 
@@ -648,10 +666,10 @@ export class BrepKernel {
 
         // Create mock package.json (as wasm-pack would generate)
         let initial = json!({
-            "name": "brepkit-wasm",
+            "name": "remus-wasm",
             "version": "0.5.3",
-            "files": ["brepkit_wasm_bg.wasm", "brepkit_wasm.js", "brepkit_wasm.d.ts"],
-            "module": "brepkit_wasm.js"
+            "files": ["remus_wasm_bg.wasm", "remus_wasm.js", "remus_wasm.d.ts"],
+            "module": "remus_wasm.js"
         });
         fs::write(
             pkg.join("package.json"),
@@ -660,13 +678,13 @@ export class BrepKernel {
         .unwrap();
 
         // Create mock nodejs entry
-        fs::write(pkg_node.join("brepkit_wasm.js"), "// node CJS entry").unwrap();
+        fs::write(pkg_node.join("remus_wasm.js"), "// node CJS entry").unwrap();
 
         merge_at(&pkg, &pkg_node).unwrap();
 
         // .cjs file was created
-        assert!(pkg.join("brepkit_wasm_node.cjs").exists());
-        let content = fs::read_to_string(pkg.join("brepkit_wasm_node.cjs")).unwrap();
+        assert!(pkg.join("remus_wasm_node.cjs").exists());
+        let content = fs::read_to_string(pkg.join("remus_wasm_node.cjs")).unwrap();
         assert_eq!(content, "// node CJS entry");
 
         // pkg-node was cleaned up
@@ -675,9 +693,9 @@ export class BrepKernel {
         // package.json was patched
         let result: serde_json::Value =
             serde_json::from_str(&fs::read_to_string(pkg.join("package.json")).unwrap()).unwrap();
-        assert_eq!(result["name"], "brepkit-wasm");
-        assert_eq!(result["main"], "brepkit_wasm_node.cjs");
-        assert_eq!(result["exports"]["."]["node"], "./brepkit_wasm_node.cjs");
+        assert_eq!(result["name"], "remus-wasm");
+        assert_eq!(result["main"], "remus_wasm_node.cjs");
+        assert_eq!(result["exports"]["."]["node"], "./remus_wasm_node.cjs");
     }
 
     #[test]

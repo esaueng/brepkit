@@ -11,7 +11,7 @@
 ```bash
 # Clone the repository
 git clone https://github.com/esaueng/brepkit.git
-cd brepkit
+cd remus
 
 # Build all Rust crates
 cargo build --workspace
@@ -20,17 +20,17 @@ cargo build --workspace
 cargo test --workspace
 
 # Build WASM target
-cargo build -p brepkit-wasm --target wasm32-unknown-unknown
+cargo build -p remus-wasm --target wasm32-unknown-unknown
 ```
 
 ## Using from TypeScript
 
 ```bash
-npm install brepkit-wasm
+npm install remus-wasm
 ```
 
 ```typescript
-import init, { BrepKernel } from 'brepkit-wasm';
+import init, { BrepKernel } from 'remus-wasm';
 
 await init();
 const kernel = new BrepKernel();
