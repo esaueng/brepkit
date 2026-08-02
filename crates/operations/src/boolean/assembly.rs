@@ -20,7 +20,7 @@ use brepkit_topology::wire::{OrientedEdge, Wire, WireId};
 
 use super::classify::polygon_centroid;
 use super::face_polygon;
-use super::types::{FaceSpec, MIN_SOLID_FACES};
+use super::types::{FaceSpec, MIN_CURVED_SOLID_FACES, MIN_SOLID_FACES};
 
 /// Quantize a coordinate to a spatial hash key.
 #[inline]
@@ -971,10 +971,24 @@ pub(super) fn validate_boolean_result_lenient(
     let shell = topo.shell(s.outer_shell())?;
     let face_count = shell.faces().len();
 
-    if face_count < MIN_SOLID_FACES {
+    // A shell made only of planar patches needs `MIN_SOLID_FACES` to close;
+    // one carrying a curved patch can close with fewer (brepkit's sphere is
+    // two spherical patches glued along the equator). See
+    // `MIN_CURVED_SOLID_FACES`.
+    let all_planar = shell.faces().iter().all(|&fid| {
+        topo.face(fid)
+            .is_ok_and(|f| matches!(f.surface(), brepkit_topology::face::FaceSurface::Plane { .. }))
+    });
+    let min_faces = if all_planar {
+        MIN_SOLID_FACES
+    } else {
+        MIN_CURVED_SOLID_FACES
+    };
+
+    if face_count < min_faces {
         return Err(crate::OperationsError::InvalidInput {
             reason: format!(
-                "boolean result has only {face_count} faces (minimum {MIN_SOLID_FACES} required for a closed solid)"
+                "boolean result has only {face_count} faces (minimum {min_faces} required for a closed solid)"
             ),
         });
     }
