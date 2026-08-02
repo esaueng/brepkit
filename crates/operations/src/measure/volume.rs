@@ -2438,7 +2438,12 @@ pub fn solid_volume_from_faces(
         let b = Vec3::new(pts[1].x(), pts[1].y(), pts[1].z());
         let c = Vec3::new(pts[2].x(), pts[2].y(), pts[2].z());
 
-        total += a.dot(b.cross(c));
+        // Enumerating the cavity shells is not enough on its own: a cavity's
+        // faces are stored REVERSED, and the wire winding alone does not say
+        // so. Without this the void's tetrahedra add instead of subtract and a
+        // hollow triangulated body reads as the outer body PLUS the void.
+        let orientation = if face.is_reversed() { -1.0 } else { 1.0 };
+        total += orientation * a.dot(b.cross(c));
     }
 
     if all_planar_triangles {
@@ -2484,6 +2489,12 @@ pub fn mass_properties(
 /// `centroid += signed_vol * (a + b + c)`, then divides by
 /// `4 * total_volume`.
 ///
+/// Cavity shells count. Their faces are stored reversed, so `tessellate`
+/// flips their winding and their signed tetrahedra subtract both the void's
+/// volume and its first moment — which is what makes the result the composite
+/// centroid `(V_out*c_out - V_void*c_void) / (V_out - V_void)` rather than the
+/// outer body's own.
+///
 /// # Errors
 ///
 /// Returns an error if the solid has zero volume or tessellation fails.
@@ -2500,15 +2511,15 @@ pub fn solid_center_of_mass(
 
     // tessellate() already handles face reversal (flips winding),
     // so signed tetrahedra sum is correct without winding heuristics.
-    let solid_data = topo.solid(solid)?;
-    let shell = topo.shell(solid_data.outer_shell())?;
+    // Outer shell plus every cavity shell.
+    let faces = brepkit_topology::explorer::solid_faces(topo, solid)?;
 
     let mut total_vol: f64 = 0.0;
     let mut cx = 0.0;
     let mut cy = 0.0;
     let mut cz = 0.0;
 
-    for &fid in shell.faces() {
+    for fid in faces {
         let mesh = tessellate::tessellate(topo, fid, deflection)?;
         let idx = &mesh.indices;
         let pos = &mesh.positions;
@@ -2550,6 +2561,10 @@ pub fn solid_center_of_mass(
 
 /// Compute center of mass directly from face vertex positions for
 /// solids composed entirely of planar triangular faces.
+///
+/// Enumerates outer shell plus every cavity shell, and applies each face's
+/// stored reversal to the tetrahedron sign, so a void subtracts its volume AND
+/// its first moment.
 fn center_of_mass_from_faces(
     topo: &Topology,
     solid: SolidId,
@@ -2557,15 +2572,14 @@ fn center_of_mass_from_faces(
     use brepkit_topology::edge::EdgeCurve;
     use brepkit_topology::face::FaceSurface;
 
-    let solid_data = topo.solid(solid)?;
-    let shell = topo.shell(solid_data.outer_shell())?;
+    let faces = brepkit_topology::explorer::solid_faces(topo, solid)?;
 
     let mut total_vol = 0.0;
     let mut cx = 0.0;
     let mut cy = 0.0;
     let mut cz = 0.0;
 
-    for &fid in shell.faces() {
+    for fid in faces {
         let face = topo.face(fid)?;
         if !matches!(face.surface(), FaceSurface::Plane { .. }) {
             return Err(crate::OperationsError::InvalidInput {
@@ -2600,7 +2614,11 @@ fn center_of_mass_from_faces(
         let b = Vec3::new(pts[1].x(), pts[1].y(), pts[1].z());
         let c = Vec3::new(pts[2].x(), pts[2].y(), pts[2].z());
 
-        let signed_vol = a.dot(b.cross(c));
+        // A face carried reversed points its wire the other way round, so its
+        // tetrahedra count with the opposite sign. Cavity shells are stored
+        // exactly that way.
+        let orientation = if face.is_reversed() { -1.0 } else { 1.0 };
+        let signed_vol = orientation * a.dot(b.cross(c));
         total_vol += signed_vol;
         cx += signed_vol * (pts[0].x() + pts[1].x() + pts[2].x());
         cy += signed_vol * (pts[0].y() + pts[1].y() + pts[2].y());
