@@ -789,15 +789,24 @@ fn glyph_side_walls_are_exact_nurbs_not_faceted() {
 
 /// Ready-repro for a defect this work uncovered but did not fix.
 ///
-/// Extruding a face with an inner wire produces a shell in which the eight
-/// edges shared between the caps and the hole walls (four at each cap) are
-/// traversed in the SAME direction by both adjacent faces, where a closed
-/// oriented shell requires opposite directions. `validate_solid` reports it
-/// as `ShellOrientationConsistent`.
+/// Extruding a face with an inner wire produces a shell in which edges shared
+/// between two adjacent faces are traversed in the SAME direction by both,
+/// where a closed oriented shell requires opposite directions.
+/// `validate_solid` reports it as `ShellOrientationConsistent`.
 ///
-/// The result is nonetheless watertight, correctly classified, and of the
-/// right volume — the geometry is right and the orientation bookkeeping is
-/// not. It is pre-existing and has nothing to do with the hole-attaching
+/// The defect is wider than the cap↔hole-wall seams alone: this annulus
+/// reports 8 inconsistent shared edges (four at each cap), but the 'O' glyph,
+/// which has the same four hole walls, reports 16 — so the vertical
+/// hole-wall↔hole-wall edges are inconsistent too. Alongside it,
+/// `validate_solid` raises one `FaceOrientationConsistency` warning per
+/// hole wall (`dot = −1.000`), which is what [`assert_solid`] allow-lists
+/// and counts.
+///
+/// The result is nonetheless watertight and of the right volume — the
+/// geometry is right and the orientation bookkeeping is not. It is NOT
+/// correctly classified everywhere: see
+/// `o_glyph_bezier_cap_band_is_misclassified`, which the flipped hole-wall
+/// normals are the leading suspect for. It is pre-existing and has nothing to do with the hole-attaching
 /// bindings: `brepkit_operations::extrude` reproduces it on a face built
 /// directly from `brepkit_topology::builder`, with no wasm in the picture.
 /// It matters for consumers that read orientation rather than re-derive it
