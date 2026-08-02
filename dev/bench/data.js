@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785651168101,
+  "lastUpdate": 1785658037665,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3995,6 +3995,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 23045242,
             "range": "± 691105",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e1129c6262a8860648350d0cd7c4dd4120730c62",
+          "message": "Three measurement defects: a blind centroid, an undetectable inversion, and a folded band (#64)\n\n* fix(operations): start a closed rim's polyline at the edge's own vertex\n\n`tessellate_solid` tessellates each edge once and hands the same polyline\nto every face that touches it, so faces meet on identical vertices. For a\nCLOSED circle (or ellipse) edge that polyline was sampled from the curve's\nintrinsic parameter origin, `t = 0` — wherever the underlying `Circle3D`\nhappens to start, which after a transform or a boolean is unrelated to\nwhere the edge's own seam vertex sits.\n\nThe face boundary walk that consumes the polyline enters the rim through\nthat vertex, from the seam edge. When the polyline does not begin there,\nthe walk jumps by the angle between the two — and on a periodic surface\n`tessellate_nonplanar_cdt` unwraps the jump into an extra turn. Measured\non a boss fused across a plate wall: the boss wall splits into a tab and a\nfull ring, the ring's lower rim is three arcs meeting a seam, and the walk\nreported a `u` span of 2.5 turns for a band that is one turn around. The\nCDT tiled that sheared domain and the triangles folded back over the\ncylinder — 36.7 % extra area on the band, 34 mm3 of extra enclosed volume,\n+0.3125 % on the whole body as the deflection tightened.\n\nNothing caught it because the folded mesh is still closed and 2-manifold:\nit is a watertight surface that simply encloses space twice. The exact\nper-face integral (`mass_properties`) had the body right to 6e-15\nthroughout, so the two routes disagreed by 0.30 % and only the meshed one\nwas wrong.\n\nSampling the same TAU from the start vertex's parameter fixes it. The\nsample count is unchanged; the phase moves so the seam vertex is sample\nzero. Two knock-on effects, both improvements:\n\n* The three golden meshes lose two vertices each (one per rim) — the\n  seam vertex used to be an extra, near-duplicate point beside the ring.\n  Triangle counts, volumes, bounding boxes and centroids are unchanged.\n\n* `cut_cylinder_by_cylinder` stood on an internal tangency (axis at\n  `x = 2`, `2 + 3 = 5`), where `A - B` is a crescent pinched to zero width\n  along the whole tangent line and has no manifold answer. It used to\n  return a body of 1003.27 because the two tessellations happened not to\n  share a vertex on the tangent line; they do now, and the boolean\n  correctly refuses. The case moved to the containment it was always\n  measuring, and now asserts the closed form exactly.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(operations): weigh a cavity when measuring a centre of mass\n\nbrepkit#61 widened five VOLUME paths from `solid.outer_shell()` to\n`explorer::solid_faces`, so a body hollowed by a cavity stopped reading at\nits un-hollowed volume. It deliberately left `solid_center_of_mass` and its\nall-planar-triangle fast path `center_of_mass_from_faces` carrying the\nidentical blindness.\n\nThat combination is worse than the original defect: a hollowed body now\nreports the RIGHT volume and the WRONG centroid, and the correct volume is\nexactly what makes the body look checked. A 20^3 blank with a 6^3 void in\none corner reported its centroid at the blank's own centre — 6.9e-3 of the\nbody's diagonal from the composite\n\n    (V_outer*c_outer - V_void*c_void) / (V_outer - V_void)\n\nidentically at 1x, 1000x and 0.001x.\n\nBoth paths now enumerate `solid_faces`. The from-faces paths additionally\nhave to honour `face.is_reversed()`: enumerating the cavity shell is not\nsufficient on its own, because a cavity's faces are stored reversed and the\nwire winding alone does not say so. Without it the void's tetrahedra ADD —\n`solid_volume_from_faces`, which #61 widened but did not re-sign, read a\ntriangulated 20^3 blank with a 6^3 void as 8216 against 7784, +5.5 %. That\nis fixed here too, since the same models exercise it.\n\nThe new tests put the void deliberately OFF-CENTRE. A concentric cavity\nleaves the centroid unmoved and passes with the defect fully intact; it is\nin the sweep only as the control that says so. Both models are all-planar,\nso both routes are exact before and after and there is no mesh residual to\nhide in. Topology is asserted directly (every edge used once in each\ndirection over outer and cavity shells) rather than through\n`validate::validate_solid`, whose Euler check takes no account of inner\nshells and calls every hollow body invalid — a separate, pre-existing gap.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(operations): make an inside-out solid detectable\n\n`measure::solid_volume` returns the MAGNITUDE of its integral, so an\ninverted solid reports the same positive number its correctly-wound twin\nwould. brepkit#59's segmented revolve built exactly such bodies — closed,\n2-manifold, consistently wound, `validate_solid`-clean, and measured at\ntheir right volume — and nothing in the kernel could say so. Only a signed\nMESH volume saw it, which is why #59 needed one as its oracle.\n\nThe magnitude turns out NOT to be a contract any caller depends on. It is\nthe opposite: four production call sites had already written the guard they\nwanted, each under the same comment — \"A shell can pass the structural\nchecks and still be turned inside out\" — and each testing\n`solid_volume(..) <= 0.0`:\n\n    operations/src/defeature.rs:153\n    operations/src/draft.rs:257\n    operations/src/split.rs:289   (per half)\n    operations/src/chamfer.rs:826\n\nNot one of them could ever fire. They were dead code guarding the exact\nfailure they were written for.\n\n`solid_volume`'s sign convention is left alone all the same — it is what\n`kernel.volume` returns to the app, and a volume is a positive quantity —\nand the inversion is made detectable instead:\n\n* `measure::solid_is_inverted` asks the question directly.\n* `validate::validate_solid` reports it as an error. That is what makes the\n  four guards live: every one of them runs `validate_solid` first and bails\n  on any error, so they now refuse an inside-out result without any change\n  at those sites. It also reaches JS unchanged, since `validateSolid`\n  returns the error count.\n\nThe check is two statements, one per shell role: the outer shell must\nenclose a positive signed volume, and every cavity shell a negative one — a\ncavity wound outward adds its void to the body instead of removing it, the\nsame class of defect as the reversal `solid_volume_from_faces` was ignoring.\nBoth are silent when the answer cannot be established rather than guessing.\n\nThe threshold below which a signed volume says nothing is a fraction of the\nmodel's own bounding-box diagonal CUBED, not an absolute figure: a volume is\nL^3, and an absolute floor would call a 0.001x model inverted and a 1000x one\nflat.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n* fix(operations): stop the boolean paying for a check it only logs, and pin\nthe fuse cliff the reported body stands on\n\nTwo things, both found by CI on the branch.\n\n## The orientation check cost a boolean 2x\n\n`boolean/cut_cylinder_through_box` went from 693 us to 1.376 ms. Attributed\nby reverting each commit alone and benchmarking: the orientation check owns\nall of it (710 us with it reverted; 1.299 ms and 1.347 ms with the other two\nreverted, i.e. no effect).\n\nIt is one face. On that body `integrate_face` costs 898 us at Gauss order 5\non the single trimmed cylinder against under 3.6 us on each of six planes —\na 250x gap, 45 % of the whole boolean, for a report that\n`boolean/assembly.rs` only LOGS.\n\n`ValidationOptions::orientation` now says what the check may spend, and that\none site turns it down to Gauss order 1 rather than off: a sign needs far\nless accuracy than a mass property, since the verdict only has to clear\n`diag^3 * 1e-9`. 828 us, 1.19x, coverage kept. The DEFAULT stays strict —\n`defeature`, `draft`, `split`, `chamfer` and `validateSolid` reaching the app\nall act on the report, and weakening the default is the wrong direction on a\ncheck that already passes a body carrying 251 mm2 of interior wall.\n\n`a_coarse_order_reaches_the_same_verdict_and_skip_reaches_none` pins the\nassumption underneath: order 1 and order 5 must agree on every model,\nupright and inverted, at every scale.\n\n## `Fuse` stops trimming the tool wall at d >= R/2\n\nCI's arm64 runner failed the reported-body case on mesh watertightness. The\nmesh was not the problem and the sliver framing this file inherited from\n`regress_boss_crossing_a_wall` was wrong — I repeated it without checking.\n\nPast half the radius the fuse never splits the boss wall against the plate:\n\n    d = 0.499 R -> 11 faces, tab 125.6637 + ring 376.9911\n    d = 0.501 R -> 10 faces, ONE face of 753.9822 = 2*pi*R*H\n\nThe whole wall, buried portion included, so the body carries\n`(2 pi - 2 acos(d/R)) R * PLATE_Z` of interior sheet — measured excess\n251.465964 against that closed form's 251.466023. A cliff, not a gradient,\ntracking the RATIO across radii sharing no factors. Pre-existing: identical\non this branch's base.\n\n`validate_solid` calls that body valid and BOTH volume routes return the\nexact closed form on it. Mesh watertightness is its only witness, which is\nwhy the closure assertion was not relaxed.\n\nThe seating OpenZCAD reports on stands exactly on the cliff. Which side a\nplatform lands on is decided by rounding — x86_64 splits at 1x and does NOT\nat 1000x, where it produces 3033 free edges, the same count arm64 reports at\n1x. Not an architecture story; reachable natively by changing scale.\n\nSo `the_reported_body_measures_its_closed_form` asserts BOTH sides in closed\nform, branching on an observable fact (how many cylindrical faces the fuse\nproduced) rather than a tolerance, and sweeps 1000x and 1x so both branches\nrun on one machine. The un-split branch pins the whole-wall area, the\ninterior-sheet excess and that the mesh is NOT watertight, so a fix to the\nfuse simply stops that branch being taken.\n`the_fuse_stops_trimming_the_tool_wall_at_half_the_radius` pins the cliff\nacross four radii.\n\nThe file's header now says what a reader needs: on whichever platform lands\non the un-split side, that case does not exercise this PR's fix at all —\nthere is no split rim on that body. The <= 0.4 R sweep and the\n`tessellate::tests` unit test are what pin it everywhere.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_015ERHr2EBswj2UpGki3pvZy\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-02T03:04:37-05:00",
+          "tree_id": "e8f45ddd50b50fdb8d2d9004d812bd369df5c183",
+          "url": "https://github.com/esaueng/brepkit/commit/e1129c6262a8860648350d0cd7c4dd4120730c62"
+        },
+        "date": 1785658036686,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 868028,
+            "range": "± 7410",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 953108,
+            "range": "± 2299",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12854,
+            "range": "± 39",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 867963,
+            "range": "± 6854",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22605803,
+            "range": "± 1206345",
             "unit": "ns/iter"
           }
         ]
