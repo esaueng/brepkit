@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785648398369,
+  "lastUpdate": 1785651168101,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -3941,6 +3941,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22832825,
             "range": "± 30485",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "46fbcc750c815856f96b89fc404bdb25632faee6",
+          "message": "fix(sphere): a disjoint cut is an identity; offsetting a sphere emits geometry (#65)\n\n* wip: sphere cut identity\n\n* wip2: offset fix + tests\n\n* wip3: final tests\n\n* wip4: disjoint-cut identity, revert min-face relaxation, drop scratch\n\n* style: satisfy fmt and clippy gates\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-02T01:10:16-05:00",
+          "tree_id": "5e48ca6c94cab7cde32e9917194034f72a272029",
+          "url": "https://github.com/esaueng/brepkit/commit/46fbcc750c815856f96b89fc404bdb25632faee6"
+        },
+        "date": 1785651167011,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 881391,
+            "range": "± 957",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 973689,
+            "range": "± 579",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14272,
+            "range": "± 117",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 705462,
+            "range": "± 2670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 23045242,
+            "range": "± 691105",
             "unit": "ns/iter"
           }
         ]
