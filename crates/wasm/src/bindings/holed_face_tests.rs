@@ -17,9 +17,16 @@
 //! hole as outside the material — volume alone cannot distinguish a real
 //! through-hole from one merely subtracted from the integral.
 //!
-//! `validate_solid` is asserted narrowly rather than in full: see
-//! [`assert_solid`] and `extruded_annulus_shell_orientation_is_inconsistent`
-//! for the pre-existing extrude defect that stops it being clean today.
+//! `validate_solid` is asserted against an explicit allow-list of the two
+//! pre-existing extrude orientation defects, at every severity rather than
+//! errors only: see [`assert_solid`],
+//! `extruded_annulus_shell_orientation_is_inconsistent` and
+//! `o_glyph_bezier_cap_band_is_misclassified`.
+//!
+//! The classification probes are placed where the answer is derivable by
+//! hand from the profile definition, and only where the kernel currently
+//! gets it right; the band where it does not is an `#[ignore]` ready-repro
+//! rather than an assertion of the wrong answer.
 //!
 //! Every kernel call goes through `execute_batch`: `JsError` cannot be
 //! constructed on non-wasm targets, so the `#[wasm_bindgen]` methods are
@@ -346,19 +353,32 @@ fn extrude_holed_face(outer: &Loop, holes: &[Loop], api: FaceApi, depth: f64) ->
 /// material and `outside_probes` (points in the holes, and outside the
 /// body) as void.
 ///
-/// `validate_solid` is run too, but its result is asserted narrowly: any
-/// error it reports must be `ShellOrientationConsistent`. Extruding a holed
-/// face has always produced a shell whose cap↔hole-wall shared edges are
-/// traversed the same way by both faces, and it still does — this is a
-/// pre-existing extrude defect, reproducible with no wasm in the picture
-/// (see `extruded_annulus_shell_orientation_is_inconsistent`). Asserting
-/// "no OTHER kind of error" catches a regression without failing the day
-/// that defect is fixed.
+/// The coarser of the two mesh densities [`assert_solid`] measures volume at.
+/// Must stay below `bbox_diag × 5e-5` for every solid tested here, or
+/// `volume_tessellation_deflection` clamps both densities to the same mesh
+/// and the convergence check becomes vacuous.
+const VOLUME_DEFLECTION_COARSE: f64 = 5e-4;
+
+/// The finer of the two — see [`VOLUME_DEFLECTION_COARSE`].
+const VOLUME_DEFLECTION_FINE: f64 = 1e-4;
+
+/// `validate_solid` is run too, and asserted against an explicit allow-list
+/// covering EVERY severity, not just `Error`. Extruding a holed face has
+/// always produced (a) one `ShellOrientationConsistent` error, because the
+/// cap↔hole-wall shared edges are traversed the same way by both faces, and
+/// (b) one `FaceOrientationConsistency` warning per hole-wall face, whose
+/// normal opposes its wire winding. Both are pre-existing extrude defects,
+/// reproducible with no wasm in the picture (see
+/// `extruded_annulus_shell_orientation_is_inconsistent`). `hole_walls` is
+/// how many of the warnings are expected — asserting the exact count means a
+/// regression that flips one MORE face inside out still fails the test,
+/// which an "ignore all warnings" filter would not.
 #[allow(clippy::too_many_arguments)]
 fn assert_solid(
     k: &mut BrepKernel,
     solid: u32,
     expected_faces: usize,
+    hole_walls: usize,
     expected_volume: f64,
     rel_tol: f64,
     deflection: f64,
@@ -401,13 +421,38 @@ fn assert_solid(
     let unexpected: Vec<_> = report
         .issues
         .iter()
-        .filter(|i| i.severity == brepkit_check::validate::Severity::Error)
-        .filter(|i| i.check != CheckId::ShellOrientationConsistent)
+        .filter(|i| {
+            !matches!(
+                i.check,
+                CheckId::ShellOrientationConsistent | CheckId::FaceOrientationConsistency
+            )
+        })
         .collect();
     assert!(
         unexpected.is_empty(),
-        "validate_solid reported errors beyond the known shell-orientation \
-         defect: {unexpected:?}"
+        "validate_solid reported issues beyond the two known extrude orientation \
+         defects: {unexpected:?}"
+    );
+    let shell_errors = report
+        .issues
+        .iter()
+        .filter(|i| i.check == CheckId::ShellOrientationConsistent)
+        .count();
+    assert_eq!(
+        shell_errors, 1,
+        "expected exactly the one known shell-orientation error, got {shell_errors}: {:?}",
+        report.issues
+    );
+    let flipped_faces = report
+        .issues
+        .iter()
+        .filter(|i| i.check == CheckId::FaceOrientationConsistency)
+        .count();
+    assert_eq!(
+        flipped_faces, hole_walls,
+        "expected one FaceOrientationConsistency warning per hole wall ({hole_walls}), \
+         got {flipped_faces} — a face outside the hole walls has been flipped: {:?}",
+        report.issues
     );
 
     let faces = brepkit_topology::explorer::solid_faces(&k.topo, solid_id).unwrap();
@@ -418,18 +463,48 @@ fn assert_solid(
          rather than swept exactly"
     );
 
-    let vol = run_all_ok(
-        k,
-        &[op(
-            "volume",
-            serde_json::json!({"solid": solid, "deflection": deflection}),
-        )],
-    );
-    let v = vol[0].as_f64().unwrap();
-    let err = (v - expected_volume).abs() / expected_volume.abs();
+    // Volume is measured at TWO mesh densities. A single measurement cannot
+    // distinguish "correct" from "wrong but inside the band at this one
+    // density"; geometry that is actually broken drifts as the mesh refines
+    // instead of converging on the oracle. Measured here, the glyph goes
+    // from 3.3e-4 relative error to 6.8e-5 — convergence, not drift.
+    //
+    // Both densities must be below the clamp `solid_volume` applies:
+    // `volume_tessellation_deflection` caps the requested deflection at
+    // `bbox_diag × 5e-5`, which is ~1.4e-3 for the annulus and ~1.0e-3 for
+    // the glyph. A pair derived from the caller's (preview-tuned)
+    // `deflection` would land above the cap and collapse to the SAME mesh,
+    // making the comparison vacuous, so the pair is fixed rather than
+    // derived (see the two constants above).
+    let measure_volume = |k: &mut BrepKernel, defl: f64| -> f64 {
+        run_all_ok(
+            k,
+            &[op(
+                "volume",
+                serde_json::json!({"solid": solid, "deflection": defl}),
+            )],
+        )[0]
+        .as_f64()
+        .unwrap()
+    };
+    let v = measure_volume(k, VOLUME_DEFLECTION_COARSE);
+    let v_fine = measure_volume(k, VOLUME_DEFLECTION_FINE);
+    for (label, measured) in [("coarse", v), ("fine", v_fine)] {
+        let err = (measured - expected_volume).abs() / expected_volume.abs();
+        assert!(
+            err < rel_tol,
+            "{label} volume {measured} vs expected {expected_volume} \
+             (relative error {err:.3e} > {rel_tol:.3e})"
+        );
+    }
+    // Refinement must not move the answer away from the oracle.
+    let coarse_err = (v - expected_volume).abs();
+    let fine_err = (v_fine - expected_volume).abs();
     assert!(
-        err < rel_tol,
-        "volume {v} vs expected {expected_volume} (relative error {err:.3e} > {rel_tol:.3e})"
+        fine_err <= coarse_err.mul_add(1.0, 1e-9),
+        "volume diverges under refinement: {v} at deflection \
+         {VOLUME_DEFLECTION_COARSE} but {v_fine} at {VOLUME_DEFLECTION_FINE} \
+         (oracle {expected_volume}) — the signature of bad geometry"
     );
 
     // Volume alone cannot tell a solid with a real through-hole from one
@@ -486,6 +561,7 @@ fn annulus_from_wires_extrudes_to_a_watertight_tube() {
         &mut k,
         solid,
         10,
+        4,
         expected_volume,
         1e-9,
         0.05,
@@ -508,6 +584,7 @@ fn annulus_via_add_holes_to_face_matches_make_face_from_wires() {
         &mut k,
         solid,
         10,
+        4,
         expected_volume,
         1e-9,
         0.05,
@@ -550,6 +627,7 @@ fn annulus_with_two_disjoint_holes_extrudes_cleanly() {
         &mut k,
         solid,
         14,
+        8,
         expected_volume,
         1e-9,
         0.05,
@@ -576,18 +654,83 @@ fn o_glyph_contour_mixing_lines_and_beziers_extrudes_to_a_valid_solid() {
     // 4 outer walls (2 planar, 2 ruled NURBS) + 4 hole walls + 2 caps.
     // The caps are chorded by tessellation, so volume is checked at a
     // relative tolerance rather than exactly.
+    //
+    // Every probe below is on the x = 0 axis, where both contours are bounded
+    // by their straight sides: material for 3 < |y| < 6, void for |y| < 3.
+    // Probes in the bezier-cap band (|x| > 2) are deliberately absent — the
+    // classifier answers them wrongly today, see
+    // `o_glyph_bezier_cap_band_is_misclassified`.
     assert_solid(
         &mut k,
         solid,
         10,
+        4,
         expected_volume,
         2e-3,
         0.005,
-        // In the wall of the 'O', above and beside the counter.
-        &[(0.0, 4.5, 1.5), (3.0, 0.0, 1.5)],
+        // In the wall of the 'O', above and below the counter.
+        &[(0.0, 4.5, 1.5), (0.0, -4.5, 1.5)],
         // In the counter, and clear of the glyph.
         &[(0.0, 0.0, 1.5), (0.0, 20.0, 1.5)],
     );
+}
+
+/// Ready-repro for a second defect this work uncovered but did not fix.
+///
+/// Along `y = 0` the 'O' is bounded by the two bezier caps, and both
+/// contours' caps are computable by hand: the hole's right cap is the cubic
+/// `P0=(2,3) P1=(5,3) P2=(5,−3) P3=(2,−3)`, which at `t = 0.5` reaches
+/// `x = (2 + 3·5 + 3·5 + 2)/8 = 4.25`; the outer's reaches `7.75` the same
+/// way. So at `y = 0` the void is `|x| < 4.25` and the material ring is
+/// `4.25 < |x| < 7.75`. The solid classifies the opposite way round, and
+/// then scrambles further out: sweeping `x` at `y = 0, z = 1.5` gives
+/// Inside at 2.0–4.0 (all void), Outside at 4.5–6.0 (all material), then
+/// Inside at 6.5, Outside at 7.0, Inside at 7.5.
+///
+/// This is NOT caught by any other rung of the ladder: the same solid is
+/// watertight, has exactly 10 faces, and matches the independent shoelace
+/// volume oracle to 7e-5. The four `FaceOrientationConsistency` warnings
+/// that [`assert_solid`] allow-lists — hole-wall normals at `dot = −1.000` —
+/// are the strongest lead on the cause, and are plausibly the same root
+/// cause as `extruded_annulus_shell_orientation_is_inconsistent`.
+///
+/// Acceptance target for the eventual fix: this test passes unmodified.
+#[test]
+#[ignore = "open: extruded bezier-cap walls classify inverted along y = 0"]
+fn o_glyph_bezier_cap_band_is_misclassified() {
+    let (k, solid) = extrude_holed_face(
+        &capsule(4.0, 6.0, 5.0, true),
+        &[capsule(2.0, 3.0, 3.0, false)],
+        FaceApi::FromWires,
+        3.0,
+    );
+    let solid_id = k.resolve_solid(solid).unwrap();
+    let options = brepkit_check::classify::ClassifyOptions::default();
+    let classify = |x: f64| {
+        brepkit_check::classify::classify_point(
+            &k.topo,
+            solid_id,
+            brepkit_math::vec::Point3::new(x, 0.0, 1.5),
+            &options,
+        )
+        .unwrap()
+    };
+    // Inside the counter — the hole reaches x = 4.25 at y = 0.
+    for x in [2.5, 3.0, 3.5, 4.0] {
+        assert_eq!(
+            classify(x),
+            brepkit_check::classify::PointClassification::Outside,
+            "({x}, 0, 1.5) is inside the counter and must classify Outside"
+        );
+    }
+    // In the material ring, 4.25 < x < 7.75.
+    for x in [4.5, 5.0, 6.0, 7.0] {
+        assert_eq!(
+            classify(x),
+            brepkit_check::classify::PointClassification::Inside,
+            "({x}, 0, 1.5) is in the material ring and must classify Inside"
+        );
+    }
 }
 
 #[test]
@@ -602,6 +745,7 @@ fn o_glyph_contour_via_add_holes_to_face_matches_make_face_from_wires() {
         &mut k,
         solid,
         10,
+        4,
         expected_volume,
         2e-3,
         0.005,
@@ -722,6 +866,40 @@ fn build_wire(k: &mut BrepKernel, l: &Loop, closed: bool) -> u32 {
 }
 
 #[test]
+fn make_wire_rejects_a_non_boolean_closed_argument() {
+    // `as_bool().unwrap_or(true)` used to turn each of these into a wire
+    // flagged CLOSED — the opposite of what the caller asked for — and
+    // `Wire::new` performs no closure validation, so nothing downstream
+    // would have noticed except, by luck, `validate_hole_wires`.
+    let mut k = BrepKernel::new();
+    let mut ops = Vec::new();
+    square(10.0, true).build_ops(&mut ops);
+    let edges = run_all_ok(&mut k, &ops);
+    let handles: Vec<u32> = edges.iter().map(as_u32).collect();
+    for bad in [
+        serde_json::json!(0),
+        serde_json::json!("false"),
+        serde_json::json!([]),
+    ] {
+        let msg = run_expect_last_error(
+            &mut k,
+            &[op(
+                "makeWire",
+                serde_json::json!({"edges": handles, "closed": bad}),
+            )],
+        );
+        assert!(msg.contains("'closed'"), "message for {bad} was: {msg}");
+    }
+    // An absent `closed` still means closed.
+    let r = run_all_ok(
+        &mut k,
+        &[op("makeWire", serde_json::json!({"edges": handles}))],
+    );
+    let wid = k.resolve_wire(as_u32(&r[0])).unwrap();
+    assert!(k.topo.wire(wid).unwrap().is_closed());
+}
+
+#[test]
 fn open_hole_wire_is_rejected() {
     let (mut k, outer_wire) = kernel_with_outer_square(10.0);
     // Three sides of a square: a path, not a loop.
@@ -838,6 +1016,180 @@ fn hole_wire_straddling_the_outer_boundary_is_rejected() {
     assert!(msg.contains("not contained"), "message was: {msg}");
 }
 
+/// A concave, non-self-intersecting 'U' outer contour opening upward, CCW.
+/// Area 400 − 12 × 16 = 208. The notch is x ∈ (−6, 6), y > −6.
+fn u_shaped_outer() -> Loop {
+    Loop {
+        start: (-10.0, -10.0),
+        segs: vec![
+            Seg::Line(10.0, -10.0),
+            Seg::Line(10.0, 10.0),
+            Seg::Line(6.0, 10.0),
+            Seg::Line(6.0, -6.0),
+            Seg::Line(-6.0, -6.0),
+            Seg::Line(-6.0, 10.0),
+            Seg::Line(-10.0, 10.0),
+            Seg::Line(-10.0, -10.0),
+        ],
+        z: 0.0,
+    }
+}
+
+#[test]
+fn a_hole_crossing_a_concave_outer_boundary_is_rejected() {
+    // Point containment alone accepts this: all four corners of the bar sit
+    // inside the two arms of the 'U', and only its middle is out in the
+    // notch. Before the edge-crossing test was added, `makeFaceFromWires`
+    // returned ok and the extruded result was not watertight (24 boundary
+    // edges) with volume 352 where the material is 600. Concave outers are
+    // the norm for the glyph case this API exists to serve, and every other
+    // containment test here uses a convex square — where a straddling hole
+    // necessarily puts a corner outside, so the point test alone suffices.
+    let mut k = BrepKernel::new();
+    let outer_wire = build_wire(&mut k, &u_shaped_outer(), true);
+    let bar = Loop {
+        start: (-8.0, 0.0),
+        segs: vec![
+            Seg::Line(-8.0, 2.0),
+            Seg::Line(8.0, 2.0),
+            Seg::Line(8.0, 0.0),
+            Seg::Line(-8.0, 0.0),
+        ],
+        z: 0.0,
+    };
+    let hole_wire = build_wire(&mut k, &bar, true);
+    let msg = run_expect_last_error(
+        &mut k,
+        &[op(
+            "makeFaceFromWires",
+            serde_json::json!({"outerWire": outer_wire, "innerWires": [hole_wire]}),
+        )],
+    );
+    assert!(
+        msg.contains("crosses the outer boundary"),
+        "message was: {msg}"
+    );
+}
+
+#[test]
+fn a_hole_wholly_inside_a_concave_outer_wire_is_still_accepted() {
+    // Guard against the crossing test over-rejecting: a hole inside one arm
+    // of the 'U' is legitimate and must pass.
+    let mut k = BrepKernel::new();
+    let outer_wire = build_wire(&mut k, &u_shaped_outer(), true);
+    let in_arm = Loop {
+        start: (-9.0, 0.0),
+        segs: vec![
+            Seg::Line(-9.0, 4.0),
+            Seg::Line(-7.0, 4.0),
+            Seg::Line(-7.0, 0.0),
+            Seg::Line(-9.0, 0.0),
+        ],
+        z: 0.0,
+    };
+    let hole_wire = build_wire(&mut k, &in_arm, true);
+    let r = run_all_ok(
+        &mut k,
+        &[op(
+            "makeFaceFromWires",
+            serde_json::json!({"outerWire": outer_wire, "innerWires": [hole_wire]}),
+        )],
+    );
+    assert!(r[0].as_u64().is_some());
+}
+
+#[test]
+fn a_self_intersecting_hole_wire_is_rejected() {
+    // A bowtie: topologically closed, coplanar, distinct from the outer wire
+    // and with all four vertices strictly inside it, so every other check
+    // passes it. With one hole the hole-vs-hole overlap pass never runs —
+    // that check is loop-vs-loop, never loop-vs-itself. Before the
+    // self-crossing test, this built a face and extruded to a shell with 16
+    // boundary edges.
+    let (mut k, outer_wire) = kernel_with_outer_square(10.0);
+    let bowtie = Loop {
+        start: (-5.0, -5.0),
+        segs: vec![
+            Seg::Line(5.0, 5.0),
+            Seg::Line(5.0, -5.0),
+            Seg::Line(-5.0, 5.0),
+            Seg::Line(-5.0, -5.0),
+        ],
+        z: 0.0,
+    };
+    let hole_wire = build_wire(&mut k, &bowtie, true);
+    let msg = run_expect_last_error(
+        &mut k,
+        &[op(
+            "makeFaceFromWires",
+            serde_json::json!({"outerWire": outer_wire, "innerWires": [hole_wire]}),
+        )],
+    );
+    assert!(
+        msg.contains("hole wire 0") && msg.contains("crosses itself"),
+        "message was: {msg}"
+    );
+}
+
+#[test]
+fn a_self_intersecting_outer_wire_is_rejected() {
+    let mut k = BrepKernel::new();
+    let bowtie = Loop {
+        start: (-10.0, -10.0),
+        segs: vec![
+            Seg::Line(10.0, 10.0),
+            Seg::Line(10.0, -10.0),
+            Seg::Line(-10.0, 10.0),
+            Seg::Line(-10.0, -10.0),
+        ],
+        z: 0.0,
+    };
+    let outer_wire = build_wire(&mut k, &bowtie, true);
+    let hole_wire = build_wire(&mut k, &square(2.0, false), true);
+    let msg = run_expect_last_error(
+        &mut k,
+        &[op(
+            "makeFaceFromWires",
+            serde_json::json!({"outerWire": outer_wire, "innerWires": [hole_wire]}),
+        )],
+    );
+    assert!(
+        msg.contains("outer wire") && msg.contains("crosses itself"),
+        "message was: {msg}"
+    );
+}
+
+#[test]
+fn a_curved_hole_edge_bulging_out_of_the_outer_wire_is_rejected() {
+    // This is what pins `OPEN_CURVE_SAMPLES` above 1. The bezier runs from
+    // (5, −5) to (5, 5) — both endpoints comfortably inside the half-10
+    // outer square — with controls at x = 25, so it reaches x = 20 at
+    // t = 0.5. Sampled only at its endpoints, the hole outlines as a plain
+    // 10×10 square and is accepted; sampled at interior parameters, the
+    // excursion is seen. Neither the point test nor the crossing test can
+    // find an escape the outline never represents.
+    let (mut k, outer_wire) = kernel_with_outer_square(10.0);
+    let bulging = Loop {
+        start: (5.0, -5.0),
+        segs: vec![
+            Seg::Cubic(25.0, -5.0, 25.0, 5.0, 5.0, 5.0),
+            Seg::Line(-5.0, 5.0),
+            Seg::Line(-5.0, -5.0),
+            Seg::Line(5.0, -5.0),
+        ],
+        z: 0.0,
+    };
+    let hole_wire = build_wire(&mut k, &bulging, true);
+    let msg = run_expect_last_error(
+        &mut k,
+        &[op(
+            "makeFaceFromWires",
+            serde_json::json!({"outerWire": outer_wire, "innerWires": [hole_wire]}),
+        )],
+    );
+    assert!(msg.contains("not contained"), "message was: {msg}");
+}
+
 #[test]
 fn the_outer_wire_cannot_be_its_own_hole() {
     let (mut k, outer_wire) = kernel_with_outer_square(10.0);
@@ -848,7 +1200,12 @@ fn the_outer_wire_cannot_be_its_own_hole() {
             serde_json::json!({"outerWire": outer_wire, "innerWires": [outer_wire]}),
         )],
     );
-    assert!(msg.contains("outer wire"), "message was: {msg}");
+    // The distinguishing phrase, not the bare token "outer wire", which
+    // "the outer wire is not planar" would also satisfy.
+    assert!(
+        msg.contains("is the face's own outer wire"),
+        "message was: {msg}"
+    );
 }
 
 #[test]
@@ -939,6 +1296,38 @@ fn adding_a_hole_that_duplicates_an_existing_one_is_rejected() {
 }
 
 #[test]
+fn adding_a_hole_that_geometrically_overlaps_an_existing_one_is_rejected() {
+    // The DISTINCT-wire case. `adding_a_hole_that_duplicates_an_existing_one`
+    // above passes the same handle back, which the cheap identity check
+    // catches before any geometry runs — so without this test the whole
+    // new-hole-vs-existing-hole comparison could be deleted and the suite
+    // would stay green. Here the second wire is a different wire nested
+    // inside the first, which only the geometric pass can see.
+    let (mut k, outer_wire) = kernel_with_outer_square(10.0);
+    let existing = build_wire(&mut k, &square(6.0, false), true);
+    let faces = run_all_ok(
+        &mut k,
+        &[op(
+            "makeFaceFromWires",
+            serde_json::json!({"outerWire": outer_wire, "innerWires": [existing]}),
+        )],
+    );
+    let face = as_u32(&faces[0]);
+    let nested = build_wire(&mut k, &square(3.0, false), true);
+    let msg = run_expect_last_error(
+        &mut k,
+        &[op(
+            "addHolesToFace",
+            serde_json::json!({"face": face, "holeWires": [nested]}),
+        )],
+    );
+    assert!(
+        msg.contains("overlaps an existing inner wire"),
+        "message was: {msg}"
+    );
+}
+
+#[test]
 fn add_holes_to_face_rejects_an_invalid_wire_handle() {
     let (mut k, outer_wire) = kernel_with_outer_square(10.0);
     let faces = run_all_ok(
@@ -956,7 +1345,10 @@ fn add_holes_to_face_rejects_an_invalid_wire_handle() {
             serde_json::json!({"face": face, "holeWires": [9999]}),
         )],
     );
-    assert!(msg.contains("wire"), "message was: {msg}");
+    // The distinguishing phrase: a bare "wire" is shared by nearly every
+    // error this API can emit, so it would not tell a bad handle from a
+    // handle that resolved to some unrelated wire and failed a later check.
+    assert!(msg.contains("invalid wire handle"), "message was: {msg}");
 }
 
 #[test]
