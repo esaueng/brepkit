@@ -48,28 +48,11 @@ pub(super) const CDT_CHORD_THRESHOLD: usize = 5;
 /// without pulling in nearby-but-off-chord polygon vertices.
 pub(super) const CDT_SNAP_FACTOR: f64 = 100.0;
 
-/// Minimum face count for a valid solid whose shell is entirely planar.
+/// Minimum face count for a valid solid.
 ///
 /// A cylinder (2 caps + 1 barrel = 3 faces) is the minimal closed solid
 /// produced by boolean operations between boxes and curved primitives.
 pub(super) const MIN_SOLID_FACES: usize = 3;
-
-/// Minimum face count for a valid solid whose shell carries a curved face.
-///
-/// A face count is only a proxy for "can this shell close?", and how good a
-/// proxy it is depends on the surfaces. A planar patch is simply connected, so
-/// a handful can never bound a region; a patch of a CLOSED surface wraps all
-/// the way round, so far fewer suffice. `make_sphere` builds exactly two
-/// spherical patches glued along the equator — a closed, watertight,
-/// 2-manifold solid — and [`MIN_SOLID_FACES`] rejected it outright, sending
-/// every sphere boolean to the mesh fallback even when the GFA result was
-/// exact. Shells carrying a curved face are admitted at 2 and left to the
-/// free-edge / non-manifold-edge / Euler gates, which measure closure directly
-/// rather than inferring it from a count.
-///
-/// A pure count, so it carries no length scale and behaves identically at
-/// every model size.
-pub(super) const MIN_CURVED_SOLID_FACES: usize = 2;
 
 /// The type of boolean operation.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

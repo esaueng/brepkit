@@ -29,6 +29,7 @@ use brepkit_operations::boolean::{BooleanOp, boolean};
 use brepkit_operations::copy::copy_and_transform_solid;
 use brepkit_operations::measure::solid_volume;
 use brepkit_operations::primitives::{make_box, make_cylinder, make_sphere};
+use brepkit_operations::tessellate::tessellate_solid;
 use brepkit_topology::Topology;
 use brepkit_topology::explorer::solid_faces;
 use brepkit_topology::solid::SolidId;
@@ -142,6 +143,24 @@ fn check_identity_cut(scale: f64, radius: f64, segments: usize) {
     );
 
     assert_closed_two_manifold(&topo, result, &what);
+
+    // The same invariant one level down: an identity result must also
+    // TESSELLATE to a closed mesh. Defect 2's offset body passed every B-rep
+    // check while emitting nothing at all, so the B-rep alone does not tell
+    // you a body is usable.
+    let mesh = tessellate_solid(&topo, result, radius * 0.001).unwrap();
+    assert!(!mesh.indices.is_empty(), "{what}: result has no triangles");
+    let mut mesh_edges: HashMap<(u32, u32), usize> = HashMap::new();
+    for tri in mesh.indices.chunks_exact(3) {
+        for (x, y) in [(tri[0], tri[1]), (tri[1], tri[2]), (tri[2], tri[0])] {
+            *mesh_edges.entry((x.min(y), x.max(y))).or_insert(0) += 1;
+        }
+    }
+    let mesh_boundary = mesh_edges.values().filter(|&&c| c == 1).count();
+    assert_eq!(
+        mesh_boundary, 0,
+        "{what}: tessellated identity result has {mesh_boundary} boundary edges"
+    );
 }
 
 #[test]
@@ -228,62 +247,73 @@ fn disjoint_cut_controls_box_and_cylinder_are_still_exact() {
     }
 }
 
-/// A Cut that DOES bite must still respond to where the tool sits. Once an
-/// earlier identity cut had faceted the sphere, that stopped being true —
-/// mirror placements returned the same number. The two closed forms here
-/// differ by 5.4x, so one shared answer cannot pass by accident.
+/// The product-level symptom, reproduced as the CHAIN it actually needs.
+///
+/// Cutting a fresh sphere responds to the tool's position perfectly well, on
+/// unfixed code too — the reported "mirror-image cuts return byte-identical
+/// volumes" only appears AFTER an earlier disjoint cut has replaced the two
+/// spherical patches with a faceted stand-in. So the first cut here is the
+/// identity cut (a tool a hundred radii away), and the mirror cuts are applied
+/// to its result. That is the sequence the product runs, and it is what makes
+/// this a regression test rather than a restatement of the one above.
 ///
 /// The tool is a cube 6x the sphere's diameter, so only the plane at its top
 /// face meets the ball. Placing that plane at +r/2 leaves the cap above it; at
-/// -r/2 it leaves everything above it.
+/// -r/2 it leaves everything above it. The two closed forms differ by 5.4x, so
+/// one shared answer cannot pass by accident.
 ///
-/// Run at 1x ONLY, deliberately. Both arms here still route through the mesh
-/// fallback — trimming a sphere with a plane is a separate GFA gap that this
-/// change does not address — and the fallback is the part of the pipeline that
-/// is scale-broken: its deflection is an ABSOLUTE 0.1, so at 0.001x it
-/// tessellates a 0.02-wide ball into 32 planes and loses 40% of the cap, and
-/// at 1000x it exceeds its own triangle work limit outright. Sweeping this
-/// test over scales would therefore measure that defect, not this one; the
-/// scale sweep that belongs to this fix is on the identity cut above, which
-/// stays on the exact analytic path at every scale. Both numbers are recorded
-/// in the PR.
+/// Run at 1x ONLY, deliberately. Both arms still route through the mesh
+/// fallback — trimming a sphere with a plane is a separate GFA gap this change
+/// does not address — and the fallback is the scale-broken part of the
+/// pipeline: its deflection is an ABSOLUTE 0.1, so at 0.001x it tessellates a
+/// 0.02-wide ball into 32 planes and loses 40% of the cap, and at 1000x it
+/// exceeds its own triangle work limit outright. Sweeping this test over
+/// scales would measure that defect, not this one. The scale sweep that
+/// belongs to this fix is on the identity cut above, which stays on the exact
+/// analytic path at every scale. Both numbers are recorded in the PR.
 #[test]
-fn mirror_placed_cuts_return_their_own_closed_forms() {
-    for scale in [1.0_f64] {
-        let radius = 10.0 * scale;
-        let side = 12.0 * radius;
-        // Spherical cap of height h on a sphere of radius r: pi*h^2*(r - h/3).
-        let h = radius / 2.0;
-        let cap = PI * h * h * (radius - h / 3.0);
-        let rest = sphere_volume(radius) - cap;
+fn mirror_cuts_after_an_identity_cut_return_their_own_closed_forms() {
+    let scale = 1.0_f64;
+    let radius = 10.0 * scale;
+    let side = 12.0 * radius;
+    // Spherical cap of height h on a sphere of radius r: pi*h^2*(r - h/3).
+    let h = radius / 2.0;
+    let cap = PI * h * h * (radius - h / 3.0);
+    let rest = sphere_volume(radius) - cap;
 
-        for (top, exact, label) in [
-            (radius / 2.0, cap, "tool top at +r/2 keeps the cap"),
-            (-radius / 2.0, rest, "tool top at -r/2 keeps the rest"),
-        ] {
-            let mut topo = Topology::default();
-            let sphere = make_sphere(&mut topo, radius, 32).unwrap();
-            let bx = make_box(&mut topo, side, side, side).unwrap();
-            let tool = copy_and_transform_solid(
-                &mut topo,
-                bx,
-                &Mat4::translation(-side / 2.0, -side / 2.0, top - side),
-            )
-            .unwrap();
-            let result = boolean(&mut topo, BooleanOp::Cut, sphere, tool)
-                .unwrap_or_else(|e| panic!("scale {scale} {label}: cut failed: {e}"));
-            let volume = solid_volume(&topo, result, radius * 0.005).unwrap();
-            let rel = (volume - exact).abs() / exact;
-            // The GFA path is exact where it applies; where it does not, the
-            // mesh fallback still lands within a few tenths of a percent. What
-            // this test asserts is that the two placements produce DIFFERENT
-            // answers, each near its own closed form — not that both are exact.
-            assert!(
-                rel < 0.01,
-                "scale {scale} {label}: got {volume}, closed form {exact} \
-                 (relative error {rel:.3e})"
-            );
-            assert_closed_two_manifold(&topo, result, &format!("scale {scale} {label}"));
-        }
+    for (top, exact, label) in [
+        (radius / 2.0, cap, "tool top at +r/2 keeps the cap"),
+        (-radius / 2.0, rest, "tool top at -r/2 keeps the rest"),
+    ] {
+        let mut topo = Topology::default();
+        let sphere = make_sphere(&mut topo, radius, 32).unwrap();
+
+        // Step 1: the identity cut. Must leave the ball untouched.
+        let far = far_tool(&mut topo, radius);
+        let carried = boolean(&mut topo, BooleanOp::Cut, sphere, far)
+            .unwrap_or_else(|e| panic!("{label}: identity cut failed: {e}"));
+
+        // Step 2: the real cut, applied to what step 1 handed on.
+        let bx = make_box(&mut topo, side, side, side).unwrap();
+        let tool = copy_and_transform_solid(
+            &mut topo,
+            bx,
+            &Mat4::translation(-side / 2.0, -side / 2.0, top - side),
+        )
+        .unwrap();
+        let result = boolean(&mut topo, BooleanOp::Cut, carried, tool)
+            .unwrap_or_else(|e| panic!("{label}: cut failed: {e}"));
+
+        let volume = solid_volume(&topo, result, radius * 0.005).unwrap();
+        let rel = (volume - exact).abs() / exact;
+        // Where the GFA path applies it is exact; where it does not, the mesh
+        // fallback still lands within a few tenths of a percent. What this
+        // asserts is that the two placements produce DIFFERENT answers, each
+        // near its own closed form — not that both are exact.
+        assert!(
+            rel < 0.01,
+            "{label}: got {volume}, closed form {exact} (relative error {rel:.3e})"
+        );
+        assert_closed_two_manifold(&topo, result, label);
     }
 }
