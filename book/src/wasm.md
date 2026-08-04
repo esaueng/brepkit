@@ -28,5 +28,9 @@ cargo build -p brepkit-wasm --target wasm32-unknown-unknown \
 ```
 
 Large sequences can use `executeBatch` to reduce JavaScript/WASM crossings.
-Checkpoints use copy-on-write topology snapshots. `serializeSolid` is a bounded
-debug replay mechanism and not a stable interchange contract.
+Checkpoints use copy-on-write topology snapshots. `deleteSolid(handle)` retires
+a solid and any topology entities not shared with another live solid. Retired
+handles remain permanently invalid and are never reused. Deletion does not
+compact the topology or reclaim its arena memory; create a new kernel when
+memory reclamation is required. `serializeSolid` is a bounded debug replay
+mechanism and not a stable interchange contract.
