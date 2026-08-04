@@ -769,8 +769,9 @@ export class BrepKernel {
      *
      * # Errors
      *
-     * Returns an error if `solid` is not a live solid handle or its topology
-     * tree contains an invalid reference.
+     * Returns an error if `solid` is not a live solid handle, if a live
+     * compound, comp-solid, or assembly still references it, or if its
+     * topology tree contains an invalid reference.
      */
     deleteSolid(solid: number): void;
     /**
