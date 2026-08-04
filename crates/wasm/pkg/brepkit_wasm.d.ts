@@ -1,6 +1,65 @@
 /* tslint:disable */
 /* eslint-disable */
 /**
+ * A final-result face for which no unique source could be established.
+ */
+export interface UnresolvedFaceV1 {
+    /**
+     * Face handle in the final result.
+     */
+    result: number;
+    /**
+     * Input faces that could not be distinguished, if any.
+     */
+    candidates: number[];
+}
+
+/**
+ * How the evolution claims were obtained.
+ */
+export type EvolutionOriginV1 = "construction" | "geometry";
+
+/**
+ * Legacy unused shape retained so existing TypeScript imports keep compiling.
+ *
+ * Evolution entry points do not return this type. New code should use
+ * [`TopologyEvolutionResultV1`].
+ */
+export interface EvolutionResult {
+    solid: number;
+    generated: number[];
+    modified: number[];
+}
+
+/**
+ * One generated final-result face and the source faces it was built from.
+ */
+export interface GeneratedFaceV1 {
+    /**
+     * Input faces that participated in constructing this new face.
+     */
+    sources: number[];
+    /**
+     * New face handle in the final result.
+     */
+    result: number;
+}
+
+/**
+ * One source face and the final-result faces that preserve its identity.
+ */
+export interface ModifiedFacesV1 {
+    /**
+     * Face handle captured before the operation.
+     */
+    source: number;
+    /**
+     * Final-result faces that carry the source face forward.
+     */
+    results: number[];
+}
+
+/**
  * Per-step entry in a `HealPipelineResult`.
  */
 export interface HealStepResult {
@@ -42,6 +101,36 @@ export interface GcsConstraintResidual {
      * survives marks where it could not.
      */
     maxResidual: number;
+}
+
+/**
+ * Stable, validated WASM payload returned by blend evolution entry points.
+ *
+ * Version 1 accounts for every input and final-result face. The kernel
+ * validates membership, completeness, uniqueness, and non-contradiction
+ * before this value crosses the WASM boundary.
+ */
+export interface TopologyEvolutionResultV1 {
+    /**
+     * Payload schema version. Version 1 decoders require exactly `1`.
+     */
+    version: number;
+    /**
+     * Final solid handle.
+     */
+    solid: number;
+    /**
+     * Complete set of face handles captured before the operation.
+     */
+    sourceFaces: number[];
+    /**
+     * Complete set of face handles belonging to `solid` after the operation.
+     */
+    resultFaces: number[];
+    /**
+     * Validated evolution claims.
+     */
+    evolution: FaceEvolutionV1;
 }
 
 /**
@@ -307,12 +396,29 @@ export interface UvMeshResult {
 }
 
 /**
- * Typed result for boolean operations with evolution tracking.
+ * Version 1 face-evolution claims.
  */
-export interface EvolutionResult {
-    solid: number;
-    generated: number[];
-    modified: number[];
+export interface FaceEvolutionV1 {
+    /**
+     * Identity-preserving source-to-result claims.
+     */
+    modified: ModifiedFacesV1[];
+    /**
+     * Newly constructed result faces and all of their known sources.
+     */
+    generated: GeneratedFaceV1[];
+    /**
+     * Input faces explicitly absent from the final result.
+     */
+    deleted: number[];
+    /**
+     * Result faces whose origin could not be established uniquely.
+     */
+    unresolved: UnresolvedFaceV1[];
+    /**
+     * Whether claims were construction-recorded or geometrically inferred.
+     */
+    origin: EvolutionOriginV1;
 }
 
 
@@ -458,6 +564,27 @@ export class BrepKernel {
      * blend computation fails.
      */
     chamferV2(solid: number, edge_handles: Uint32Array, d1: number, d2: number): number;
+    /**
+     * Apply a symmetric chamfer and return validated face evolution.
+     *
+     * The returned [`TopologyEvolutionResultV1`](crate::types::TopologyEvolutionResultV1)
+     * is a typed JavaScript object, not a JSON string. `version`,
+     * `sourceFaces`, and `resultFaces` make the coverage contract explicit;
+     * malformed, incomplete, duplicate, contradictory, or non-result claims
+     * are rejected before return.
+     *
+     * This entry point runs the same production engine chain as [`chamfer`](Self::chamfer_solid):
+     * the planar engine first, then the walking-builder fallback. Geometry,
+     * validation, tolerances, rollback, and failure behavior are unchanged.
+     * Construction provenance is returned only when the successful builder
+     * recorded it; otherwise `evolution.origin` is `"geometry"`.
+     *
+     * # Errors
+     *
+     * Returns an error if a handle is invalid, the distance is non-positive,
+     * the chamfer fails, or its evolution payload cannot be proven complete.
+     */
+    chamferWithEvolution(solid: number, edge_handles: Uint32Array, distance: number): TopologyEvolutionResultV1;
     /**
      * Save a snapshot of the current kernel state.
      *
@@ -673,6 +800,19 @@ export class BrepKernel {
      * produces an empty or non-manifold result.
      */
     cutWithOptions(a: number, b: number, unify_faces?: boolean | null): number;
+    /**
+     * Decode and validate a persisted version 1 topology-evolution payload.
+     *
+     * This applies the same completeness, uniqueness, contradiction, handle,
+     * and final-solid membership checks used before kernel-generated payloads
+     * cross the WASM boundary.
+     *
+     * # Errors
+     *
+     * Returns an error for malformed JSON, unsupported versions, invalid
+     * handles, incomplete coverage, or contradictory claims.
+     */
+    decodeEvolutionPayload(payload_json: string): TopologyEvolutionResultV1;
     /**
      * Remove specified faces from a solid (defeaturing).
      *
@@ -966,12 +1106,13 @@ export class BrepKernel {
      */
     filletVariable(solid: number, json: string): number;
     /**
-     * Apply a constant-radius fillet and return face-evolution tracking data.
+     * Apply a constant-radius fillet and return validated face evolution.
      *
-     * Returns a JSON string `{"solid": <u32>, "evolution": {modified,
-     * generated, deleted, unresolved, origin}}` — the same shape as
-     * `fuseWithEvolution`. Blend faces appear under `generated` and surviving
-     * faces under `modified`.
+     * The returned [`TopologyEvolutionResultV1`](crate::types::TopologyEvolutionResultV1)
+     * is a typed JavaScript object, not the historical runtime-only JSON
+     * string. `version`, `sourceFaces`, and `resultFaces` make the coverage
+     * contract explicit; malformed, incomplete, duplicate, contradictory, or
+     * non-result claims are rejected before return.
      *
      * A blend band is listed under **both** faces its rounded edge separated.
      * It was built between them, so both are its origin; `generated` is an
@@ -980,7 +1121,7 @@ export class BrepKernel {
      * not any input face cut back, and a selection stored against one of those
      * faces must not acquire it.
      *
-     * `origin` says how far the answer can be trusted. `"construction"` means
+     * `evolution.origin` says how far the answer can be trusted. `"construction"` means
      * the blend engine recorded the correspondence while assembling the
      * result; `"geometry"` means it was matched from face normals and
      * centroids, because the engine that ran rebuilds faces instead of
@@ -988,7 +1129,7 @@ export class BrepKernel {
      * `origin` distinguishes a recorded fact from an inference that happens to
      * reach the same answer.
      *
-     * Either way, `unresolved` lists result faces with no established origin
+     * Either way, `evolution.unresolved` lists result faces with no established origin
      * (with the input faces that tied, when there were any) — a caller holding
      * a persistent face reference must fail closed on those rather than pick
      * from the candidates. For a fillet of a box or a cylinder rim it is empty.
@@ -998,7 +1139,7 @@ export class BrepKernel {
      * Returns an error if a handle is invalid, the radius is non-positive, or
      * the fillet fails.
      */
-    filletWithEvolution(solid: number, edge_handles: Uint32Array, radius: number): any;
+    filletWithEvolution(solid: number, edge_handles: Uint32Array, radius: number): TopologyEvolutionResultV1;
     /**
      * Fix face orientations to ensure consistent outward normals.
      *

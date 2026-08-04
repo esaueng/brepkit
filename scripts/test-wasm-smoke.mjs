@@ -24,6 +24,65 @@ const { BrepKernel } = require(
 
 const DEFLECTION = 0.1;
 
+const sortedNumbers = (values) => Array.from(values).sort((a, b) => a - b);
+
+/** Assert the versioned face-evolution set contract on the shipped package. */
+const assertEvolutionV1 = (payload, label) => {
+  assert.equal(typeof payload, "object", `${label}: payload must be an object`);
+  assert.equal(payload.version, 1, `${label}: payload version`);
+  assert.equal(typeof payload.solid, "number", `${label}: solid handle`);
+  assert.deepEqual(
+    sortedNumbers(payload.resultFaces),
+    sortedNumbers(kernel.getSolidFaces(payload.solid)),
+    `${label}: resultFaces must exactly cover the final solid`,
+  );
+
+  const sourceFaces = new Set(payload.sourceFaces);
+  const resultFaces = new Set(payload.resultFaces);
+  assert.equal(sourceFaces.size, payload.sourceFaces.length, `${label}: unique sources`);
+  assert.equal(resultFaces.size, payload.resultFaces.length, `${label}: unique results`);
+
+  const accountedSources = new Set();
+  const claimedResults = new Set();
+  const claimResult = (result, kind) => {
+    assert.ok(resultFaces.has(result), `${label}: ${kind} result ${result} is final`);
+    assert.ok(!claimedResults.has(result), `${label}: result ${result} claimed once`);
+    claimedResults.add(result);
+  };
+
+  for (const entry of payload.evolution.modified) {
+    assert.ok(sourceFaces.has(entry.source), `${label}: modified source is input`);
+    assert.ok(!accountedSources.has(entry.source), `${label}: source claimed once`);
+    accountedSources.add(entry.source);
+    assert.ok(entry.results.length > 0, `${label}: modified result is non-empty`);
+    for (const result of entry.results) claimResult(result, "modified");
+  }
+  for (const source of payload.evolution.deleted) {
+    assert.ok(sourceFaces.has(source), `${label}: deleted source is input`);
+    assert.ok(!accountedSources.has(source), `${label}: deleted source claimed once`);
+    accountedSources.add(source);
+  }
+  for (const entry of payload.evolution.generated) {
+    assert.ok(entry.sources.length > 0, `${label}: generated face has sources`);
+    for (const source of entry.sources) {
+      assert.ok(sourceFaces.has(source), `${label}: generated source is input`);
+    }
+    claimResult(entry.result, "generated");
+  }
+  for (const entry of payload.evolution.unresolved) {
+    for (const source of entry.candidates) {
+      assert.ok(sourceFaces.has(source), `${label}: unresolved candidate is input`);
+    }
+    claimResult(entry.result, "unresolved");
+  }
+
+  assert.equal(accountedSources.size, sourceFaces.size, `${label}: every source accounted`);
+  assert.equal(claimedResults.size, resultFaces.size, `${label}: every result accounted`);
+
+  const decoded = kernel.decodeEvolutionPayload(JSON.stringify(payload));
+  assert.deepEqual(decoded, payload, `${label}: strict decoder round trip`);
+};
+
 // 1. Kernel creation
 const kernel = new BrepKernel();
 console.log("ok - BrepKernel created");
@@ -240,6 +299,107 @@ if (typeof kernel.importPly === "function") {
     `ok - coaxial annulus fuse stayed analytic: ${faceKinds.length} faces, ` +
       `${cylinders} cylindrical`,
   );
+}
+
+// 12. Versioned, typed fillet/chamfer evolution on the SHIPPED package.
+{
+  const oneEdgeBox = kernel.makeBox(10, 10, 10);
+  const oneEdge = Array.from(kernel.getSolidEdges(oneEdgeBox))[0];
+  const oneEdgePayload = kernel.filletWithEvolution(oneEdgeBox, Uint32Array.of(oneEdge), 1);
+  assertEvolutionV1(oneEdgePayload, "single-edge box fillet");
+  assert.equal(oneEdgePayload.evolution.generated.length, 1, "one edge, one blend band");
+  assert.equal(oneEdgePayload.evolution.generated[0].sources.length, 2);
+  assert.equal(oneEdgePayload.evolution.origin, "geometry");
+
+  const twoEdgeBox = kernel.makeBox(10, 10, 10);
+  const twoEdges = Array.from(kernel.getSolidEdges(twoEdgeBox));
+  const twoEdgePayload = kernel.filletWithEvolution(
+    twoEdgeBox,
+    Uint32Array.of(twoEdges[0], twoEdges[2]),
+    1,
+  );
+  assertEvolutionV1(twoEdgePayload, "two-edge box fillet");
+  assert.equal(twoEdgePayload.evolution.generated.length, 2, "two edges, two bands");
+
+  const cylinder = kernel.makeCylinder(6, 12);
+  const rims = Array.from(kernel.getSolidEdges(cylinder)).filter(
+    (edge) => kernel.getEdgeCurveType(edge) === "CIRCLE",
+  );
+  assert.equal(rims.length, 2, "cylinder should expose two circular rims");
+  const rimFillet = kernel.filletWithEvolution(cylinder, Uint32Array.of(rims[1]), 1);
+  assertEvolutionV1(rimFillet, "cylinder-rim fillet");
+  assert.equal(rimFillet.evolution.origin, "construction");
+  assert.equal(rimFillet.evolution.generated.length, 1);
+  assert.equal(
+    kernel.getSurfaceType(rimFillet.evolution.generated[0].result),
+    "torus",
+    "fillet-generated rim band stays analytic",
+  );
+  assert.equal(JSON.parse(kernel.meshQuality(rimFillet.solid, DEFLECTION)).isWatertight, true);
+
+  const chamferBox = kernel.makeBox(10, 10, 10);
+  const chamferEdge = Array.from(kernel.getSolidEdges(chamferBox))[0];
+  const bevel = kernel.chamferWithEvolution(chamferBox, Uint32Array.of(chamferEdge), 1);
+  assertEvolutionV1(bevel, "single-edge box chamfer");
+  assert.equal(bevel.evolution.generated.length, 1, "one edge, one bevel face");
+
+  const chamferCylinder = kernel.makeCylinder(6, 12);
+  const chamferRim = Array.from(kernel.getSolidEdges(chamferCylinder)).find(
+    (edge) => kernel.getEdgeCurveType(edge) === "CIRCLE",
+  );
+  assert.notEqual(chamferRim, undefined);
+  const rimChamfer = kernel.chamferWithEvolution(chamferCylinder, Uint32Array.of(chamferRim), 1);
+  assertEvolutionV1(rimChamfer, "cylinder-rim chamfer");
+  assert.equal(rimChamfer.evolution.origin, "construction");
+  assert.equal(
+    kernel.getSurfaceType(rimChamfer.evolution.generated[0].result),
+    "cone",
+    "chamfer-generated rim band stays analytic",
+  );
+
+  const beforeFailure = kernel.makeBox(10, 10, 10);
+  const beforeFailureEdge = Array.from(kernel.getSolidEdges(beforeFailure))[0];
+  const volumeBeforeFailure = kernel.volume(beforeFailure, DEFLECTION);
+  assert.throws(
+    () => kernel.filletWithEvolution(beforeFailure, Uint32Array.of(beforeFailureEdge), 0),
+    /positive|radius/i,
+    "non-positive fillet must fail",
+  );
+  assert.ok(
+    Math.abs(kernel.volume(beforeFailure, DEFLECTION) - volumeBeforeFailure) < 1e-9,
+    "failed fillet must leave the input unchanged",
+  );
+
+  assert.throws(
+    () => kernel.decodeEvolutionPayload("{not json}"),
+    /malformed JSON/i,
+    "malformed payload must fail",
+  );
+  const duplicateClaim = structuredClone(oneEdgePayload);
+  duplicateClaim.evolution.generated.push(structuredClone(duplicateClaim.evolution.generated[0]));
+  assert.throws(
+    () => kernel.decodeEvolutionPayload(JSON.stringify(duplicateClaim)),
+    /duplicate or contradictory/i,
+    "duplicate result claim must fail",
+  );
+
+  if (typeof kernel.exportStep === "function") {
+    const beforeStepVolume = kernel.volume(rimFillet.solid, DEFLECTION);
+    const [reinspected] = kernel.importStep(kernel.exportStep(rimFillet.solid));
+    const afterStepVolume = kernel.volume(reinspected, DEFLECTION);
+    assert.ok(
+      Math.abs(afterStepVolume - beforeStepVolume) / beforeStepVolume < 1e-3,
+      `fillet STEP reinspection volume ${afterStepVolume} vs ${beforeStepVolume}`,
+    );
+    assert.ok(
+      Array.from(kernel.getSolidFaces(reinspected)).some(
+        (face) => kernel.getSurfaceType(face) === "torus",
+      ),
+      "STEP reinspection preserves the analytic fillet band",
+    );
+  }
+
+  console.log("ok - typed fillet/chamfer evolution v1 and strict decoder");
 }
 
 console.log("\nAll smoke tests passed");

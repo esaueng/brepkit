@@ -18,8 +18,8 @@ use crate::handles::{edge_id_to_u32, face_id_to_u32, solid_id_to_u32, wire_id_to
 use brepkit_geometry::extrema::point_to_nurbs_surface;
 
 use crate::helpers::{
-    TOL, classify_to_string, create_apex_face, fillet_failure_js_error, panic_message,
-    parse_points, try_fillet_with_origins,
+    TOL, classify_to_string, create_apex_face, fillet_failure_js_error,
+    fillet_whole_selection_with_origins, panic_message, parse_points, try_chamfer_with_origins,
 };
 use crate::kernel::BrepKernel;
 
@@ -243,6 +243,65 @@ impl BrepKernel {
         Ok(solid_id_to_u32(result))
     }
 
+    /// Apply a symmetric chamfer and return validated face evolution.
+    ///
+    /// The returned [`TopologyEvolutionResultV1`](crate::types::TopologyEvolutionResultV1)
+    /// is a typed JavaScript object, not a JSON string. `version`,
+    /// `sourceFaces`, and `resultFaces` make the coverage contract explicit;
+    /// malformed, incomplete, duplicate, contradictory, or non-result claims
+    /// are rejected before return.
+    ///
+    /// This entry point runs the same production engine chain as [`chamfer`](Self::chamfer_solid):
+    /// the planar engine first, then the walking-builder fallback. Geometry,
+    /// validation, tolerances, rollback, and failure behavior are unchanged.
+    /// Construction provenance is returned only when the successful builder
+    /// recorded it; otherwise `evolution.origin` is `"geometry"`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a handle is invalid, the distance is non-positive,
+    /// the chamfer fails, or its evolution payload cannot be proven complete.
+    #[wasm_bindgen(js_name = "chamferWithEvolution")]
+    #[allow(clippy::needless_pass_by_value)]
+    pub fn chamfer_with_evolution(
+        &mut self,
+        solid: u32,
+        edge_handles: Vec<u32>,
+        distance: f64,
+    ) -> Result<crate::types::TopologyEvolutionResultV1, JsError> {
+        validate_positive(distance, "distance")?;
+        let solid_id = self.resolve_solid(solid)?;
+        let edge_ids: Vec<brepkit_topology::edge::EdgeId> = edge_handles
+            .iter()
+            .map(|&handle| self.resolve_edge(handle))
+            .collect::<Result<_, _>>()?;
+
+        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
+            || -> Result<crate::types::TopologyEvolutionResultV1, JsError> {
+                let input_faces =
+                    brepkit_operations::boolean::collect_face_signatures(&self.topo, solid_id)?;
+                let (result_solid, origins) =
+                    try_chamfer_with_origins(self.topo_mut(), solid_id, &edge_ids, distance)?;
+                let map = brepkit_operations::blend_ops::evolution_from_blend_origins(
+                    &self.topo,
+                    result_solid,
+                    origins.as_ref(),
+                    &input_faces,
+                )?;
+                Ok(crate::evolution::build_payload_v1(
+                    &self.topo,
+                    result_solid,
+                    &input_faces,
+                    &map,
+                )?)
+            },
+        ));
+        match result {
+            Ok(inner) => inner,
+            Err(panic_info) => Err(JsError::new(&panic_message(&panic_info, "Chamfer"))),
+        }
+    }
+
     // ── Fillet ────────────────────────────────────────────────────
 
     /// Fillet (round) edges of a solid.
@@ -284,12 +343,13 @@ impl BrepKernel {
         }
     }
 
-    /// Apply a constant-radius fillet and return face-evolution tracking data.
+    /// Apply a constant-radius fillet and return validated face evolution.
     ///
-    /// Returns a JSON string `{"solid": <u32>, "evolution": {modified,
-    /// generated, deleted, unresolved, origin}}` — the same shape as
-    /// `fuseWithEvolution`. Blend faces appear under `generated` and surviving
-    /// faces under `modified`.
+    /// The returned [`TopologyEvolutionResultV1`](crate::types::TopologyEvolutionResultV1)
+    /// is a typed JavaScript object, not the historical runtime-only JSON
+    /// string. `version`, `sourceFaces`, and `resultFaces` make the coverage
+    /// contract explicit; malformed, incomplete, duplicate, contradictory, or
+    /// non-result claims are rejected before return.
     ///
     /// A blend band is listed under **both** faces its rounded edge separated.
     /// It was built between them, so both are its origin; `generated` is an
@@ -298,7 +358,7 @@ impl BrepKernel {
     /// not any input face cut back, and a selection stored against one of those
     /// faces must not acquire it.
     ///
-    /// `origin` says how far the answer can be trusted. `"construction"` means
+    /// `evolution.origin` says how far the answer can be trusted. `"construction"` means
     /// the blend engine recorded the correspondence while assembling the
     /// result; `"geometry"` means it was matched from face normals and
     /// centroids, because the engine that ran rebuilds faces instead of
@@ -306,7 +366,7 @@ impl BrepKernel {
     /// `origin` distinguishes a recorded fact from an inference that happens to
     /// reach the same answer.
     ///
-    /// Either way, `unresolved` lists result faces with no established origin
+    /// Either way, `evolution.unresolved` lists result faces with no established origin
     /// (with the input faces that tied, when there were any) — a caller holding
     /// a persistent face reference must fail closed on those rather than pick
     /// from the candidates. For a fillet of a box or a cylinder rim it is empty.
@@ -322,7 +382,7 @@ impl BrepKernel {
         solid: u32,
         edge_handles: Vec<u32>,
         radius: f64,
-    ) -> Result<JsValue, JsError> {
+    ) -> Result<crate::types::TopologyEvolutionResultV1, JsError> {
         validate_positive(radius, "radius")?;
         let solid_id = self.resolve_solid(solid)?;
         let edge_ids: Vec<brepkit_topology::edge::EdgeId> = edge_handles
@@ -333,32 +393,58 @@ impl BrepKernel {
         // Wrap in catch_unwind like `fillet` does: a fillet panic must not
         // abort the whole WASM instance.
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(
-            || -> Result<String, JsError> {
+            || -> Result<crate::types::TopologyEvolutionResultV1, JsError> {
                 // Snapshot the input faces BEFORE the blend: a successful blend
                 // trims them in place, so collecting afterwards would compare
                 // the result against itself.
                 let input_faces =
                     brepkit_operations::boolean::collect_face_signatures(&self.topo, solid_id)?;
-                let (result, origins) =
-                    try_fillet_with_origins(self.topo_mut(), solid_id, &edge_ids, radius)
-                        .map_err(|e| fillet_failure_js_error(&e))?;
+                let (result, origins) = fillet_whole_selection_with_origins(
+                    self.topo_mut(),
+                    solid_id,
+                    &edge_ids,
+                    radius,
+                )
+                .map_err(|e| fillet_failure_js_error(&e))?;
                 let evo = brepkit_operations::blend_ops::evolution_from_blend_origins(
                     &self.topo,
                     result,
                     origins.as_ref(),
                     &input_faces,
                 )?;
-                Ok(format!(
-                    "{{\"solid\":{},\"evolution\":{}}}",
-                    solid_id_to_u32(result),
-                    evo.to_json()
-                ))
+                Ok(crate::evolution::build_payload_v1(
+                    &self.topo,
+                    result,
+                    &input_faces,
+                    &evo,
+                )?)
             },
         ));
         match result {
-            Ok(inner) => inner.map(|json| JsValue::from_str(&json)),
+            Ok(inner) => inner,
             Err(panic_info) => Err(JsError::new(&panic_message(&panic_info, "Fillet"))),
         }
+    }
+
+    /// Decode and validate a persisted version 1 topology-evolution payload.
+    ///
+    /// This applies the same completeness, uniqueness, contradiction, handle,
+    /// and final-solid membership checks used before kernel-generated payloads
+    /// cross the WASM boundary.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error for malformed JSON, unsupported versions, invalid
+    /// handles, incomplete coverage, or contradictory claims.
+    #[wasm_bindgen(js_name = "decodeEvolutionPayload")]
+    pub fn decode_evolution_payload(
+        &self,
+        payload_json: &str,
+    ) -> Result<crate::types::TopologyEvolutionResultV1, JsError> {
+        Ok(crate::evolution::decode_payload_v1(
+            &self.topo,
+            payload_json,
+        )?)
     }
 
     // ── Operations ─────────────────────────────────────────────────

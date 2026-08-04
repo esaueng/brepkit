@@ -38,7 +38,92 @@ pub struct BoundingBoxResult {
     pub max_z: f64,
 }
 
-/// Typed result for boolean operations with evolution tracking.
+/// One source face and the final-result faces that preserve its identity.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct ModifiedFacesV1 {
+    /// Face handle captured before the operation.
+    pub source: u32,
+    /// Final-result faces that carry the source face forward.
+    pub results: Vec<u32>,
+}
+
+/// One generated final-result face and the source faces it was built from.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct GeneratedFaceV1 {
+    /// Input faces that participated in constructing this new face.
+    pub sources: Vec<u32>,
+    /// New face handle in the final result.
+    pub result: u32,
+}
+
+/// A final-result face for which no unique source could be established.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct UnresolvedFaceV1 {
+    /// Face handle in the final result.
+    pub result: u32,
+    /// Input faces that could not be distinguished, if any.
+    pub candidates: Vec<u32>,
+}
+
+/// How the evolution claims were obtained.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, serde::Deserialize, serde::Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+pub enum EvolutionOriginV1 {
+    /// The modeling builder recorded the correspondence during construction.
+    Construction,
+    /// The operation supplied no construction record, so geometry was matched.
+    Geometry,
+}
+
+/// Version 1 face-evolution claims.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+pub struct FaceEvolutionV1 {
+    /// Identity-preserving source-to-result claims.
+    pub modified: Vec<ModifiedFacesV1>,
+    /// Newly constructed result faces and all of their known sources.
+    pub generated: Vec<GeneratedFaceV1>,
+    /// Input faces explicitly absent from the final result.
+    pub deleted: Vec<u32>,
+    /// Result faces whose origin could not be established uniquely.
+    pub unresolved: Vec<UnresolvedFaceV1>,
+    /// Whether claims were construction-recorded or geometrically inferred.
+    pub origin: EvolutionOriginV1,
+}
+
+/// Stable, validated WASM payload returned by blend evolution entry points.
+///
+/// Version 1 accounts for every input and final-result face. The kernel
+/// validates membership, completeness, uniqueness, and non-contradiction
+/// before this value crosses the WASM boundary.
+#[derive(Debug, Clone, PartialEq, Eq, serde::Deserialize, serde::Serialize, Tsify)]
+#[serde(rename_all = "camelCase")]
+#[serde(deny_unknown_fields)]
+#[tsify(into_wasm_abi)]
+pub struct TopologyEvolutionResultV1 {
+    /// Payload schema version. Version 1 decoders require exactly `1`.
+    pub version: u32,
+    /// Final solid handle.
+    pub solid: u32,
+    /// Complete set of face handles captured before the operation.
+    pub source_faces: Vec<u32>,
+    /// Complete set of face handles belonging to `solid` after the operation.
+    pub result_faces: Vec<u32>,
+    /// Validated evolution claims.
+    pub evolution: FaceEvolutionV1,
+}
+
+/// Legacy unused shape retained so existing TypeScript imports keep compiling.
+///
+/// Evolution entry points do not return this type. New code should use
+/// [`TopologyEvolutionResultV1`].
 #[derive(serde::Serialize, Tsify)]
 #[serde(rename_all = "camelCase")]
 #[tsify(into_wasm_abi)]
