@@ -257,6 +257,8 @@ export const brepkernel_transformWire: (a: number, b: number, c: number, d: numb
 export const brepkernel_unifyFaces: (a: number, b: number) => [number, number, number];
 export const brepkernel_untrimFace: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const brepkernel_validateSolid: (a: number, b: number) => [number, number, number];
+export const brepkernel_validateSolidDetailed: (a: number, b: number) => [number, number, number];
+export const brepkernel_validateSolidDetailedWithOptions: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_validateSolidRelaxed: (a: number, b: number) => [number, number, number];
 export const brepkernel_validateSolidWithOptions: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_volume: (a: number, b: number, c: number) => [number, number, number];

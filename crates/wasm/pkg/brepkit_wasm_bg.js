@@ -5354,6 +5354,50 @@ export class BrepKernel {
         return ret[0] >>> 0;
     }
     /**
+     * Validate a solid and return every diagnostic.
+     *
+     * Returns a JSON string containing
+     * `{ errorCount, warningCount, issues: [{ severity, description }] }`
+     * (see the `ValidationReportResult` TypeScript type). Diagnostics come
+     * from the same operations validator used by [`validate_solid`](Self::validate_solid).
+     *
+     * # Errors
+     *
+     * Returns an error if the solid handle is invalid or validation fails.
+     * @param {number} solid
+     * @returns {any}
+     */
+    validateSolidDetailed(solid) {
+        const ret = wasm.brepkernel_validateSolidDetailed(this.__wbg_ptr, solid);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
+     * Validate a solid with configurable tolerance scaling and return every
+     * diagnostic.
+     *
+     * `tolerance_scale` has the same meaning as in
+     * [`validate_solid_with_options`](Self::validate_solid_with_options).
+     * Returns a JSON string containing
+     * `{ errorCount, warningCount, issues: [{ severity, description }] }`.
+     *
+     * # Errors
+     *
+     * Returns an error if the solid handle is invalid or validation fails.
+     * @param {number} solid
+     * @param {number} tolerance_scale
+     * @returns {any}
+     */
+    validateSolidDetailedWithOptions(solid, tolerance_scale) {
+        const ret = wasm.brepkernel_validateSolidDetailedWithOptions(this.__wbg_ptr, solid, tolerance_scale);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * Validate a solid with relaxed checks suitable for assembled geometry.
      *
      * Operations like boolean, fillet, and shell produce geometrically
