@@ -297,6 +297,55 @@ fn tessellate_solid_core(
         }
     }
 
+    // A period-wrapping inner wire crosses the cylindrical face's UV seam in
+    // the middle of one sampled edge segment. Insert that seam point into the
+    // shared edge polyline before global IDs are assigned, so the holed wall
+    // and the neighbouring bore wall split the same boundary segment.
+    for &face_id in &all_faces {
+        let face_data = topo.face(face_id)?;
+        let FaceSurface::Cylinder(cyl) = face_data.surface() else {
+            continue;
+        };
+        if face_data.inner_wires().is_empty() {
+            continue;
+        }
+        let seam_u = compute_angular_range(topo, face_data, |p| cyl.project_point(p)).0;
+        let tau = std::f64::consts::TAU;
+        for &wire_id in face_data.inner_wires() {
+            let wire = topo.wire(wire_id)?;
+            for oe in wire.edges() {
+                let Some(points) = edge_points.get_mut(&oe.edge().index()) else {
+                    continue;
+                };
+                let mut insertions = Vec::new();
+                for (i, pair) in points.windows(2).enumerate() {
+                    let (ua, va) = cyl.project_point(pair[0]);
+                    let (ub, vb) = cyl.project_point(pair[1]);
+                    let ua = seam_u + (ua - seam_u).rem_euclid(tau);
+                    let ub = seam_u + (ub - seam_u).rem_euclid(tau);
+                    let (ub_unwrapped, seam_crossing) = if ub - ua > std::f64::consts::PI {
+                        (ub - tau, seam_u)
+                    } else if ua - ub > std::f64::consts::PI {
+                        (ub + tau, seam_u + tau)
+                    } else {
+                        continue;
+                    };
+                    let t = (seam_crossing - ua) / (ub_unwrapped - ua);
+                    let seam_v = (vb - va).mul_add(t, va);
+                    let seam_point = cyl.evaluate(seam_u, seam_v);
+                    if (seam_point - pair[0]).length() >= 1e-10
+                        && (seam_point - pair[1]).length() >= 1e-10
+                    {
+                        insertions.push((i + 1, seam_point));
+                    }
+                }
+                for (index, point) in insertions.into_iter().rev() {
+                    points.insert(index, point);
+                }
+            }
+        }
+    }
+
     let mut merged = TriangleMesh::default();
     let mut point_to_global: DetHashMap<(i64, i64, i64), u32> = DetHashMap::default();
     let mut edge_global_indices: DetHashMap<usize, Vec<u32>> = DetHashMap::default();
@@ -855,9 +904,10 @@ pub(super) fn tessellate_face_with_shared_edges(
                 // is watertight by construction. The snap path re-samples the
                 // rim independently and cracks at fine deflections when its
                 // segment count diverges from the pool's (the #696 class, seen
-                // on gridfinity socket cone/cylinder corner rings). Faces WITH
-                // inner wires must keep the snap path: this CDT does not
-                // constrain inner wires and would skin the holes over.
+                // on gridfinity socket cone/cylinder corner rings). Faces with
+                // inner wires keep the snap path, whose face mesh uses the
+                // dedicated hole-aware cylindrical CDT before snapping every
+                // outer and inner boundary vertex into this shared pool.
                 let mut cdt_handled = false;
                 if face_data.inner_wires().is_empty() {
                     let pos_save = merged.positions.len();
