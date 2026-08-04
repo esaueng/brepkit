@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785698319312,
+  "lastUpdate": 1785803624681,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4265,6 +4265,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22454170,
             "range": "± 344440",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "67ad25cf31b7e6c16ca8de63ee20090fa521f65b",
+          "message": "Merge pull request #70 from esaueng/codex/conservative-radial-clearance\n\ntest(blend): pin off-axis rim clearance crossings",
+          "timestamp": "2026-08-03T19:31:27-05:00",
+          "tree_id": "2b7d290205a2688905bfa936d0e3ac38d72c5700",
+          "url": "https://github.com/esaueng/brepkit/commit/67ad25cf31b7e6c16ca8de63ee20090fa521f65b"
+        },
+        "date": 1785803623705,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 583213,
+            "range": "± 3824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 648421,
+            "range": "± 16248",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8808,
+            "range": "± 251",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 577694,
+            "range": "± 3265",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15622282,
+            "range": "± 28543",
             "unit": "ns/iter"
           }
         ]
