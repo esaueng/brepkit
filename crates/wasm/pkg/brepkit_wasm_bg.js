@@ -886,6 +886,25 @@ export class BrepKernel {
         return ret[0] >>> 0;
     }
     /**
+     * Retire a solid handle and its unshared topology subtree.
+     *
+     * The handle becomes permanently invalid. This does not compact the
+     * kernel or reclaim arena memory; future entities receive new handles so
+     * a stale handle can never alias a different solid.
+     *
+     * # Errors
+     *
+     * Returns an error if `solid` is not a live solid handle or its topology
+     * tree contains an invalid reference.
+     * @param {number} solid
+     */
+    deleteSolid(solid) {
+        const ret = wasm.brepkernel_deleteSolid(this.__wbg_ptr, solid);
+        if (ret[1]) {
+            throw takeFromExternrefTable0(ret[0]);
+        }
+    }
+    /**
      * Reconstruct a solid from a buffer produced by [`Self::serialize_solid`].
      *
      * # Errors
