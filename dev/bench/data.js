@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785816696959,
+  "lastUpdate": 1785822305457,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4481,6 +4481,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22240662,
             "range": "± 53797",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3f5f5528f2e19bda2e21e003536706ff572b6f6c",
+          "message": "Merge pull request #82 from esaueng/codex/fix-cylindrical-hole-resize\n\nfix: preserve exact cylindrical bore resize",
+          "timestamp": "2026-08-04T00:42:34-05:00",
+          "tree_id": "b892b843e14e68bab1920bda0e2b8b311351f71a",
+          "url": "https://github.com/esaueng/brepkit/commit/3f5f5528f2e19bda2e21e003536706ff572b6f6c"
+        },
+        "date": 1785822304536,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 866137,
+            "range": "± 2853",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 953516,
+            "range": "± 2343",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12960,
+            "range": "± 136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 874942,
+            "range": "± 2643",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22411111,
+            "range": "± 77311",
             "unit": "ns/iter"
           }
         ]
