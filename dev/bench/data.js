@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785822305457,
+  "lastUpdate": 1785824011382,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4535,6 +4535,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22411111,
             "range": "± 77311",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "083ce513e37f7a0bd28f6a9223256bd42b8f1037",
+          "message": "Merge pull request #83 from esaueng/codex/sync-upstream-2026-08-04\n\nSync selected upstream geometry fixes through #1284",
+          "timestamp": "2026-08-04T01:11:08-05:00",
+          "tree_id": "92918d2716ed44f82d05064f566a099aa5dfe1ca",
+          "url": "https://github.com/esaueng/brepkit/commit/083ce513e37f7a0bd28f6a9223256bd42b8f1037"
+        },
+        "date": 1785824010342,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 758596,
+            "range": "± 4614",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 826489,
+            "range": "± 2823",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10934,
+            "range": "± 25",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 713995,
+            "range": "± 987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 19930528,
+            "range": "± 149896",
             "unit": "ns/iter"
           }
         ]
