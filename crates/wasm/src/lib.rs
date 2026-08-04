@@ -9,6 +9,7 @@
 
 mod bindings;
 pub mod error;
+mod evolution;
 mod handles;
 mod helpers;
 pub mod holed_face;

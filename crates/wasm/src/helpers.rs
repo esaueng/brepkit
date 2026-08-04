@@ -343,8 +343,29 @@ pub fn fillet_whole_selection(
     edge_ids: &[brepkit_topology::edge::EdgeId],
     radius: f64,
 ) -> Result<brepkit_topology::solid::SolidId, brepkit_operations::OperationsError> {
-    let primary = match try_fillet(topo, solid_id, edge_ids, radius) {
-        Ok(solid) => return Ok(solid),
+    fillet_whole_selection_with_origins(topo, solid_id, edge_ids, radius).map(|(solid, _)| solid)
+}
+
+/// [`fillet_whole_selection`], preserving construction origins from the engine
+/// that produced the exact same accepted solid.
+///
+/// # Errors
+///
+/// Same as [`fillet_whole_selection`].
+pub fn fillet_whole_selection_with_origins(
+    topo: &mut brepkit_topology::Topology,
+    solid_id: brepkit_topology::solid::SolidId,
+    edge_ids: &[brepkit_topology::edge::EdgeId],
+    radius: f64,
+) -> Result<
+    (
+        brepkit_topology::solid::SolidId,
+        Option<brepkit_operations::blend_ops::BlendFaceOrigins>,
+    ),
+    brepkit_operations::OperationsError,
+> {
+    let primary = match try_fillet_with_origins(topo, solid_id, edge_ids, radius) {
+        Ok(result) => return Ok(result),
         Err(e) => e,
     };
 
@@ -395,6 +416,31 @@ pub fn try_chamfer(
     edge_ids: &[brepkit_topology::edge::EdgeId],
     distance: f64,
 ) -> Result<brepkit_topology::solid::SolidId, brepkit_operations::OperationsError> {
+    try_chamfer_with_origins(topo, solid_id, edge_ids, distance).map(|(solid, _)| solid)
+}
+
+/// [`try_chamfer`], also returning construction-recorded face origins when the
+/// successful engine provides them.
+///
+/// This is deliberately a projection of the existing production engine chain:
+/// the planar v1 chamfer still runs first and returns `None`; only the v2
+/// walking-builder fallback can return construction provenance.
+///
+/// # Errors
+///
+/// Same as [`try_chamfer`].
+pub fn try_chamfer_with_origins(
+    topo: &mut brepkit_topology::Topology,
+    solid_id: brepkit_topology::solid::SolidId,
+    edge_ids: &[brepkit_topology::edge::EdgeId],
+    distance: f64,
+) -> Result<
+    (
+        brepkit_topology::solid::SolidId,
+        Option<brepkit_operations::blend_ops::BlendFaceOrigins>,
+    ),
+    brepkit_operations::OperationsError,
+> {
     let is_valid =
         |topo: &brepkit_topology::Topology, s: brepkit_topology::solid::SolidId| -> bool {
             topo.solid(s)
@@ -413,12 +459,12 @@ pub fn try_chamfer(
     if let Ok(s) = brepkit_operations::chamfer::chamfer(topo, solid_id, edge_ids, distance)
         && is_valid(topo, s)
     {
-        return Ok(s);
+        return Ok((s, None));
     }
     topo.restore_preserving_handle_slots(&snapshot);
 
     match brepkit_operations::blend_ops::chamfer_v2(topo, solid_id, edge_ids, distance, distance) {
-        Ok(r) if is_valid(topo, r.solid) => Ok(r.solid),
+        Ok(r) if is_valid(topo, r.solid) => Ok((r.solid, r.face_origins)),
         Ok(_) => {
             topo.restore_preserving_handle_slots(&snapshot);
             Err(brepkit_operations::OperationsError::InvalidInput {

@@ -119,7 +119,15 @@ pub fn build_both_targets(simd: bool) -> Result<()> {
     println!("\nBuilding WASM (bundler target)...");
     run_cmd(
         Command::new("wasm-pack")
-            .args(["build", "--target", "bundler", "--release", "--out-dir", "pkg"])
+            .args([
+                "build",
+                "--target",
+                "bundler",
+                "--release",
+                "--out-dir",
+                "pkg",
+                "--no-opt",
+            ])
             .current_dir(&wasm_crate)
             .env("RUSTFLAGS", &rustflags),
     )
@@ -128,7 +136,15 @@ pub fn build_both_targets(simd: bool) -> Result<()> {
     println!("\nBuilding WASM (nodejs target)...");
     run_cmd(
         Command::new("wasm-pack")
-            .args(["build", "--target", "nodejs", "--release", "--out-dir", "pkg-node"])
+            .args([
+                "build",
+                "--target",
+                "nodejs",
+                "--release",
+                "--out-dir",
+                "pkg-node",
+                "--no-opt",
+            ])
             .current_dir(&wasm_crate)
             .env("RUSTFLAGS", &rustflags),
     )

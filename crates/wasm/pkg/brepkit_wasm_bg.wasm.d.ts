@@ -28,6 +28,7 @@ export const brepkernel_chamfer: (a: number, b: number, c: number, d: number, e:
 export const brepkernel_chamfer2d: (a: number, b: number, c: number, d: number) => [number, number, number, number];
 export const brepkernel_chamferDistanceAngle: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
 export const brepkernel_chamferV2: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
+export const brepkernel_chamferWithEvolution: (a: number, b: number, c: number, d: number, e: number) => [number, number, number];
 export const brepkernel_checkpoint: (a: number) => number;
 export const brepkernel_checkpointCount: (a: number) => number;
 export const brepkernel_circularPattern: (a: number, b: number, c: number, d: number, e: number, f: number) => [number, number, number];
@@ -51,6 +52,7 @@ export const brepkernel_curveSplit: (a: number, b: number, c: number) => [number
 export const brepkernel_cut: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_cutWithEvolution: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_cutWithOptions: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const brepkernel_decodeEvolutionPayload: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_defeature: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const brepkernel_deserializeSolid: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_detectCoincidentFaces: (a: number, b: number, c: number) => [number, number, number, number];
