@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785824011382,
+  "lastUpdate": 1785826956311,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4589,6 +4589,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 19930528,
             "range": "± 149896",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "65e3840c221b20b3d8fd64ca45513d5687c868d6",
+          "message": "Merge pull request #84 from esaueng/blacksmith-migration-8c64146\n\n.github/workflows: Migrate workflows to Blacksmith runners",
+          "timestamp": "2026-08-04T02:00:29-05:00",
+          "tree_id": "66b7d290d2cdec5ee2772c7a86b9894b13a2e4a3",
+          "url": "https://github.com/esaueng/brepkit/commit/65e3840c221b20b3d8fd64ca45513d5687c868d6"
+        },
+        "date": 1785826955379,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 443610,
+            "range": "± 759",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 493936,
+            "range": "± 2456",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6763,
+            "range": "± 23",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 409837,
+            "range": "± 2254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 12905818,
+            "range": "± 180543",
             "unit": "ns/iter"
           }
         ]
