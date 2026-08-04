@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785826956311,
+  "lastUpdate": 1785851118633,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4643,6 +4643,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 12905818,
             "range": "± 180543",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5b192e1e6d099095660c528f1447e3d2bc798432",
+          "message": "Merge pull request #85 from esaueng/codex/typed-fillet-chamfer-evolution\n\nfeat: harden fillet and chamfer evolution",
+          "timestamp": "2026-08-04T08:42:39-05:00",
+          "tree_id": "2c170d58cd8be2c9b81826c348cdc90a89f0f8ba",
+          "url": "https://github.com/esaueng/brepkit/commit/5b192e1e6d099095660c528f1447e3d2bc798432"
+        },
+        "date": 1785851117690,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 631366,
+            "range": "± 34992",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 582014,
+            "range": "± 33478",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7838,
+            "range": "± 416",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 473156,
+            "range": "± 32609",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14667296,
+            "range": "± 565639",
             "unit": "ns/iter"
           }
         ]
