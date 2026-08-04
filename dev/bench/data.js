@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785851118633,
+  "lastUpdate": 1785887948025,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4697,6 +4697,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14667296,
             "range": "± 565639",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cc28b6fbf09b1a54ab791e5509f4a0e68c73db3c",
+          "message": "Merge pull request #90 from esaueng/codex/openzcad-mounting-bracket-regression\n\ntest(wasm): cover OpenZCAD mounting-bracket evolution resize",
+          "timestamp": "2026-08-04T18:56:53-05:00",
+          "tree_id": "6c3e848c230952a75e3425960143b1501c9534c4",
+          "url": "https://github.com/esaueng/brepkit/commit/cc28b6fbf09b1a54ab791e5509f4a0e68c73db3c"
+        },
+        "date": 1785887946998,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 598238,
+            "range": "± 59572",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 633552,
+            "range": "± 29846",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7357,
+            "range": "± 90",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 559205,
+            "range": "± 8323",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14736792,
+            "range": "± 432720",
             "unit": "ns/iter"
           }
         ]
