@@ -53,6 +53,7 @@ export const brepkernel_cut: (a: number, b: number, c: number) => [number, numbe
 export const brepkernel_cutWithEvolution: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_cutWithOptions: (a: number, b: number, c: number, d: number) => [number, number, number];
 export const brepkernel_defeature: (a: number, b: number, c: number, d: number) => [number, number, number];
+export const brepkernel_deleteSolid: (a: number, b: number) => [number, number];
 export const brepkernel_deserializeSolid: (a: number, b: number, c: number) => [number, number, number];
 export const brepkernel_detectCoincidentFaces: (a: number, b: number, c: number) => [number, number, number, number];
 export const brepkernel_detectSmallFeatures: (a: number, b: number, c: number, d: number) => [number, number, number, number];
