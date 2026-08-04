@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785803624681,
+  "lastUpdate": 1785811271621,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4319,6 +4319,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15622282,
             "range": "± 28543",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b0ad1debe1b566db2f7d243d28f03a9844303f83",
+          "message": "Merge pull request #71 from esaueng/security/audit-hardening\n\nci: security audit hardening — token persistence + pin comments",
+          "timestamp": "2026-08-03T21:37:44-05:00",
+          "tree_id": "17e53b1c3a61ea829ab76ea3fb270a404354dc8e",
+          "url": "https://github.com/esaueng/brepkit/commit/b0ad1debe1b566db2f7d243d28f03a9844303f83"
+        },
+        "date": 1785811270721,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 866256,
+            "range": "± 1711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 954919,
+            "range": "± 2176",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13088,
+            "range": "± 34",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 873569,
+            "range": "± 59726",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22240551,
+            "range": "± 51401",
             "unit": "ns/iter"
           }
         ]
