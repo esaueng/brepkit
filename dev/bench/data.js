@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785887948025,
+  "lastUpdate": 1785888105776,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4751,6 +4751,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14736792,
             "range": "± 432720",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d491db1973a5d7300b403b2432f22fce4e91a170",
+          "message": "Merge pull request #87 from esaueng/codex/fix-step-rational-weight-preservation\n\nfeat(step): preserve rational STEP geometry exactly",
+          "timestamp": "2026-08-04T18:57:16-05:00",
+          "tree_id": "2a5e6cc1041463c0399ee5d385fb1b821b0aba93",
+          "url": "https://github.com/esaueng/brepkit/commit/d491db1973a5d7300b403b2432f22fce4e91a170"
+        },
+        "date": 1785888104737,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 623163,
+            "range": "± 59385",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 645593,
+            "range": "± 61772",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7852,
+            "range": "± 483",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 530903,
+            "range": "± 20824",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15581720,
+            "range": "± 484605",
             "unit": "ns/iter"
           }
         ]
