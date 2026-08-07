@@ -265,6 +265,90 @@ pub fn project_point_to_surface(
     refine_from(surface, point, tolerance, seed, MAX_ITERATIONS)
 }
 
+/// The coarse grid [`project_point_to_surface`] searches to find a Newton
+/// start, evaluated once and reusable across many points.
+///
+/// The grid is a property of the surface alone — the query point only picks
+/// the nearest node — yet [`project_point_to_surface`] rebuilds all
+/// `(SURFACE_GRID_SIZE + 1)²` = 81 surface evaluations on every call. A caller
+/// projecting many points onto one surface can build this once and hand it to
+/// [`project_point_to_surface_with_grid`], which then costs 81 distance
+/// comparisons instead of 81 surface evaluations — the same answer, bit for
+/// bit, because it is the same grid and so the same seed.
+///
+/// Unlike a seed supplied by the caller, this changes nothing about where
+/// Newton starts, so it carries none of the judgement
+/// [`project_point_to_surface_seeded`] asks for.
+#[derive(Debug, Clone)]
+pub struct SurfaceSeedGrid {
+    /// `(u, v, S(u, v))` in the same order `surface_coarse_search` walks them,
+    /// so nearest-node ties resolve identically.
+    nodes: Vec<(f64, f64, Point3)>,
+}
+
+impl SurfaceSeedGrid {
+    /// Evaluate the coarse grid for `surface`.
+    #[must_use]
+    pub fn for_surface(surface: &NurbsSurface) -> Self {
+        let (u_min, u_max, v_min, v_max) = surface_domain(surface);
+        let n = SURFACE_GRID_SIZE;
+        let mut nodes = Vec::with_capacity((n + 1) * (n + 1));
+        for i in 0..=n {
+            #[allow(clippy::cast_precision_loss)]
+            let u = (i as f64 / n as f64).mul_add(u_max - u_min, u_min);
+            for j in 0..=n {
+                #[allow(clippy::cast_precision_loss)]
+                let v = (j as f64 / n as f64).mul_add(v_max - v_min, v_min);
+                nodes.push((u, v, surface.evaluate(u, v)));
+            }
+        }
+        Self { nodes }
+    }
+
+    /// The grid node nearest `point`, matching `surface_coarse_search`'s scan
+    /// order and its strict `<` tie-break.
+    fn nearest(&self, point: Point3) -> (f64, f64) {
+        let mut best = (0.0, 0.0);
+        let mut best_dist_sq = f64::INFINITY;
+        for &(u, v, pt) in &self.nodes {
+            let d_sq = (pt - point).length_squared();
+            if d_sq < best_dist_sq {
+                best_dist_sq = d_sq;
+                best = (u, v);
+            }
+        }
+        best
+    }
+}
+
+/// [`project_point_to_surface`] with the coarse grid supplied rather than
+/// rebuilt.
+///
+/// Returns exactly what [`project_point_to_surface`] would, provided `grid`
+/// was built from `surface`: same nodes, same scan order, same nearest node,
+/// so the same Newton start and the same result. Passing a grid built from a
+/// *different* surface is not unsafe but is meaningless — the seed would be a
+/// point of some other surface.
+///
+/// # Errors
+///
+/// Returns [`MathError::ConvergenceFailure`] if Newton iteration does not
+/// converge within the maximum number of iterations.
+pub fn project_point_to_surface_with_grid(
+    surface: &NurbsSurface,
+    point: Point3,
+    tolerance: f64,
+    grid: &SurfaceSeedGrid,
+) -> Result<SurfaceProjection, MathError> {
+    refine_from(
+        surface,
+        point,
+        tolerance,
+        grid.nearest(point),
+        MAX_ITERATIONS,
+    )
+}
+
 /// Find the closest point on a NURBS surface to `point`, starting Newton from
 /// `seed` rather than from a fresh coarse search.
 ///
@@ -722,6 +806,57 @@ mod tests {
             vec![vec![1.0; 3]; 3],
         )
         .expect("valid dome patch")
+    }
+
+    #[test]
+    fn a_supplied_grid_gives_bit_identical_results() {
+        // The whole basis for using this on the boolean path: it is a speed
+        // change, not a behaviour one. Same grid, same nearest node, same
+        // Newton start — so every field must match exactly, not approximately.
+        let s = dome_patch();
+        let grid = SurfaceSeedGrid::for_surface(&s);
+        for i in 0..=6 {
+            for j in 0..=6 {
+                for h in [-2.0, 0.0, 0.7, 40.0] {
+                    let p = Point3::new(f64::from(i) / 3.0 - 0.5, f64::from(j) / 3.0 - 0.5, h);
+                    let want = project_point_to_surface(&s, p, TOL);
+                    let got = project_point_to_surface_with_grid(&s, p, TOL, &grid);
+                    assert_eq!(
+                        want.is_ok(),
+                        got.is_ok(),
+                        "one path converged and the other did not at {p:?}"
+                    );
+                    if let (Ok(w), Ok(g)) = (want, got) {
+                        assert_eq!(w.u.to_bits(), g.u.to_bits(), "u at {p:?}");
+                        assert_eq!(w.v.to_bits(), g.v.to_bits(), "v at {p:?}");
+                        assert_eq!(
+                            w.distance.to_bits(),
+                            g.distance.to_bits(),
+                            "distance at {p:?}"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn a_grid_holds_every_node_of_the_coarse_search() {
+        // Same node count and the same scan order as `surface_coarse_search`,
+        // which is what makes the nearest-node tie-break identical.
+        let s = dome_patch();
+        let grid = SurfaceSeedGrid::for_surface(&s);
+        assert_eq!(grid.nodes.len(), (SURFACE_GRID_SIZE + 1).pow(2));
+        for (idx, &(u, v, pt)) in grid.nodes.iter().enumerate() {
+            let (i, j) = (idx / (SURFACE_GRID_SIZE + 1), idx % (SURFACE_GRID_SIZE + 1));
+            #[allow(clippy::cast_precision_loss)]
+            let (want_u, want_v) = (
+                i as f64 / SURFACE_GRID_SIZE as f64,
+                j as f64 / SURFACE_GRID_SIZE as f64,
+            );
+            assert!((u - want_u).abs() < 1e-15 && (v - want_v).abs() < 1e-15);
+            assert_eq!(pt.x().to_bits(), s.evaluate(u, v).x().to_bits());
+        }
     }
 
     #[test]
