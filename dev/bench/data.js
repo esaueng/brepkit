@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786069517431,
+  "lastUpdate": 1786072615294,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4913,6 +4913,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 12929079,
             "range": "± 127115",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "aec76e8de35f778d34bfea7587745493021a54fd",
+          "message": "Merge pull request #97 from esaueng/codex/reconcile-open-prs-20260806\n\nchore: reconcile reviewed open PRs on current main",
+          "timestamp": "2026-08-06T22:14:57-05:00",
+          "tree_id": "5bf9c96c128be498f398e58e302d74e101803c02",
+          "url": "https://github.com/esaueng/brepkit/commit/aec76e8de35f778d34bfea7587745493021a54fd"
+        },
+        "date": 1786072614343,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 443644,
+            "range": "± 674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 487838,
+            "range": "± 3118",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6922,
+            "range": "± 155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 397441,
+            "range": "± 2228",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 12805912,
+            "range": "± 34165",
             "unit": "ns/iter"
           }
         ]
