@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786111751215,
+  "lastUpdate": 1786112268285,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5561,6 +5561,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 27521392,
             "range": "± 3601929",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "899e314259021cc5e52743d4185fd797b08db759",
+          "message": "docs(math): stop a public doc linking a private constant (#109)\n\n`project_point_to_surface_seeded`'s `# Errors` section linked\n`SEEDED_MAX_ITERATIONS`, which is private, so rustdoc's\n`private_intra_doc_links` fired and the Documentation job — which runs\nwith `RUSTDOCFLAGS: -D warnings` — has been failing on main since #108.\n\nThe budget is an implementation detail a reader of the public docs cannot\nfollow the link to anyway, so say what it means instead of naming it:\nshorter than the unseeded entry point's, which is the property callers\nactually need to know.\n\nReproduce with `RUSTDOCFLAGS=\"-D warnings\" cargo doc --workspace\n--no-deps --all-features` — the check I did not run before #108.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T10:15:09-04:00",
+          "tree_id": "8b0e829099cc8cea6aaf97a514350e511c4bc486",
+          "url": "https://github.com/esaueng/brepkit/commit/899e314259021cc5e52743d4185fd797b08db759"
+        },
+        "date": 1786112267028,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 529058,
+            "range": "± 30696",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 656471,
+            "range": "± 53761",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7893,
+            "range": "± 434",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 535564,
+            "range": "± 48049",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16745376,
+            "range": "± 1545075",
             "unit": "ns/iter"
           }
         ]
