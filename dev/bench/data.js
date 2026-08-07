@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786107600657,
+  "lastUpdate": 1786110702990,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5345,6 +5345,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13259823,
             "range": "± 177534",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7619ae2b603033cadb7ec04e71e204fa3d62136a",
+          "message": "fix(operations): veto materially-overlapping genus-0 outer-shell components in validate (#104)\n\nThe per-component acceptance in #103 was too permissive: a broken boolean\nthat leaves closed tool fragments floating INSIDE the stock (the\nequal-radius cross-drill's sealed bore lobes) validated clean, silencing\nthe consuming editor's repair path. Add an overlap veto for multi-component\nouter shells: two components whose AABBs (from sampled face polygons)\nintersect with real thickness in every dimension are debris, not a\ntangent/disjoint union — those intersect in a zero-thickness slab.\n\nTwo exemptions mirror legitimate containment: components carrying\ninner-shell (cavity) faces, and pairs where either component has genus\nabove zero (a full hollow revolve stores its toroidal cavity wall as a\nsecond outer-shell component — the shape the historical higher-genus\nconnectivity skip existed for).\n\nVerified: fuse_cylinder_tangent_to_box_wall_succeeds still passes, the\nvalidate module (incl. hollow_revolve_is_valid) is 44/44, and the\nnextest failure set is byte-identical to base.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T08:48:55-05:00",
+          "tree_id": "97646eef91f54972c08e747115715d14dbbe26ff",
+          "url": "https://github.com/esaueng/brepkit/commit/7619ae2b603033cadb7ec04e71e204fa3d62136a"
+        },
+        "date": 1786110701771,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 555131,
+            "range": "± 14693",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 599067,
+            "range": "± 30489",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7454,
+            "range": "± 184",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 522667,
+            "range": "± 32064",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15545273,
+            "range": "± 1201590",
             "unit": "ns/iter"
           }
         ]
