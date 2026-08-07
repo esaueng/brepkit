@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786072615294,
+  "lastUpdate": 1786077280882,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4967,6 +4967,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 12805912,
             "range": "± 34165",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ebbc7745f3a834522e8bd5f617a8de51b577d36d",
+          "message": "Merge pull request #96 from esaueng/codex/step-axis2-optional-attrs\n\nfix: read STEP placement attributes by position",
+          "timestamp": "2026-08-06T23:32:36-05:00",
+          "tree_id": "30b98545099f5190ff07d9dfa3affb4acaec48a7",
+          "url": "https://github.com/esaueng/brepkit/commit/ebbc7745f3a834522e8bd5f617a8de51b577d36d"
+        },
+        "date": 1786077279899,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 519476,
+            "range": "± 10616",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 578930,
+            "range": "± 5406",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7378,
+            "range": "± 111",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 518041,
+            "range": "± 10458",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14113621,
+            "range": "± 308795",
             "unit": "ns/iter"
           }
         ]
