@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786069416250,
+  "lastUpdate": 1786069517431,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4859,6 +4859,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13588988,
             "range": "± 131834",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dc40e1f4674c6445c18a8793090c92ee0bc934a8",
+          "message": "Merge pull request #95 from esaueng/codex/step-edge-curve-same-sense\n\nfix(io)!: honour EDGE_CURVE same_sense on STEP import",
+          "timestamp": "2026-08-06T21:21:39-05:00",
+          "tree_id": "84572340b077edce0bc3ca79ba24c40edad275ec",
+          "url": "https://github.com/esaueng/brepkit/commit/dc40e1f4674c6445c18a8793090c92ee0bc934a8"
+        },
+        "date": 1786069516423,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 452843,
+            "range": "± 3041",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 501889,
+            "range": "± 5751",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7005,
+            "range": "± 92",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 406294,
+            "range": "± 851",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 12929079,
+            "range": "± 127115",
             "unit": "ns/iter"
           }
         ]
