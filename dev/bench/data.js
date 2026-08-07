@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786119351871,
+  "lastUpdate": 1786121471085,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5777,6 +5777,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 28237022,
             "range": "± 2616721",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "dbb033f3c5ed7dccfafecf96cba1525df921924d",
+          "message": "Merge pull request #113 from esaueng/fix/corner-tangent-line-graze\n\nfix(algo): veto line sections that only graze a plane face's rim",
+          "timestamp": "2026-08-07T11:48:20-05:00",
+          "tree_id": "cc277ba3aeb0dfebccf4b05d2cbb36ab71e19ee7",
+          "url": "https://github.com/esaueng/brepkit/commit/dbb033f3c5ed7dccfafecf96cba1525df921924d"
+        },
+        "date": 1786121469676,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 834858,
+            "range": "± 121098",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 956441,
+            "range": "± 103088",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10043,
+            "range": "± 431",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 791252,
+            "range": "± 54154",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21044026,
+            "range": "± 1772441",
             "unit": "ns/iter"
           }
         ]
