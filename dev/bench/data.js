@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786077280882,
+  "lastUpdate": 1786080449884,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5021,6 +5021,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14113621,
             "range": "± 308795",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1d99b1a296ee7613c2927e3dd65a2376b644212a",
+          "message": "Merge pull request #98 from esaueng/codex/e5b-stable-wasm-error-codes\n\nfeat(wasm): add stable batch error codes",
+          "timestamp": "2026-08-07T00:25:35-05:00",
+          "tree_id": "32c159ec5ea0e0940320436e9973fbd1768c036f",
+          "url": "https://github.com/esaueng/brepkit/commit/1d99b1a296ee7613c2927e3dd65a2376b644212a"
+        },
+        "date": 1786080448906,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 427348,
+            "range": "± 1342",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 474052,
+            "range": "± 1354",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7188,
+            "range": "± 115",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 409542,
+            "range": "± 1439",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 12593493,
+            "range": "± 62319",
             "unit": "ns/iter"
           }
         ]
