@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786104804025,
+  "lastUpdate": 1786107600657,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5291,6 +5291,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14397203,
             "range": "± 212502",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c6d855e41c81b2218f22c883006999e83b57b710",
+          "message": "fix(operations): validate multi-component shells per component (#103)\n\nA fuse of solids that touch only on a measure-zero set (the tangent-union\ncase fixed by #102) or not at all keeps each operand as its own closed\ncomponent — but validate_solid flagged every such result: either \"shell is\ndisconnected\" (when the global genus read 0) or a bogus global Euler error\n(V-E+F = 4 is exactly right for two closed components). OpenZCAD's strict\nunion gate requires validateSolid == 0, so the tangent union still showed\nthe open/non-manifold banner even after #102.\n\nDecompose the shell's faces into edge-connected components once and\nevaluate both checks per component: each component must independently be\nclosed and Euler-consistent (V-E+F = 2 + L, per-component genus allowance\nunchanged). A disconnection paired with any per-component Euler defect or\nboundary edge still reports the classic assembly error. Cavity shells,\nwhich are separate components by construction, now validate on the same\nrule instead of relying on the old genus>0 skip.\n\nThe tangent-union regression test now asserts validate_solid reports zero\nerrors — the exact gate the consuming editor applies.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T07:57:49-05:00",
+          "tree_id": "f6fd721ff2f17e0c9cb13109fd9d7f5e632a67b8",
+          "url": "https://github.com/esaueng/brepkit/commit/c6d855e41c81b2218f22c883006999e83b57b710"
+        },
+        "date": 1786107599329,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 463522,
+            "range": "± 4420",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 518588,
+            "range": "± 87421",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6865,
+            "range": "± 24",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 421398,
+            "range": "± 2263",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13259823,
+            "range": "± 177534",
             "unit": "ns/iter"
           }
         ]
