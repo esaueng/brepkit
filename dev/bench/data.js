@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786116054139,
+  "lastUpdate": 1786119351871,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5723,6 +5723,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 18064294,
             "range": "± 2598524",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "db17ef6d2c28819da7b477b1a2bf5fbd43b41cd2",
+          "message": "Merge pull request #112 from esaueng/fix/cylinder-cylinder-breakout-windows\n\nfix(math): emit one breakout loop per angular window in cylinder-cylinder",
+          "timestamp": "2026-08-07T11:12:14-05:00",
+          "tree_id": "1a4661534ceae9ddaa416688ead604869e635915",
+          "url": "https://github.com/esaueng/brepkit/commit/db17ef6d2c28819da7b477b1a2bf5fbd43b41cd2"
+        },
+        "date": 1786119350459,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 907235,
+            "range": "± 138059",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 829159,
+            "range": "± 152296",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12409,
+            "range": "± 1225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 889371,
+            "range": "± 41846",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 28237022,
+            "range": "± 2616721",
             "unit": "ns/iter"
           }
         ]
