@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786121471085,
+  "lastUpdate": 1786127811816,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5831,6 +5831,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21044026,
             "range": "± 1772441",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "86ae8a0917b8eb282aafea57dd405a23f36a1c59",
+          "message": "Merge pull request #114 from esaueng/feat/union-robustness-census\n\nfeat(operations): union robustness census example",
+          "timestamp": "2026-08-07T13:34:20-05:00",
+          "tree_id": "26282af2d0ab65d07a8f6b55ec664b9c36cad9ce",
+          "url": "https://github.com/esaueng/brepkit/commit/86ae8a0917b8eb282aafea57dd405a23f36a1c59"
+        },
+        "date": 1786127810621,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 517914,
+            "range": "± 40505",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 595613,
+            "range": "± 49259",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7319,
+            "range": "± 559",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 565865,
+            "range": "± 47540",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15863179,
+            "range": "± 1184207",
             "unit": "ns/iter"
           }
         ]
