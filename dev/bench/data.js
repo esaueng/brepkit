@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1785888105776,
+  "lastUpdate": 1786069416250,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -4805,6 +4805,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15581720,
             "range": "± 484605",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8eced005e8fd2911f11e69847f3254383b390934",
+          "message": "Merge pull request #94 from esaueng/codex/step-axis2-refdir-projection\n\nfix(step): honour the declared AXIS2_PLACEMENT_3D ref_direction on conics",
+          "timestamp": "2026-08-06T21:21:31-05:00",
+          "tree_id": "5a0efc8f26aef7b353c70b305adef13dd2d6ae3c",
+          "url": "https://github.com/esaueng/brepkit/commit/8eced005e8fd2911f11e69847f3254383b390934"
+        },
+        "date": 1786069415233,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 471125,
+            "range": "± 5132",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 508650,
+            "range": "± 9770",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7370,
+            "range": "± 50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 461280,
+            "range": "± 4502",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13588988,
+            "range": "± 131834",
             "unit": "ns/iter"
           }
         ]
