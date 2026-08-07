@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786110986692,
+  "lastUpdate": 1786111592268,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5453,6 +5453,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14613255,
             "range": "± 303391",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "eb3618a3f613b0ecee01506207b60eb3c1aee774",
+          "message": "fix+perf: bound NURBS faces by their trim, and stop rebuilding the projection grid (#108)\n\n* fix: bound a NURBS face by its trim, not its knot domain\n\nThe sibling of the sphere/torus fix. A NURBS face's interior grid spanned\nthe surface's whole knot domain, so a face cut from the corner of a large\npatch reported the rest of the patch — the reporting CATIA part carries\n65 B-spline surfaces alongside its 72 tori. On a domed test sheet a face\nliving beyond x = 80 and never rising past 31 came back as x from 25 and\nz to 75: the sheet's peak, from a grid point at the domain's centre that\nthe face does not contain.\n\nThe region is now recovered from the boundary, as the analytic surfaces\ndo. A NURBS surface has no closed-form inversion, so this projects the\nboundary samples onto it, and three things keep that affordable:\n\n  * A direction the surface closes on skips straight to its full domain.\n    The seam bounds nothing there and both ends of the domain are the\n    same points in space, so no projection could tell them apart anyway\n    — `is_periodic_u`/`_v` already answer this.\n  * A face whose control hull already sits inside the box cannot move it\n    (positive weights, so the surface is inside the hull), so it skips\n    the projection outright. The final box is identical either way, since\n    the box only grows.\n  * A sample budget spread across the edges, and shared corners dropped\n    before projecting rather than after. Per-edge density alone made cost\n    scale with edge count: a forty-eight-sided face cost 432 projections\n    where a four-sided one cost 36. Together these took the worst case\n    from 2160 us to 241 us a face.\n\nSampling is now closed rather than interior-only. Over the full domain\nthe boundary edges covered the rim; over a trimmed region they do not,\nand an interior-only grid was reading 12% under the patch's true height.\n\nCosts are real and worth stating: against main, a trimmed NURBS face goes\n2.3 us -> 241 us, a 32-segment sphere 2.2 -> 23 us, a trimmed torus band\n0.4 -> 2.8 us; box and cylinder are unchanged. Accuracy was chosen over\nspeed at every one of those: `face_set_bounding_box` promises the boolean\ndisjoint fast path an outer bound, and a box that is too small there is a\nwrong boolean, not a slow one. Newton's projection is kept for the same\nreason, over a nearest-grid-node inversion that would be ~20x cheaper and\ncan land on the wrong side of a fold.\n\nThree tests: the corner patch, an untrimmed face that must keep its peak,\nand a cylinder-as-NURBS where the periodic direction must keep the whole\nring while the other still trims.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* perf: let a caller seed NURBS point inversion\n\n`project_point_to_surface` spends an 81-point grid evaluation on every\ncall purely to find somewhere to start Newton. A caller projecting many\npoints onto one surface — successive samples along a trim curve — already\nknows where each one lands, because the last one landed next to it.\n`project_point_to_surface_seeded` lets it say so. Measured on a walk\nacross a domed patch, interleaved in one process so both paths see the\nsame machine: 4.38 us a point down to 1.01, and the chained walk agrees\nwith the grid search to 3e-10 in parameter.\n\nThe existing entry point now delegates through the same plumbing with the\ngrid result as its seed. That path is unchanged by construction — a grid\npoint is always finite and in-domain, so the new clamp and finite check\nare no-ops on it — which matters because `intersection/surface_seeding`\nreads `SurfaceProjection::distance` as a correctness oracle.\n\nSeeding is only safe because the refiner's residual can be trusted, and\nthat took two guards. The seed is clamped: the refiner takes its starting\niterate unclamped and several exits return it verbatim, so an\nout-of-domain seed could surface as a result whose `(u, v)` sat outside\nthe domain while `distance` described the clamped evaluation somewhere\nelse. And a non-finite seed is refused, because unlike the curve refiner\nthe surface one has no NaN guard.\n\nWith those, `distance` describes the surface at the returned parameters\non all four exits, which is what lets a caller check the answer — and it\nhas to, because `Ok` means very little here. Newton solves perpendicularity\nwith no descent test, so from a bad seed it settles on whatever stationary\npoint it reaches, and two exits return successfully without having\nconverged at all. The doc comment says so plainly rather than leaving the\nnext caller to find out.\n\n`nurbs_patch_domain` chains along the boundary on that contract, and the\nthreshold it judges by is learned, not fixed. A boundary sample is a point\nof the *edge* curve, which lies on its face's surface only to the tolerance\nthe edge was built at; demanding the Newton tolerance rejected every\nhealthy-but-inexact edge and paid for both paths, which measured *slower*\nthan not seeding — 578 us on a face that costs 105 with a budget calibrated\nfrom the face's own observed edge-to-surface gap. The seeded iteration cap\ncame out of the same measurement: eight cut off legitimate solves for\npoints sitting off the surface, and twelve costs the same as thirty.\n\nAlso fixes a real defect this inherited. `ParametricSurface::project_point`\nanswers the domain midpoint when Newton fails, so a failed inversion was\nfolding a point the face may not contain into the recovered span — the\nhazard `holed_face.rs` and the pave filler both already route around. A\nface that cannot be inverted now keeps its full domain instead.\n\nBounding-box cost, trimmed NURBS faces: 241 -> 63 us at 48 edges,\n578 -> 105 at 12.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* perf: evaluate a NURBS coarse-search grid once per face, not per point\n\nProfiling the slowest boolean in the suite — a tilted divider bin socket\nfuse — put 77% of its runtime inside `project_point_to_surface`, and 90%\nof the thread under one caller: `pave_filler::phase_ef`'s edge-face pair\ncheck. Not pcurve computation, which static call-site counting had\nfingered and which measures ~1,100 projections against that phase's\n260,000.\n\nThe waste is structural. Inverting a point onto a NURBS surface begins\nwith an 81-point coarse grid, and that grid depends only on the surface —\nthe query point merely picks the nearest node. `phase_ef` walks every\nedge against every face, so it was rebuilding the same face's grid for\nevery sample of every edge: 17 per pair for the on-surface test, 60 more\nper crossing for `refine_crossing`'s ternary search.\n\n`SurfaceSeedGrid` evaluates that grid once; `project_point_to_surface_with_grid`\ntakes it and spends 81 distance comparisons where the old path spent 81\nsurface evaluations. `phase_ef` builds one per NURBS face before the edge\nloop and the whole nest reuses it.\n\nThis is a speed change and nothing else. The grid holds the same nodes in\nthe same scan order, so the nearest-node tie-break resolves identically,\nso Newton starts at the same seed and lands on the same answer — asserted\nbit-for-bit over 196 probe points, `to_bits()` on u, v and distance. The\nNURBS arm of `distance_to_surface` mirrors `ParametricSurface::project_point`\nexactly, domain-midpoint fallback included, rather than taking the chance\nto fix it: correcting that hazard belongs in its own change, where the\nbehavioural effect can be reviewed on its own terms.\n\nMeasured serially on one profile, before -> after:\n\n  socket_assembly_fuse   27.01s -> 5.87s   4.6x\n  honeycomb_cut          10.13s -> 6.22s   1.6x\n  fracwidth_corner        3.63s -> 1.26s   2.9x\n  lipcorner_tangent       2.99s -> 1.66s   1.8x\n  lship_lipcut            2.21s -> 2.11s   1.05x\n  total                  45.97s -> 17.11s  2.7x\n\nOptimized build, socket fuse alone: 3.46s -> 0.67s.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T10:03:38-04:00",
+          "tree_id": "3eed6b53fa98c6a79cb491bae657cdc41f66f250",
+          "url": "https://github.com/esaueng/brepkit/commit/eb3618a3f613b0ecee01506207b60eb3c1aee774"
+        },
+        "date": 1786111591060,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 509000,
+            "range": "± 24184",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 555857,
+            "range": "± 21747",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7623,
+            "range": "± 225",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 526315,
+            "range": "± 44962",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14756299,
+            "range": "± 798168",
             "unit": "ns/iter"
           }
         ]
