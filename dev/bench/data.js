@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786112268285,
+  "lastUpdate": 1786114366947,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5615,6 +5615,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16745376,
             "range": "± 1545075",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9cf613f2af41f2d18a42a1df755345ff7891b778",
+          "message": "Merge pull request #111 from esaueng/codex/bump-brepkit-3.0.0\n\nchore: bump brepkit-wasm to 3.0.0",
+          "timestamp": "2026-08-07T09:50:32-05:00",
+          "tree_id": "d4dff830052be4cfcf775f05e73eb35d5bc99e24",
+          "url": "https://github.com/esaueng/brepkit/commit/9cf613f2af41f2d18a42a1df755345ff7891b778"
+        },
+        "date": 1786114365675,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 498541,
+            "range": "± 6668",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 536408,
+            "range": "± 5841",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6838,
+            "range": "± 727",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 510871,
+            "range": "± 35279",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15973989,
+            "range": "± 1225768",
             "unit": "ns/iter"
           }
         ]
