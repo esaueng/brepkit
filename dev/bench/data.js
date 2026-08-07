@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786080449884,
+  "lastUpdate": 1786081181281,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5075,6 +5075,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 12593493,
             "range": "± 62319",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0ad93a1a369824c26411d2a9e33a404254622ba1",
+          "message": "Merge pull request #99 from esaueng/codex/fix-bounding-box-untrimmed-surfaces\n\nfix: bound a solid's box by its faces, not their surfaces",
+          "timestamp": "2026-08-07T00:37:45-05:00",
+          "tree_id": "fff71c56d0df443b04cda2f42476396386a0bbc1",
+          "url": "https://github.com/esaueng/brepkit/commit/0ad93a1a369824c26411d2a9e33a404254622ba1"
+        },
+        "date": 1786081180325,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 486010,
+            "range": "± 1543",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 545087,
+            "range": "± 11243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6479,
+            "range": "± 108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 447076,
+            "range": "± 6248",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 12702488,
+            "range": "± 108588",
             "unit": "ns/iter"
           }
         ]
