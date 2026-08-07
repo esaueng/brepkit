@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786127811816,
+  "lastUpdate": 1786130083164,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5885,6 +5885,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15863179,
             "range": "± 1184207",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f44a0331bb1e05d0d3801e4bf2ff1e4ee139aa0d",
+          "message": "fix(algo): band-split a lateral drilled clean through (#115)\n\nA cross-drilled shaft measured as UN-BORED stock — 848.040 at bore r=1\nand r=2 against closed forms of 829.646 and 777.294, the same number for\ntwo geometrically different holes. The bore was not merely mis-measured:\nit was never carved. The mesh carried 20 boundary edges and\n`classify_point` put the bore's centre INSIDE the solid.\n\nSeen from the BORE cylinder the two breakout rims are closed loops that\nWIND its `u` period once each (measured +/-6.2832 rad at bore\nr=2.9/2/1). A period-winding loop bounds no disc — it separates the\nlateral into bands, with the tube the drill leaves inside the shaft as\nthe middle one. `split_face_2d` routed them to the internal-loops path\ninstead, which read each as a contractible hole, built a disc off it and\ndropped the tube between them. The winding went unseen because\n`winding_section_chain` sums `u`-progress over section ENDPOINTS, and a\nclosed loop's two endpoints are the same point.\n\nThe census hid all of this: 5 faces, a wall with 2 inner wires and 2\nbore-tube faces LOOKS right. The tell was that those two \"tube\" faces\nmeshed out to x in [-86, +164] on a body living in x in [-3, 3].\n\n- `winding_section_chains` returns every winding chain, not just the\n  first, and `split_periodic_face_by_winding_chain` is generalised from\n  ONE separator (2 bands) to N (N+1 bands), ordered by `v` at the seam\n  with a strict non-crossing test. Its N=1 output is unchanged.\n- `compute_winding_loop_cuts` / `presplit_closed_winding_loops` open the\n  loops so they have a vertex on the seam the band wires run along.\n  Applied to EVERY face, so both sides of a shared curve carry identical\n  arcs and `merge_duplicate_edges` can pair their edges.\n- Each arc gets its own sub-curve via `curve_split` rather than a\n  start/end pair on the shared closed one: on a closed curve the seam\n  parameter is ambiguous, so `domain_with_endpoints` cannot tell the arc\n  ending there from its complement and falls back to the FULL domain —\n  the edge silently becomes the whole loop again, and\n  `split_arc_edges_at_collinear_vertices` then re-cut it at every other\n  arc's endpoints.\n- Three cut meridians 120 degrees apart, one on the seam: an arc\n  spanning exactly pi folds the wrong way under `wrap_pi` and cancels\n  the loop's winding to exactly zero.\n- Band seam segments run between the separators' OWN vertices instead of\n  re-evaluating the surface, which lands up to the rim's fit error away\n  — past the vertex quantum on a shallow breakout, giving the seam its\n  own duplicate vertices and an unclosed wire.\n- Reversed faces take the opposite wire winding, or every shared edge is\n  traversed the same way by both neighbours.\n- The seam is excluded from \"the boundary\" in the internal-loops gate,\n  but only for sections that chain into closed loops among themselves.\n  A bore's seam meridian meets the shaft's own wherever the two share a\n  half-plane, so opening the rims put an opening point exactly on the\n  wall's seam and the whole face fell to the wire builder.\n- `split_edges_at_collinear_vertices` leaves SEAM boundaries alone.\n  Refining one buys nothing (no second face's partition to match) and\n  costs an edge with no vertex to pay for it, so the solid's Euler\n  characteristic comes out odd and the acceptance gate falls the whole\n  boolean back to mesh.\n\nEQUAL radii keep the disc-per-loop reading. There the intersection\ndegenerates to two planar conics, which `algebraic_cylinder_cylinder`\ndoes not return: its +/-sqrt branches survive the whole sweep, so what\ncomes back is the pair's ENVELOPES, which wind but meet at the swap\npoints and bound no band. Nothing distinguishes the two configurations\nlocally — at bore r=2.999 the loops sit 0.155 apart and at r=3 they sit\n0.114 apart, on faces of the same scale — so the exact degeneracy is the\ntest.\n\nMeasured against the closed form (stock 848.230):\n\n| bore r | before   | after      | closed form |\n|--------|----------|------------|-------------|\n| 3      | 704.263  | 704.263    | 704.230     |\n| 2      | 848.040  | 777.295    | 777.294     |\n| 1      | 848.040  | 829.646    | 829.646     |\n| 0.5    | 848.040  | 843.534    | 843.534     |\n\n`a_cross_drilled_shaft_measures_its_closed_form_at_every_bore_radius`\ncomes off `#[ignore]`, and a new\n`a_cross_drilled_shaft_has_its_bore_carved_out` ray-casts the bore —\nthe check the volume alone cannot make, since a body measured as stock\nand a body whose bore is missing from the B-rep read the same on any\nintegrator.\n\nKnown residue, both leaving the affected bodies on exactly the route\nthey take today: a bore radius whose rim samples a meridian EXACTLY\nloses that cut, so the loop stays closed and the body keeps the mesh\nfallback (r=2.5 and r=2.95 of this family). And the through-bore band's\nown tessellation emits a doubled ruling strip — 16 non-manifold mesh\nedges at r=2, deflection-independent — so the exported mesh is closed\nbut not manifold there.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T14:12:31-05:00",
+          "tree_id": "445bfd5f7bf3d0f13467fd668b49d64ea6b22558",
+          "url": "https://github.com/esaueng/brepkit/commit/f44a0331bb1e05d0d3801e4bf2ff1e4ee139aa0d"
+        },
+        "date": 1786130081903,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 461959,
+            "range": "± 1756",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 521909,
+            "range": "± 11697",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7186,
+            "range": "± 146",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 432522,
+            "range": "± 10298",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13197447,
+            "range": "± 32887",
             "unit": "ns/iter"
           }
         ]
