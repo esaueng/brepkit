@@ -16,7 +16,7 @@ DATA;
      CONICAL_SURFACE('Cone.?', #43, 12., 6.435011087932844E-1)
 
    whose `semi_angle` is atan(3/4) — 3 of radius per 4 of axis — and whose
-   `base_radius` of 12 ISO 10303-42 states on the placement plane at #40,
+   `base_radius` of 12 ISO 10303-42 states on the placement plane at #48,
    z=0. The apex is therefore NOT the placement origin: it sits
    12*cot(atan(3/4)) = 16 below it, at (0,0,-16).
 
