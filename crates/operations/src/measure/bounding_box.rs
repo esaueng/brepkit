@@ -4,8 +4,9 @@ use std::collections::HashSet;
 use std::f64::consts::{FRAC_PI_2, PI, TAU};
 
 use brepkit_math::aabb::Aabb3;
+use brepkit_math::nurbs::projection::{project_point_to_surface, project_point_to_surface_seeded};
+use brepkit_math::nurbs::surface::NurbsSurface;
 use brepkit_math::surfaces::{SphericalSurface, ToroidalSurface};
-use brepkit_math::traits::ParametricSurface;
 use brepkit_math::vec::{Point3, Vec3};
 use brepkit_topology::Topology;
 use brepkit_topology::face::{FaceId, FaceSurface};
@@ -232,6 +233,36 @@ const NURBS_TRIM_SAMPLES_PER_EDGE: usize = 8;
 /// resolve the boundary finely.
 const NURBS_TRIM_SAMPLE_BUDGET: usize = 64;
 
+/// Newton tolerance for inverting a boundary sample onto its NURBS surface.
+///
+/// The value [`ParametricSurface::project_point`](brepkit_math::traits::ParametricSurface::project_point)
+/// hardcodes, which is the solve this replaced.
+const NURBS_PROJECT_TOL: f64 = 1e-7;
+
+/// Floor for the residual a seeded inversion may leave, as a fraction of the
+/// surface's own size.
+///
+/// It cannot be [`NURBS_PROJECT_TOL`]: a boundary sample is a point of the
+/// *edge* curve, which lies on the face's surface only to the tolerance the
+/// edge was built or imported at, so demanding the Newton tolerance itself
+/// would reject every healthy-but-inexact edge and fall back on all of them —
+/// slower than never having seeded at all. Nor can it be an absolute slack,
+/// which would mean different things on a part drawn in metres and one drawn
+/// in millimetres.
+///
+/// This is only the floor. How far a face's edges actually sit off its surface
+/// is a property of that face, not a constant, so the real budget is learned
+/// per face — see [`SeedBudget`].
+const NURBS_SEED_FLOOR_FRAC: f64 = 1e-5;
+
+/// Margin over a face's own observed edge-to-surface gap within which a seeded
+/// inversion is still believed.
+///
+/// The failure being screened out is a seed whose basin led somewhere else on
+/// the patch, which lands a good fraction of the patch away — far outside a
+/// few times the gap the face's own edges already show.
+const NURBS_SEED_SLACK: f64 = 4.0;
+
 /// Slack added to each side of a recovered NURBS parameter span, as a fraction
 /// of that span.
 ///
@@ -418,10 +449,27 @@ fn nurbs_patch_domain(
         }
     }
 
+    // Walk the boundary carrying the last verified parameter forward as the
+    // next Newton seed. `distinct` preserves wire order, so consecutive
+    // entries are neighbours along the boundary and land within a step or two
+    // of one another in parameter — which is the grid search's whole job, had
+    // for free. A seed that leads elsewhere is caught and paid for below.
+    let mut budget = SeedBudget::for_surface(nurbs);
+    let mut seed: Option<(f64, f64)> = None;
     let (mut u_lo, mut u_hi) = (f64::INFINITY, f64::NEG_INFINITY);
     let (mut v_lo, mut v_hi) = (f64::INFINITY, f64::NEG_INFINITY);
     for p in &distinct {
-        let (u, v) = ParametricSurface::project_point(nurbs, *p);
+        let Some((u, v)) = invert_boundary_sample(nurbs, *p, &mut seed, &mut budget) else {
+            // Neither the seed nor the grid search could place this sample.
+            // The recovered span would be missing a piece of the boundary, and
+            // a span that is too small is a box that is too small, so give up
+            // on trimming this face rather than report a region we cannot
+            // stand behind.
+            return PatchDomain {
+                u: full_u,
+                v: full_v,
+            };
+        };
         u_lo = u_lo.min(u);
         u_hi = u_hi.max(u);
         v_lo = v_lo.min(v);
@@ -440,6 +488,106 @@ fn nurbs_patch_domain(
             padded_span((v_lo, v_hi), full_v)
         },
     }
+}
+
+/// Invert one boundary sample onto its NURBS surface, seeding Newton from the
+/// previous sample's parameters and carrying the answer forward.
+///
+/// The sample lies *on* the surface by construction — it is a point of the
+/// face's own boundary — so a correct inversion leaves a residual near zero,
+/// and one that does not is not this point's parameter. That is what makes a
+/// seed safe to use at all: Newton solves perpendicularity rather than
+/// minimising, so it settles wherever the seed's basin leads, and a seeded
+/// answer is only ever as good as its seed. Accepted, the result is a verified
+/// preimage; rejected, the call falls back to the grid search that ran here
+/// before, so the recovered span is never worse for having tried.
+///
+/// Only verified parameters are carried forward — seeding the next solve from
+/// an unchecked basin would let one bad inversion walk down the whole
+/// boundary.
+///
+/// Returns `None` when even the grid search cannot place the sample.
+/// [`ParametricSurface::project_point`](brepkit_math::traits::ParametricSurface::project_point)
+/// answers the domain midpoint there, which would fold a point the face may
+/// not contain into the span; the caller needs to know instead.
+fn invert_boundary_sample(
+    nurbs: &NurbsSurface,
+    p: Point3,
+    seed: &mut Option<(f64, f64)>,
+    budget: &mut SeedBudget,
+) -> Option<(f64, f64)> {
+    let seeded = seed.and_then(|s| {
+        project_point_to_surface_seeded(nurbs, p, NURBS_PROJECT_TOL, s)
+            .ok()
+            .filter(|proj| budget.accepts(proj.distance))
+    });
+    if let Some(proj) = seeded {
+        *seed = Some((proj.u, proj.v));
+        return Some((proj.u, proj.v));
+    }
+
+    let proj = project_point_to_surface(nurbs, p, NURBS_PROJECT_TOL).ok()?;
+    budget.observe(proj.distance);
+    *seed = budget.accepts(proj.distance).then_some((proj.u, proj.v));
+    Some((proj.u, proj.v))
+}
+
+/// How large a residual a seeded inversion may leave on this face and still be
+/// believed.
+///
+/// A fixed threshold cannot work. Set it at the Newton tolerance and every
+/// face whose edges sit slightly off their surface — which is most imported
+/// geometry — rejects every seed and pays for both paths, ending up slower
+/// than never seeding. Set it loose enough for those and it stops screening
+/// anything on a face whose edges are exact.
+///
+/// So it is learned. The grid search runs on the first sample of every face
+/// and on every rejection, and what it leaves is this face's own edge-to-
+/// surface gap, measured rather than assumed; the budget is a few times that,
+/// never below a floor scaled to the patch. A seed that landed in the wrong
+/// basin is a good fraction of the patch away and still fails it.
+struct SeedBudget {
+    limit: f64,
+}
+
+impl SeedBudget {
+    /// Start from the floor alone: the patch's size times
+    /// [`NURBS_SEED_FLOOR_FRAC`], before any edge has been measured.
+    fn for_surface(nurbs: &NurbsSurface) -> Self {
+        Self {
+            limit: surface_extent(nurbs) * NURBS_SEED_FLOOR_FRAC,
+        }
+    }
+
+    /// Fold in a residual left by the grid search — evidence of how far this
+    /// face's edges genuinely lie off its surface.
+    fn observe(&mut self, grid_residual: f64) {
+        if grid_residual.is_finite() {
+            self.limit = self.limit.max(grid_residual * NURBS_SEED_SLACK);
+        }
+    }
+
+    fn accepts(&self, residual: f64) -> bool {
+        residual <= self.limit
+    }
+}
+
+/// Diagonal of the surface's control-point box — a cheap stand-in for how big
+/// the patch is, and an upper bound on it, since the surface lies inside that
+/// hull.
+fn surface_extent(nurbs: &NurbsSurface) -> f64 {
+    let mut lo = [f64::INFINITY; 3];
+    let mut hi = [f64::NEG_INFINITY; 3];
+    for p in nurbs.control_points().iter().flatten() {
+        for (axis, c) in [p.x(), p.y(), p.z()].into_iter().enumerate() {
+            lo[axis] = lo[axis].min(c);
+            hi[axis] = hi[axis].max(c);
+        }
+    }
+    if lo[0] > hi[0] {
+        return 0.0;
+    }
+    (hi[0] - lo[0]).hypot(hi[1] - lo[1]).hypot(hi[2] - lo[2])
 }
 
 /// Widen a recovered parameter span by [`NURBS_DOMAIN_PAD`] on each side and
