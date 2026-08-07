@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786082056855,
+  "lastUpdate": 1786088181266,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5183,6 +5183,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13507000,
             "range": "± 188895",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4f93fc4d75d67730fd2b573829199689e035873b",
+          "message": "fix(algo): drop tangency-graze section circles riding the plane-extent margin band (#102)\n\nFusing a cylinder whose wall is tangent to a box face (line contact, zero\noverlap volume) errored out with NonManifoldResult: the cap-plane x wall\nsection circles touch the box's top/bottom faces at a single grazing point,\nbut survived restrict_curves_to_faces by riding the plane extent's\n1%-of-face containment margin for ~10% of their circumference — enough\nconsecutive in-both samples to defeat the run-length graze test. The kept\ncircles split three faces along a measure-zero contact, the tangent edge\ncame out shared by 3 faces, the manifold gate rejected the GFA result, and\nthe mesh fallback welded the same tangent line into non-manifold edges, so\nthe whole fuse failed (tangent-union report from the OpenZCAD editor).\n\nVeto a closed section curve with a PARTIAL in-both run when any interior\nprobe of the run lies decisively OUTSIDE a plane-side extent (beyond a band\ncovering float noise and the arc-edge polygon sagitta). Points inside or ON\na boundary stay legitimate: same-footprint stacked prisms ride the cap\noutline exactly, cap-rim sections ride the partner cylinder's v-boundary\n(analytic extents are exempt), and full-circumference runs stay with the\nseam-adoption/CommonBlock path.\n\nWith the graze circles gone, a tangent-contact fuse degenerates to the\ndisjoint-union assembly: both operands stay whole and analytic, volume is\nthe plain sum, and ray-cast classification is correct on both interiors.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T02:34:24-05:00",
+          "tree_id": "d250b6567e0629f722112c14bb5f3090e8d1ef2c",
+          "url": "https://github.com/esaueng/brepkit/commit/4f93fc4d75d67730fd2b573829199689e035873b"
+        },
+        "date": 1786088180223,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 500355,
+            "range": "± 2523",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 540503,
+            "range": "± 3923",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7180,
+            "range": "± 29",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 439163,
+            "range": "± 9912",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13948228,
+            "range": "± 40192",
             "unit": "ns/iter"
           }
         ]
