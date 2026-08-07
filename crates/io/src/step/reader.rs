@@ -835,15 +835,18 @@ impl<'a> StepBuilder<'a> {
                 // `base_radius` is a length measure, so it takes the file's
                 // length scale like every other radius here.
                 //
-                // Read it only when both floats are present: a statement that
-                // carries one number states no radius, and `first()` would
-                // hand back the semi_angle as one.
+                // Counted from the END, like the semi_angle above, because
+                // `parse_floats` does not skip the entity's name: it strips
+                // the quotes and parses what is inside, so a cone labelled
+                // '2' contributes a leading 2.0 that shifts every index
+                // counted from the front. A statement carrying one number
+                // states a semi_angle and no radius.
                 let base_radius = match floats.as_slice() {
-                    [radius, _, ..] => radius * self.units.length,
+                    [.., radius, _] => radius * self.units.length,
                     _ => 0.0,
                 };
                 let (origin, axis, _ref_dir) = self.build_axis2_placement(axis_ref)?;
-                let apex = cone_apex(surface_ref, origin, axis, base_radius, half_angle)?;
+                let apex = cone_apex(origin, axis, base_radius, half_angle);
                 let cone = brepkit_math::surfaces::ConicalSurface::new(apex, axis, half_angle)
                     .map_err(|e| IoError::ParseError {
                         reason: format!("CONICAL_SURFACE #{surface_ref}: {e}"),
@@ -2031,43 +2034,38 @@ impl<'a> StepBuilder<'a> {
 /// require a `DIRECTION` to be unit. It is normalized here so the shift is
 /// not scaled by whatever length the file happened to write.
 ///
-/// A `radius` of zero returns the origin untouched and does no arithmetic at
-/// all, so the cones most writers emit (brepkit's own among them) import
-/// bit-for-bit as before.
+/// Every case that yields no usable shift returns the origin, which is the
+/// apex this reader used before the radius was read at all. That keeps the
+/// cones most writers emit (brepkit's own among them) bit-for-bit unchanged,
+/// and it means no statement that imported before can fail here now:
 ///
-/// `h0` grows without bound as `semi_angle` approaches zero, which is a cone
-/// whose generators run parallel to its axis. That apex is where the file
-/// puts it and is returned as written; only a `h0` that is not finite is
-/// refused, because an apex of infinity or NaN would spread through every
-/// point derived from the surface without ever reporting itself.
+/// - a `radius` of zero, the overwhelmingly common case, does no arithmetic;
+/// - a negative `radius` violates ISO 10303-42's `WHERE` rule on
+///   `conical_surface`, and shifting by it would put the apex on the far side
+///   of the placement plane, opening the cone away from the material its own
+///   trim curves bound;
+/// - an axis of zero length gives no direction to shift along, and
+///   `ConicalSurface::new` refuses that placement a moment later with the
+///   message it has always given;
+/// - an offset that overflows to infinity, reachable at absurd radii as
+///   `semi_angle` approaches zero, would otherwise put NaN into every point
+///   derived from the surface without ever announcing itself.
 ///
-/// # Errors
-/// Returns an error if the apex offset is not finite.
-fn cone_apex(
-    surface_ref: u64,
-    origin: Point3,
-    axis: Vec3,
-    base_radius: f64,
-    half_angle: f64,
-) -> Result<Point3, IoError> {
-    if base_radius == 0.0 {
-        return Ok(origin);
+/// A large but finite offset is honoured: that apex is where the file puts it.
+fn cone_apex(origin: Point3, axis: Vec3, base_radius: f64, half_angle: f64) -> Point3 {
+    // NaN is named explicitly: it compares false against every bound, so a
+    // plain `<= 0.0` would let it through and put NaN in the apex.
+    if base_radius.is_nan() || base_radius <= 0.0 {
+        return origin;
     }
     let Ok(unit_axis) = axis.normalize() else {
-        // No direction to shift along. `ConicalSurface::new` refuses this
-        // placement a moment later with the message it has always given.
-        return Ok(origin);
+        return origin;
     };
     let offset = base_radius * half_angle.tan();
     if !offset.is_finite() {
-        return Err(IoError::ParseError {
-            reason: format!(
-                "CONICAL_SURFACE #{surface_ref} places its radius {base_radius} at a \
-                 semi-angle that puts the apex at no finite point"
-            ),
-        });
+        return origin;
     }
-    Ok(origin - unit_axis * offset)
+    origin - unit_axis * offset
 }
 
 // ── Placement frames ────────────────────────────────────────────────
@@ -6514,16 +6512,51 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         assert!((at_plane - 1.0).abs() < 1e-6, "radius at plane {at_plane}");
     }
 
-    /// An apex at no finite point is refused rather than handed to topology.
-    /// Every position derived from such a surface is infinite or NaN, and
-    /// none of them report themselves.
+    /// An offset that overflows leaves the apex at the origin — the answer
+    /// this reader gave before it read the radius at all. Refusing instead
+    /// would reject a statement that imports today.
     #[test]
-    fn cone_whose_apex_has_no_finite_point_is_refused() {
-        let err = surface_geometry(&z_axis_cone("1.E300", "1.E-16"), 5).unwrap_err();
-        assert!(
-            err.to_string().contains("no finite point"),
-            "unexpected error: {err}"
+    fn cone_whose_apex_offset_overflows_keeps_the_placement_origin() {
+        // A semi_angle of 1e-9 leaves `half_angle` strictly inside the range
+        // `ConicalSurface::new` accepts, so the surface itself is fine and
+        // only the offset overflows. (At 1e-16 the angle rounds to pi/2 and
+        // the constructor refuses it, on this branch and on main alike.)
+        let cone = cone_geometry(&z_axis_cone("1.E300", "1.E-9"));
+
+        assert_apex_bits(&cone, [0.0, 0.0, 0.0]);
+    }
+
+    /// ISO 10303-42's `WHERE` rule on `conical_surface` requires a
+    /// non-negative radius. Shifting by a negative one would put the apex on
+    /// the far side of the placement plane, opening the cone away from the
+    /// material its own trim curves bound, so it is treated as no radius —
+    /// which is what this reader did before it read the attribute.
+    #[test]
+    fn cone_with_a_negative_radius_keeps_the_placement_origin() {
+        let cone = cone_geometry(&z_axis_cone("-12.", CONE_SEMI_ANGLE_3_4));
+
+        assert_apex_bits(&cone, [0.0, 0.0, 0.0]);
+    }
+
+    /// `parse_floats` does not skip the entity's name: it strips the quotes
+    /// and parses what is inside. A cone labelled '2' therefore contributes a
+    /// leading 2.0, and a radius counted from the FRONT would read the label.
+    /// The semi_angle has always been counted from the end and was immune;
+    /// the radius is read the same way for the same reason.
+    #[test]
+    fn a_numeric_cone_label_is_not_its_base_radius() {
+        let body = format!(
+            "#1 = CARTESIAN_POINT('',(0.,0.,0.));\n\
+             #2 = DIRECTION('',(0.,0.,1.));\n\
+             #3 = DIRECTION('',(1.,0.,0.));\n\
+             #4 = AXIS2_PLACEMENT_3D('',#1,#2,#3);\n\
+             #5 = CONICAL_SURFACE('2',#4,0.,{CONE_SEMI_ANGLE_3_4});"
         );
+        let cone = cone_geometry(&body);
+
+        // The declared radius is 0, so the apex is the placement origin. Were
+        // the label read as the radius it would sit at z = -2*4/3.
+        assert_apex_bits(&cone, [0.0, 0.0, 0.0]);
     }
 
     /// A statement carrying a single number states a `semi_angle` and no
