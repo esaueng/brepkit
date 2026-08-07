@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786114366947,
+  "lastUpdate": 1786116054139,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5669,6 +5669,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15973989,
             "range": "± 1225768",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "483883d4b9ac3f037b1ff08d0bbefe2bbe090fb0",
+          "message": "Merge pull request #110 from esaueng/claude/xenodochial-banach-2c7138\n\nfix(operations): a corner-diagonal disjoint union is not debris",
+          "timestamp": "2026-08-07T10:15:04-05:00",
+          "tree_id": "181473f613b12b0f35481a35fc21f79f2394c5da",
+          "url": "https://github.com/esaueng/brepkit/commit/483883d4b9ac3f037b1ff08d0bbefe2bbe090fb0"
+        },
+        "date": 1786116052887,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 684985,
+            "range": "± 92040",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 819347,
+            "range": "± 62152",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8832,
+            "range": "± 548",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 624243,
+            "range": "± 61632",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18064294,
+            "range": "± 2598524",
             "unit": "ns/iter"
           }
         ]
