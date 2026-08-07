@@ -16,7 +16,6 @@
 use std::f64::consts::PI;
 
 use brepkit_math::mat::Mat4;
-use brepkit_operations::OperationsError;
 use brepkit_operations::boolean::{BooleanOp, BooleanOptions, boolean, boolean_with_options};
 use brepkit_operations::measure::solid_volume;
 use brepkit_operations::primitives::{make_box, make_cone, make_cylinder, make_sphere};
