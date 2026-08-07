@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786088181266,
+  "lastUpdate": 1786104804025,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5237,6 +5237,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13948228,
             "range": "± 40192",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "60bd81b23dbbd2eae00a7f0360ec4669e853d039",
+          "message": "fix: place a truncated cone's apex from its declared radius (#101)\n\n* fix(io): read CONICAL_SURFACE base_radius when placing the apex\n\nISO 10303-42 states a cone's `radius` on its placement plane, not at the\napex. The reader read `floats.last()` for the semi_angle and never read\n`floats.first()`, then handed the AXIS2_PLACEMENT origin straight to\n`ConicalSurface::new` as the apex. Every cone declaring a non-zero radius\ntherefore landed radius*cot(semi_angle) too far along its own axis and\ncarried the wrong radius at every point. Radius 0 — what most writers,\nbrepkit's own included, emit — was unaffected, which is why it survived.\n\nsemi_angle is measured from the axis, so a point h along the axis from the\napex carries radius h*tan(semi_angle); the placement plane sits\nh0 = radius*cot(semi_angle) = radius*tan(half_angle) ahead of it, where\nhalf_angle is brepkit's complement pi/2 - semi_angle.\n\nbase_radius takes the file's length scale, and the axis is normalized\nbefore it scales the shift because a declared DIRECTION need not be unit.\nA radius of zero returns the origin with no arithmetic at all, so today's\ncones import bit-for-bit. An apex offset that is not finite is refused\nrather than spread through every point derived from the surface.\n\nOn a 400-face customer part whose 2 non-zero-radius cones were the entire\nremaining volume error, volume at deflection 0.01 moves 2,267,517 ->\n2,558,290 mm^3 against an OpenCascade reference of 2,541,341.\n\nThe fixture states its wall as two cone faces deliberately: solid_volume\nrecognises a one-cone-plus-planar-caps shell as a primitive frustum and\nreads the cap radii off the trim circles, never touching the conical\nsurface, so a single-face frustum measures its closed form with the apex\nin the wrong place.\n\n* fix(io): count the cone's base_radius from the end of its floats\n\n`parse_floats` does not skip an entity's name: it strips the quotes and\nparses what is inside. A CONICAL_SURFACE labelled '2' therefore\ncontributes a leading 2.0, and reading the radius as floats[0] took the\nlabel as the radius. The semi_angle has always been read with `.last()`\nand was immune; the radius now counts from the same end.\n\nBoth reviewers found this independently, on a file declaring radius 0\nwhose apex moved anyway -- the same class of positional fragility this\nchange exists to remove.\n\nAlongside it, three cases that reached the arithmetic instead of being\ndecided: a negative radius shifted the apex to the far side of the\nplacement plane, opening the cone away from the material its own trim\ncurves bound; a NaN radius would have propagated into the apex; and an\noffset that overflows was refused outright, which lost files that import\non main today.\n\nAll of them now return the placement origin -- the apex this reader used\nbefore it read the radius at all -- so no statement that imported before\ncan fail here, and the error path is gone with them.\n\nThe zero-radius test survived deleting the guard it claimed to pin. The\nnegative-radius case does not: without the guard the apex lands sixteen\nunits the wrong side of the plane. Verified by mutation.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T08:11:17-04:00",
+          "tree_id": "a0cf2856146603187c02845eac6f4502fd8c7607",
+          "url": "https://github.com/esaueng/brepkit/commit/60bd81b23dbbd2eae00a7f0360ec4669e853d039"
+        },
+        "date": 1786104802860,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 504835,
+            "range": "± 13812",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 562768,
+            "range": "± 4960",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7307,
+            "range": "± 55",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 453260,
+            "range": "± 2217",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14397203,
+            "range": "± 212502",
             "unit": "ns/iter"
           }
         ]
