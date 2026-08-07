@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786110702990,
+  "lastUpdate": 1786110986692,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5399,6 +5399,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15545273,
             "range": "± 1201590",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5e0a55beebcd300af70e6e7581b0fa5a7d2a4394",
+          "message": "fix(operations): a cross-drilled shaft is not a wavy band (#105)\n\n`analytic_faces_solid_volume` declines a solid carrying a notched quadric\nwall whose outer wire is a marched NURBS rim, and hands the body to\ntessellation. d01d0241 added that decline for the wavy band a\ncircle-outside cone/box fuse leaves, whose rim marches the WHOLE way\nround the lateral: the per-face integrator has no closed outline to trim\non there and credits the analytic rectangle, over-counting the removed\nlobes.\n\nA cross-drilled bore's wall answers both of those tests too — no inner\nwires, one closed NURBS rim visiting three or more axial levels — so\nevery cross-drilled shaft left the exact path and fell through to\ntessellation, which reads the UN-BORED stock:\n\n  bore r | tessellated | closed form | error\n  -------|-------------|-------------|--------\n     3   |  848.040240 |  704.230016 | +20.4 %\n     2   |  848.040240 |  777.293907 |  +9.1 %\n     1   |  848.040240 |  829.646029 |  +2.2 %\n\nOne number for three geometrically different holes, converging on\n`solid_volume(make_cylinder(3, 30))` as the deflection tightens.\nConfirmed by build: ebb6ff75 reads 704.263/750.652/802.579 and its child\nd01d0241 reads 848.040 at all three, with `mass_properties` byte-identical\nacross the flip — the dispatch changed, not the maths.\n\nAdd the property that actually separates the two shapes, rather than a\nthird shape name: whether the boundary WINDS the periodic angle.\n`integrate_with_trimming` trims a quadric on its projected outline only\nwhen that outline closes; a boundary that winds has no inside to test\nagainst and falls back to the analytic rectangle. So winding is exactly\nthe condition under which the decline is warranted. A bore wall's rim\ncloses within the period and measures to its own chording.\n\nUn-ignore `the_body_is_the_cross_drilled_shaft_it_claims_to_be`, whose\nignore reason recorded the wrong number as a baseline.\n\nbrepkit-operations + brepkit-check, --no-fail-fast: 15 failures before,\n3 after — 12 newly passing, 0 newly failing. The decline was not only\nbreaking cross-drilled shafts; it also took out fillet and chamfer sliver\nvolumes, revolve winding, and the plate-bore fills. The 3 that remain\n(box_cylinder_fuse_returns_manifold_result,\nchamfer_v2_convex_ridge_removes_material, golden_sphere_r3) are\nbyte-identical with and without this change.\n`circle_outside_cone_box_fuse_is_watertight` still passes, so the fuse\nbug d01d0241 fixed stays fixed.\n\nBore radii below the shaft radius are still 3.4 % light. That is NOT this\ndefect and NOT tessellation: `algebraic_cylinder_cylinder` splices the two\ndisjoint bore lobes into one NURBS, which strays 1.25 mm off a 3 mm shaft\nat bore r=2 and 2.96 mm at r=1. The new ignored test records the\nquadrature truths and names that cause.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T08:54:01-05:00",
+          "tree_id": "1b4dbc53d7f1649731332aa3c30769af6428d26d",
+          "url": "https://github.com/esaueng/brepkit/commit/5e0a55beebcd300af70e6e7581b0fa5a7d2a4394"
+        },
+        "date": 1786110985478,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 510319,
+            "range": "± 5100",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 544897,
+            "range": "± 1654",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7242,
+            "range": "± 28",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 463616,
+            "range": "± 14852",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14613255,
+            "range": "± 303391",
             "unit": "ns/iter"
           }
         ]
