@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786111592268,
+  "lastUpdate": 1786111751215,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5507,6 +5507,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14756299,
             "range": "± 798168",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "772b8171b5d42240c09ff4f44614e02a34aaf6c1",
+          "message": "fix(algo): unwrap periodic wire UV per edge, not across the whole loop (#106)\n\n`sample_wire_loop_uv_periodic` flattened every wire edge into one point\nlist and re-derived each point's period copy from its predecessor with\n`k = (du / period).round()`. A cylinder rim is built from two SEMICIRCLE\nedges, so `du / period` is exactly +/-0.5 -- and `f64::round` breaks that\ntie away from zero, folding a genuine +pi step to -pi no matter which way\nthe arc runs. The tie is hit exactly, not approximately, so no epsilon\navoids it.\n\nBox (0..2)^3 fused with a corner-overlapped cylinder r=0.5 h=2 is the\ncase that exposes it: the wall's seam sits in the box's y=0 face, so the\n3/4 lateral band's UV rectangle folded from u in [0, 3pi/2] onto\n[3pi/2, 5pi/2]. Both sub-faces of the split wall then took the SAME\ninterior sample (0.354, 0.354, 1.0) -- theta=45deg, inside the quarter the\nbox swallows -- so the 3/4 wall classified Inside, was dropped, and the\nshell came back with 4 free edges. The boolean mesh-fell-back to 18\nplanar faces and volume 9.144 against a closed form of 9.178.\n\nAn edge's own stored span is authoritative, so unwrap per edge and\nreconcile period copies only BETWEEN edges, where the shared vertex makes\nthe step a whole number of periods and the rounding is unambiguous. The\nresult is analytic again: 9 faces (1 cylinder + 8 planes), one closed\nshell, zero free edges, volume 9.178021. The quarter piece's polygon is\nbyte-identical before and after, which is why no other case moves.\n\nAlso assert the surviving cylinder wall in the regression test. Volume\nalone could not catch this: a mesh fallback whose discretization error\nlands inside 1e-3 would pass every assertion the test had.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-08-07T10:05:14-04:00",
+          "tree_id": "18de160153063369cb4255a160a26a0691b4ea4d",
+          "url": "https://github.com/esaueng/brepkit/commit/772b8171b5d42240c09ff4f44614e02a34aaf6c1"
+        },
+        "date": 1786111749716,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 650437,
+            "range": "± 6924",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 805057,
+            "range": "± 86748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7914,
+            "range": "± 1032",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 610952,
+            "range": "± 92465",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 27521392,
+            "range": "± 3601929",
             "unit": "ns/iter"
           }
         ]
