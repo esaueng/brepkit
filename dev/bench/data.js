@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786159672215,
+  "lastUpdate": 1786159785213,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5993,6 +5993,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14169471,
             "range": "± 35990",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8caa538be4ae87ecbde45ee25229614369e749d4",
+          "message": "fix(algo): keep the protruding cap crescent when a cylinder fuses past a box corner (#116)\n\nFusing a cylinder onto a box it pokes out of fell back to a co-refined mesh\n(~40-60 all-planar faces) whenever the cylinder swallowed a vertical corner of\nthe box. This is the OpenZCAD default layout — both primitives based at z=0\nwith equal height — so users hit it constantly.\n\nCap coplanarity looked like the trigger but is not: the discriminator is\nwhether the box's corner edge falls inside the cylinder. Crossings of a single\nside face always worked; every failing placement swallowed the corner, in every\nz-layout (coplanar caps, taller cylinder, and sunk cylinder alike).\n\nThe corner cuts the cap disc into an in-body WEDGE and a protruding CRESCENT.\nTwo independent defects each lost the crescent, leaving its rim edges used\nonce, the shell open, and the acceptance gate rejecting the result:\n\n1. The two pieces are bounded by the same chord walked opposite ways round the\n   circle, so they carry the same vertex-pair edge set. The pairwise same-domain\n   passes already refuse to union two pieces of one source face, but the box\n   floor's own wedge is coextensive with the cap's wedge AND hashes with the\n   crescent, pulling all three into one union-find group transitively. The\n   crescent was then dropped as a within-rank duplicate of the wedge it tiles\n   the disc WITH. Two pieces of one face's partition can never be duplicates of\n   each other, so the residue gate now says so directly.\n\n2. Split parameters for a CLOSED rim were anchored at the circle's own angular\n   origin rather than the rim edge's seam vertex. Where those differ the wedge\n   came back twice and the crescent not at all. The anchoring fix already\n   existed for cylinder and cone rims and was explicitly scoped away from\n   planes as \"out of scope\"; a cap coplanar with a box face is exactly the\n   plane case.\n\nAlso subdivide any closed-rim piece spanning more than a half turn. The\nplane-face arrangement subdivides an arc by its chord, and a chord serves a\nmajor arc and its minor complement equally, so the wrong region can be\nrecovered. An exactly-half-turn piece is the worst case, not the safe boundary,\nand arises whenever the cutting plane passes through the circle's centre.\n\nVerified against the closed-form union volume, a closed manifold shell, and\nray-cast classification of a point in the protruding wall: the corner-swallowing\nsweep goes from 9/66 fully correct to 64/66. The two that remain (cx=5, cy=4)\nprotrude as two disjoint lobes without swallowing the corner and read ~0.5% low\nbyte-identically before and after — a separate, still-open defect.\n\nThe honeycomb raw-GFA residual ceiling moves 50 -> 52 free edges on pcut1\n(pcut2 and pcut3 unchanged); every production-level test in that file holds.\nWorkspace failing-test set is unchanged from main.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Fable 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T23:26:07-04:00",
+          "tree_id": "d93f86bea41020e34b2e0acad12364575b8e3bb3",
+          "url": "https://github.com/esaueng/brepkit/commit/8caa538be4ae87ecbde45ee25229614369e749d4"
+        },
+        "date": 1786159784057,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 459660,
+            "range": "± 1664",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 507909,
+            "range": "± 879",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6738,
+            "range": "± 27",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 413798,
+            "range": "± 473",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13089531,
+            "range": "± 18477",
             "unit": "ns/iter"
           }
         ]
