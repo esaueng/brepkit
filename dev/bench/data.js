@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786159785213,
+  "lastUpdate": 1786161649309,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6047,6 +6047,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13089531,
             "range": "± 18477",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ee6e6d8691d069a9f24f579272e0fc3aad80dd17",
+          "message": "chore(wasm): bump kernel to 3.0.1 (#118)\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-08-07T23:58:51-04:00",
+          "tree_id": "5d21e32a2a3124dc63e88b0a321ab2660198c77c",
+          "url": "https://github.com/esaueng/brepkit/commit/ee6e6d8691d069a9f24f579272e0fc3aad80dd17"
+        },
+        "date": 1786161648209,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 526038,
+            "range": "± 16525",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 580583,
+            "range": "± 30216",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6657,
+            "range": "± 50",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 483372,
+            "range": "± 2644",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13385698,
+            "range": "± 119099",
             "unit": "ns/iter"
           }
         ]
