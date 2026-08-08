@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786161649309,
+  "lastUpdate": 1786161765226,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6101,6 +6101,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13385698,
             "range": "± 119099",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c83cb4b6a299a06e30a4f910a5469c912e07e658",
+          "message": "test(operations): cover the one-flush-cap corner fuse variants (#119)\n\nThe reported family needs the box corner inside the cylinder AND at least\none cap flush with a box face — not both caps. The user's actual document\nis top-flush (cylinder taller than the box, top cap level with the box top,\nhanging below), which the existing sweep never exercised.\n\nAdd the reported document as its own case and sweep both one-cap variants.\nAll seven tests in this file fail on the parent commit and pass here.\n\nExtend the harness with a `matrix` mode: a post-gate table over six\nz-layouts, which separates this family from the residue it leaves behind.\nThat residue is a distinct, pre-existing defect in a different crate — it\nreproduces with no flush cap at all. A box side plane is parallel to the\ncylinder axis, so it meets the cylinder in two straight generators rather\nthan an ellipse, and exact_plane_cylinder has no arm for that; within about\nr/600 of the axis lying on the plane, the sampled fallback chain degrades\nand the fuse loses the protrusion. operands_are_represented catches every\none, so those placements are faceted but correct in volume. Documented on\nthe excluded-placement predicate rather than asserted.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T23:59:00-04:00",
+          "tree_id": "a2bd5a1f3a04793e783bcec9453c9af7da2f7388",
+          "url": "https://github.com/esaueng/brepkit/commit/c83cb4b6a299a06e30a4f910a5469c912e07e658"
+        },
+        "date": 1786161764083,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 499858,
+            "range": "± 2810",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 546236,
+            "range": "± 6367",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6682,
+            "range": "± 131",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 445375,
+            "range": "± 1248",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14178666,
+            "range": "± 22263",
             "unit": "ns/iter"
           }
         ]
