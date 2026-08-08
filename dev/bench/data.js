@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786130083164,
+  "lastUpdate": 1786159672215,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -5939,6 +5939,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13197447,
             "range": "± 32887",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1e37d75c0590a7a33006d9d0d0a7a0cdd8e753ab",
+          "message": "fix(boolean): parallel-cylinder sections, circular cap boundaries, tangent-pinch fuse acceptance (#117)\n\n* fix(algo): exact sections for parallel cylinders and circular cap boundaries\n\nTwo FF-phase roots behind the parallel-cylinder lens fuse family (the\ncensus's DROPPED class — material silently missing from a gate-accepted\nresult):\n\n1. Parallel-axis cylinder pairs had no exact sections: the algebraic\n   quadratic bows out for parallel axes and the marcher fragments the two\n   straight generator lines, so neither wall split and classification\n   dropped a whole operand wall. New cylinder_cylinder_parallel_lines\n   solves the 2D circle-circle crossing and emits exact axis-parallel\n   Lines, bbox-trimmed (the plane_cylinder_parallel_lines pattern).\n\n2. circle_exits_plane_boundary tested only Line boundary edges, so a\n   closed section circle exiting through a cylinder cap's circular rim was\n   never split at the cap boundary and the coplanar cap crescents dropped\n   (fuse_two_cylinders red with NonManifoldResult). The circle-edge\n   crossing logic is shared via a new circle_arc_crossings helper.\n\nClosed-circle arc midpoints also resolve against existing pave/face\nvertices before minting a fresh one (a midpoint can land on an operand\nseam vertex; a position-duplicate desyncs the partitions).\n\nVerified: fuse_two_cylinders passes; census 73 -> 74 with both DROPPED\nverdicts now correct-geometry fallbacks; r5/r3 flush-cap and external-\ntangency fuses exact analytic (probe example debug_parallel_cyl added).\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01G9WHwYy88W4K4VnSEgFHSV\n\n* feat(operations): accept tangent-pinch fuse results\n\nA fuse whose operands touch along a line — two boxes sharing one edge, or\na cylinder wall tangent to a box's corner edge — is inherently\nnon-manifold at the contact line (four faces meet there), and no fallback\ncan make it manifold: the mesh boolean pinches identically, so these\ncases hard-failed with NonManifoldResult and users had to nudge bodies\ninto overlap by a micron.\n\nAccept the GFA result when the only defects are genuine pinches: no free\nedges or unclosed wires, every over-shared edge used exactly four times\nwith its midpoint at distance ~0 from BOTH operands' boundaries (a\ndamaged shell's over-shared edges are interior to one operand and fail\nthis), and Euler balancing with one extra unit per pinch edge. Fuse only.\n\nThe two tests that pinned the fail-closed behaviour\n(test_boolean_shared_edge, fuse_edge_on_edge_boxes) now assert the new\ncontract: exact union volume from the pinched solid.\n\nCensus: 74 -> 79/121 (box∪box 8/8; box∪cyl 59 -> 63; edge-touch,\ncorner-edge-tangent and flush-tangent families all exact-volume ok).\nSuite: no other test moved.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01G9WHwYy88W4K4VnSEgFHSV\n\n* fix(operations): drop unused OperationsError import in boolean_edge_cases\n\nThe tangent-pinch contract flip removed the last use; CI clippy runs with\n-D warnings and refused the build.\n\nCo-Authored-By: Claude Fable 5 <noreply@anthropic.com>\nClaude-Session: https://claude.ai/code/session_01G9WHwYy88W4K4VnSEgFHSV\n\n---------\n\nCo-authored-by: Claude <noreply@anthropic.com>",
+          "timestamp": "2026-08-07T23:25:57-04:00",
+          "tree_id": "bdc92fec06175f586a89580410abd233df60ef2d",
+          "url": "https://github.com/esaueng/brepkit/commit/1e37d75c0590a7a33006d9d0d0a7a0cdd8e753ab"
+        },
+        "date": 1786159671055,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 499467,
+            "range": "± 1674",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 550075,
+            "range": "± 2572",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6987,
+            "range": "± 45",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 428271,
+            "range": "± 1436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14169471,
+            "range": "± 35990",
             "unit": "ns/iter"
           }
         ]
