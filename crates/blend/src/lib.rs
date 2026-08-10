@@ -12,6 +12,8 @@ pub(crate) mod builder_utils;
 pub mod chamfer_builder;
 pub(crate) mod corner;
 pub mod fillet_builder;
+#[allow(dead_code)]
+mod fillet_builder_legacy;
 pub mod g1_chain;
 pub mod radius_law;
 pub(crate) mod section;

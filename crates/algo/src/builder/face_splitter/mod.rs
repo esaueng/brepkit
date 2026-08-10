@@ -4594,6 +4594,49 @@ fn split_face_2d_impl(
         Ok(f) => f,
         Err(_) => return Vec::new(),
     };
+    // Two FF pairs emit the SAME section when the partner faces are coplanar
+    // neighbours and the curve rides their shared boundary (a slot-corner
+    // cylinder against a wall face and the coplanar lip band above it).
+    // Duplicate sections become parallel twin edges in the trace input, and
+    // the greedy walker's angular successor is ill-defined on parallel
+    // twins — it grand-tours adjacent regions into one slitted loop instead
+    // of partitioning them. Drop near-exact geometric duplicates.
+    let deduped_sections: Option<Vec<SectionEdge>> = {
+        let band = tol.linear * 10.0;
+        let same_pt = |p: Point3, q: Point3| (p - q).length() <= band;
+        let mids: Vec<Point3> = sections
+            .iter()
+            .map(|s| s.curve_3d.evaluate_with_endpoints(0.5, s.start, s.end))
+            .collect();
+        let mut keep = vec![true; sections.len()];
+        let mut any_dup = false;
+        for i in 0..sections.len() {
+            if !keep[i] {
+                continue;
+            }
+            for j in (i + 1)..sections.len() {
+                if !keep[j] {
+                    continue;
+                }
+                let (a, b) = (&sections[i], &sections[j]);
+                let ends_match = (same_pt(a.start, b.start) && same_pt(a.end, b.end))
+                    || (same_pt(a.start, b.end) && same_pt(a.end, b.start));
+                if ends_match && same_pt(mids[i], mids[j]) {
+                    keep[j] = false;
+                    any_dup = true;
+                }
+            }
+        }
+        any_dup.then(|| {
+            sections
+                .iter()
+                .zip(&keep)
+                .filter(|&(_, &k)| k)
+                .map(|(s, _)| s.clone())
+                .collect()
+        })
+    };
+    let sections: &[SectionEdge] = deduped_sections.as_deref().unwrap_or(sections);
     let trace_split =
         std::env::var("BK_SPLIT_TRACE").is_ok_and(|v| v == format!("{}", face_id.index()));
     let surface = face.surface().clone();
@@ -4604,6 +4647,25 @@ fn split_face_2d_impl(
             "STRACE face={face_id:?} plane={is_plane} sections={}",
             sections.len()
         );
+        let mut rows: Vec<String> = sections
+            .iter()
+            .map(|sec| {
+                format!(
+                    "STRACE-SEC s=({:.7},{:.7},{:.7}) e=({:.7},{:.7},{:.7}) pb={:?}",
+                    sec.start.x(),
+                    sec.start.y(),
+                    sec.start.z(),
+                    sec.end.x(),
+                    sec.end.y(),
+                    sec.end.z(),
+                    sec.pave_block_id
+                )
+            })
+            .collect();
+        rows.sort();
+        for r in rows {
+            log::debug!("{r}");
+        }
     }
 
     // Use provided frame or build one from wire points (plane faces only).
@@ -6261,6 +6323,40 @@ fn split_face_2d_impl(
 
     // Build wire loops via angular-sorting traversal.
     let mut loops = build_wire_loops(&all_edges, tol.linear, u_periodic, v_periodic);
+    if trace_split {
+        let mut rows: Vec<String> = all_edges
+            .iter()
+            .map(|e| {
+                format!(
+                    "STRACE-IN ({:.7},{:.7})->({:.7},{:.7}) src={:?}",
+                    e.start_uv.x(),
+                    e.start_uv.y(),
+                    e.end_uv.x(),
+                    e.end_uv.y(),
+                    e.source_edge_idx
+                )
+            })
+            .collect();
+        rows.sort();
+        for r in rows {
+            log::debug!("{r}");
+        }
+        let mut lrows: Vec<String> = loops
+            .iter()
+            .map(|lp| {
+                let mut vs: Vec<String> = lp
+                    .iter()
+                    .map(|e| format!("({:.7},{:.7})", e.start_uv.x(), e.start_uv.y()))
+                    .collect();
+                vs.sort();
+                format!("STRACE-LOOP n={} {}", lp.len(), vs.join(""))
+            })
+            .collect();
+        lrows.sort();
+        for r in lrows {
+            log::debug!("{r}");
+        }
+    }
     // Clockwise-boundary handling: this face's UV frame derives from the raw
     // surface normal, not the effective face orientation, so an inner-shell
     // (cavity) wall winds CW in UV while the outer wall winds CCW. Two effects
@@ -6645,6 +6741,24 @@ fn split_face_2d_impl(
         {
             loops = dcel;
         }
+    } else if !u_periodic && !v_periodic && !is_plane && !sections.is_empty() && greedy_broken {
+        // Non-periodic band grand tour: sections meeting at T-junctions
+        // (a slot-corner cylinder crossing a wall-face pair and the lip
+        // taper) give the greedy walker degree-3 nodes where its
+        // order-dependent successor tours adjacent regions into one
+        // slitted loop. The DCEL successor is a pure function of the
+        // graph; adopt it only when it strictly refines the partition and
+        // is clean by EVERY absolute loop-health signature (no seam on a
+        // non-periodic face, so no periodic-aware relaxation applies).
+        let dcel = build_wire_loops_dcel(&all_edges, tol.linear, u_periodic, v_periodic);
+        if dcel.len() > loops.len()
+            && !wire_loops_have_degenerate_area(&dcel, tol.linear)
+            && !wire_loops_self_cross(&dcel, tol.linear)
+            && (!greedy_outer_loops_nested(&dcel, cw_loops)
+                || greedy_outer_loops_nested(&loops, cw_loops))
+        {
+            loops = dcel;
+        }
     }
 
     // Classify each loop as outer (positive area) or hole (negative).
@@ -6731,7 +6845,19 @@ fn split_face_2d_impl(
                 holes.push(wire_loop);
             }
         } else {
-            let pts = sample_wire_loop_uv_periodic(&wire_loop, u_per_opt, v_per_opt);
+            // Plane faces: classify on the arc-true via-frame polygon. The
+            // pcurve sampler chords Circle2D arcs and can fold
+            // reversed-boundary arcs, flipping the SIGN for a thin band
+            // between two near-parallel arcs (the crescent between a bin
+            // bottom's corner arc and a base socket outline): the correctly
+            // wound band then classifies as a hole and the adjacent-region
+            // promotion below inverts it — a same-sense shell defect. Same
+            // rationale as the via-frame switch in the nesting test.
+            let pts = if is_plane {
+                sampling::sample_wire_loop_uv_via_frame(&wire_loop, frame)
+            } else {
+                sample_wire_loop_uv_periodic(&wire_loop, u_per_opt, v_per_opt)
+            };
             let area = if cw_loops {
                 -signed_area_2d(&pts)
             } else {

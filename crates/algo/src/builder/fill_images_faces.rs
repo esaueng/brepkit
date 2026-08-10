@@ -7,6 +7,17 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::hash::BuildHasher;
+use std::sync::LazyLock;
+
+/// `BK_SECEDGE=1`: the clipped 3D extent of every section handed to the
+/// splitter — the level at which a section that survived phase FF can still be
+/// clipped to the wrong window (#1510). Read once; these sit on hot paths.
+static TRACE_SECEDGE: LazyLock<bool> = LazyLock::new(|| std::env::var("BK_SECEDGE").is_ok());
+
+/// `BK_CLIP=1`: per-call chord vs true-arc crossings in
+/// `clip_line_to_face_boundary`, which is what separates a chord-short clip
+/// from a genuinely absent section.
+static TRACE_CLIP: LazyLock<bool> = LazyLock::new(|| std::env::var("BK_CLIP").is_ok());
 
 /// Quantized 3D position pair for CommonBlock edge matching.
 type CbEdgeKey = ((i64, i64, i64), (i64, i64, i64));
@@ -338,6 +349,19 @@ pub fn fill_images_faces<S: BuildHasher, S2: BuildHasher>(
             has_sections,
             sections.len()
         );
+        if *TRACE_SECEDGE {
+            for (i, s) in sections.iter().enumerate() {
+                log::debug!(
+                    "SECEDGE face={face_id:?} #{i} ({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3})",
+                    s.start.x(),
+                    s.start.y(),
+                    s.start.z(),
+                    s.end.x(),
+                    s.end.y(),
+                    s.end.z()
+                );
+            }
+        }
         if sections.is_empty() {
             let expanded =
                 rebuild_face_with_edge_images(topo, face_id, edge_images).unwrap_or(face_id);
@@ -438,6 +462,37 @@ pub fn fill_images_faces<S: BuildHasher, S2: BuildHasher>(
         );
 
         if std::env::var("BK_SPLITW").is_ok_and(|v| v == format!("{}", face_id.index())) {
+            if let Ok(face) = topo.face(face_id)
+                && let brepkit_topology::face::FaceSurface::Plane { normal, .. } = face.surface()
+            {
+                for (ri, r) in split_results.iter().enumerate() {
+                    if r.outer_wire.len() < 3 {
+                        continue;
+                    }
+                    let uvs: Vec<brepkit_math::vec::Point2> =
+                        r.outer_wire.iter().map(|e| e.start_uv).collect();
+                    let mut uv_area = 0.0;
+                    for k in 0..uvs.len() {
+                        let a = uvs[k];
+                        let b = uvs[(k + 1) % uvs.len()];
+                        uv_area += a.x() * b.y() - b.x() * a.y();
+                    }
+                    let pts: Vec<brepkit_math::vec::Point3> =
+                        r.outer_wire.iter().map(|e| e.start_3d).collect();
+                    let mut acc = brepkit_math::vec::Vec3::new(0.0, 0.0, 0.0);
+                    for k in 1..pts.len().saturating_sub(1) {
+                        let u = pts[k] - pts[0];
+                        let v = pts[k + 1] - pts[0];
+                        acc += u.cross(v);
+                    }
+                    log::debug!(
+                        "SPLITW piece[{ri}] rev={} uv_area={:.4} n_area={:.4}",
+                        r.reversed,
+                        uv_area * 0.5,
+                        acc.dot(*normal) * 0.5
+                    );
+                }
+            }
             for (si, sec) in sections.iter().enumerate() {
                 log::debug!(
                     "SPLITW sec[{si}] {} ({:.4},{:.4},{:.4})->({:.4},{:.4},{:.4})",
@@ -3189,15 +3244,25 @@ fn clip_line_to_face_boundary(
     }
 
     crossings.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    if std::env::var("BK_CLIP").is_ok() {
+    if *TRACE_CLIP {
+        // Crossings are reported as 3D points as well as raw t: a chord-short
+        // clip is only recognisable once you can read the coordinate it stops
+        // at against the face's real boundary (#1510).
+        let at = |t: f64| {
+            let p = line_start + line_dir * t;
+            (t, p.x(), p.y(), p.z())
+        };
         log::debug!(
-            "CLIP face={face_id:?} line=({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3}) crossings={crossings:?} ext={crossings_ext:?}",
+            "CLIP face={face_id:?} holed={} line=({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3}) crossings={:?} ext={:?}",
+            !face.inner_wires().is_empty(),
             line_start.x(),
             line_start.y(),
             line_start.z(),
             line_end.x(),
             line_end.y(),
-            line_end.z()
+            line_end.z(),
+            crossings.iter().map(|&t| at(t)).collect::<Vec<_>>(),
+            crossings_ext.iter().map(|&t| at(t)).collect::<Vec<_>>()
         );
     }
 
@@ -3302,11 +3367,22 @@ fn clip_line_to_face_boundary(
             })
             .collect()
     } else {
-        // Non-plane fallback: the historical outermost pair.
-        vec![(
-            crossings[0].clamp(0.0, 1.0),
-            crossings[crossings.len() - 1].clamp(0.0, 1.0),
-        )]
+        // Non-plane fallback: the historical outermost pair — but over the
+        // TRUE-arc crossings as well as the chord ones. A chord crossing sits
+        // a sagitta inside its arc, so on a face whose boundary corners are
+        // arcs the pair alone stops short of the real boundary and the section
+        // never reaches the face edge (#1510: 39.200 is where the outer corner
+        // chord meets y=40.550; the arc meets it at 40.7495, and a cut ending
+        // at the chord cannot separate the piece beyond it).
+        let outer = crossings
+            .iter()
+            .chain(crossings_ext.iter())
+            .map(|t| t.clamp(0.0, 1.0));
+        let lo = outer
+            .clone()
+            .fold(f64::INFINITY, |a: f64, b| if b < a { b } else { a });
+        let hi = outer.fold(f64::NEG_INFINITY, |a: f64, b| if b > a { b } else { a });
+        vec![(lo, hi)]
     };
 
     let t_tol = tol / line_len;

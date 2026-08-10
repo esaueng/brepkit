@@ -605,6 +605,25 @@ pub(crate) fn assemble_solid_mixed_with_history(
                     oriented_edges.push(OrientedEdge::new(edge_id, is_forward));
                 }
 
+                // Same guard as the planar arm: a degenerate ring can lose
+                // every edge to the skips above; drop it rather than erroring.
+                if oriented_edges.is_empty() {
+                    continue;
+                }
+
+                // A reversed face flips every edge's effective traversal, so
+                // its wire must be built with reversed winding (the #1367
+                // rule) or the face traverses shared edges in the same
+                // effective sense as its neighbours. The arc EDGES above are
+                // built from the given vertex order — only the wire order
+                // flips here, not the curve geometry.
+                if *reversed {
+                    oriented_edges.reverse();
+                    for oe in &mut oriented_edges {
+                        *oe = OrientedEdge::new(oe.edge(), !oe.is_forward());
+                    }
+                }
+
                 let wire =
                     Wire::new(oriented_edges, true).map_err(crate::OperationsError::Topology)?;
                 let wire_id = topo.add_wire(wire);
@@ -703,6 +722,14 @@ pub(crate) fn assemble_solid_mixed_with_history(
                         continue;
                     }
                     oriented_edges.push(OrientedEdge::new(edge_id, is_forward));
+                }
+
+                // A sub-resolution polygon can lose every edge to the
+                // degenerate/duplicate skips above (all vertices quantize to
+                // one id); it bounds no area, so drop it instead of erroring
+                // the whole assembly on an empty wire.
+                if oriented_edges.is_empty() {
+                    continue;
                 }
 
                 let wire =
