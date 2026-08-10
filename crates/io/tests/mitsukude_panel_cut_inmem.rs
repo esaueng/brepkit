@@ -94,7 +94,9 @@ fn mitsukude_panel_cut_is_analytic_watertight() {
     // The fork's shared-edge tessellator triangulates this same analytic B-rep
     // differently from upstream's coarse face mesh. Pin both measurements: the
     // routed volume guards the underlying cut, while the signed mesh pin guards
-    // this fork's orientation and tessellation path.
+    // this fork's orientation and tessellation path. Developable faces retain
+    // two interior rows because omitting them makes holed cylindrical meshes
+    // overlap at their rims; this keeps the fork's established mesh pin.
     assert!(
         (routed_volume - 27112.24).abs() < 5.0,
         "cut solid volume drifted: got {routed_volume:.2}, pinned 27112.24"
