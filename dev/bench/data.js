@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786334105529,
+  "lastUpdate": 1786335240763,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6263,6 +6263,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14018758,
             "range": "± 168535",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9c60a37373ff6a9b32dfd536b94ed3386f36b35",
+          "message": "Merge pull request #121 from esaueng/codex/fix-box-cylinder-side-plane\n\nfix(algo): preserve both box-cylinder side lobes",
+          "timestamp": "2026-08-10T00:10:19-04:00",
+          "tree_id": "1faf849ad3c442d352069e65f63f44a789b00425",
+          "url": "https://github.com/esaueng/brepkit/commit/f9c60a37373ff6a9b32dfd536b94ed3386f36b35"
+        },
+        "date": 1786335239574,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 471321,
+            "range": "± 1749",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 523365,
+            "range": "± 3889",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6783,
+            "range": "± 77",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 436768,
+            "range": "± 1036",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14512974,
+            "range": "± 99011",
             "unit": "ns/iter"
           }
         ]
