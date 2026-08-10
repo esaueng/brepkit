@@ -4,7 +4,7 @@
 //! and solid assembly. Supports constant and variable radius fillets on
 //! planar face pairs (v1).
 
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use brepkit_math::curves::Circle3D;
 use brepkit_math::vec::{Point3, Vec3};
@@ -13,13 +13,17 @@ use brepkit_topology::edge::{Edge, EdgeCurve, EdgeId};
 use brepkit_topology::face::{Face, FaceId, FaceSurface};
 use brepkit_topology::shell::Shell;
 use brepkit_topology::solid::{Solid, SolidId};
-use brepkit_topology::vertex::Vertex;
-use brepkit_topology::wire::{OrientedEdge, Wire};
+use brepkit_topology::vertex::{Vertex, VertexId};
+use brepkit_topology::wire::{OrientedEdge, Wire, WireId};
 
 use crate::analytic;
 use crate::blend_func::{ConstRadBlend, EvolRadBlend};
-use crate::builder_utils::{FlippedNormalSurface, sample_nurbs_endpoints, surface_ref_or_adapter};
+use crate::builder_utils::{
+    FlippedNormalSurface, project_onto_axis, radial_distance, sample_nurbs_endpoints,
+    surface_ref_or_adapter, wire_axial_range, wire_radial_extremum,
+};
 use crate::corner;
+use crate::g1_chain;
 use crate::radius_law::RadiusLaw;
 use crate::spine::Spine;
 use crate::stripe::{Stripe, StripeResult};
@@ -36,10 +40,6 @@ pub struct FilletBuilder<'a> {
     solid: SolidId,
     /// Edge sets to fillet, each with their radius/law.
     edge_sets: Vec<(Vec<EdgeId>, RadiusLaw)>,
-    /// Whether the caller selected the radius-law API. Orientation repair is
-    /// scoped to that newer assembly path so legacy constant-radius fillets
-    /// retain the fork's established face-orientation contract.
-    explicit_radius_law: bool,
 }
 
 impl<'a> FilletBuilder<'a> {
@@ -50,7 +50,6 @@ impl<'a> FilletBuilder<'a> {
             topo,
             solid,
             edge_sets: Vec::new(),
-            explicit_radius_law: false,
         }
     }
 
@@ -68,7 +67,6 @@ impl<'a> FilletBuilder<'a> {
     /// Returns `&mut Self` for method chaining.
     pub fn add_edges_with_law(&mut self, edges: &[EdgeId], law: RadiusLaw) -> &mut Self {
         self.edge_sets.push((edges.to_vec(), law));
-        self.explicit_radius_law = true;
         self
     }
 
@@ -78,7 +76,7 @@ impl<'a> FilletBuilder<'a> {
     ///
     /// 1. Build adjacency index for the solid.
     /// 2. For each target edge, find the two adjacent faces.
-    /// 3. Build single-edge spines (no G1 chain propagation in v1).
+    /// 3. Expand each edge set into G1 ridgeline chains and build a spine per chain.
     /// 4. Compute stripes via analytic fast path or walking engine.
     /// 5. Trim adjacent faces along contact curves.
     /// 6. Assemble new solid from trimmed faces, blend faces, and untouched
@@ -91,30 +89,15 @@ impl<'a> FilletBuilder<'a> {
     /// [`BlendResult::failed`] rather than aborting the whole operation.
     #[allow(clippy::too_many_lines)]
     pub fn build(self) -> Result<BlendResult, BlendError> {
-        if !self.explicit_radius_law {
-            let mut legacy =
-                crate::fillet_builder_legacy::FilletBuilder::new(self.topo, self.solid);
-            for (edges, law) in self.edge_sets {
-                let RadiusLaw::Constant(radius) = law else {
-                    unreachable!("non-constant laws use add_edges_with_law")
-                };
-                legacy.add_edges(&edges, radius);
-            }
-            return legacy.build();
-        }
-
-        let repair_radius_law_orientation = self.explicit_radius_law;
-        // Expand edge sets: keep actual RadiusLaw references via indices.
-        let mut all_edges: Vec<(EdgeId, usize)> = Vec::new();
+        // Keep each edge set beside its RadiusLaw via a shared index.
+        let mut seeds_by_law: Vec<Vec<EdgeId>> = Vec::with_capacity(self.edge_sets.len());
         let mut laws: Vec<RadiusLaw> = Vec::with_capacity(self.edge_sets.len());
-        for (law_idx, (edges, law)) in self.edge_sets.into_iter().enumerate() {
-            for eid in edges {
-                all_edges.push((eid, law_idx));
-            }
+        for (edges, law) in self.edge_sets {
+            seeds_by_law.push(edges);
             laws.push(law);
         }
 
-        if all_edges.is_empty() {
+        if seeds_by_law.iter().all(Vec::is_empty) {
             return Err(BlendError::Topology(
                 brepkit_topology::TopologyError::Empty {
                     entity: "fillet edge set",
@@ -138,17 +121,119 @@ impl<'a> FilletBuilder<'a> {
         let mut failed: Vec<(EdgeId, BlendError)> = Vec::new();
         let mut stripe_results: Vec<StripeResult> = Vec::new();
 
-        for &(edge_id, law_idx) in &all_edges {
-            let result = compute_stripe_for_edge(topo, &adjacency, edge_id, &laws[law_idx]);
-            match result {
+        // Blend whole G1 ridgelines, not the individual edges the caller
+        // happened to name. A tangent-continuous run that is split into
+        // several edges — a corner column interrupted where a wall seats into
+        // a plate, say — cannot be filleted piecewise: a stripe covering only
+        // part of it has to run out in the middle of a smooth edge, where
+        // there is no cap face to close against. Expanding to the chain gives
+        // the stripe real ends. This matches the v1 rolling-ball engine, which
+        // has always called `expand_g1_chain`.
+        let tol = brepkit_math::tolerance::Tolerance::new();
+        let mut chain_work: Vec<(Vec<EdgeId>, usize)> = Vec::new();
+        for (law_idx, seeds) in seeds_by_law.iter().enumerate() {
+            if seeds.is_empty() {
+                continue;
+            }
+            for chain in g1_chain::g1_chains(topo, self.solid, seeds, tol)? {
+                chain_work.push((chain, law_idx));
+            }
+        }
+
+        // Two or more chains touching the same vertex need a vertex blend
+        // there. The corner solver computes exact geometry for that
+        // (`corner::compute_corners` already returns patches), but this builder
+        // cannot yet assemble it watertight. Fail fast with a typed error
+        // before any stripe work so callers (`try_fillet`, `fillet_v2`) fall
+        // through to an engine that closes corners, instead of paying for a
+        // doomed build plus rollback.
+        //
+        // Removing this guard does not currently reach the corner code at all.
+        // Measured on a two-edge box corner with the guard disabled, the
+        // blockers are, in the order they bite:
+        //
+        //  1. `trimmer` cannot cut one base face twice. Both stripes trim the
+        //     shared cap and the second cut fails outright with
+        //     `TrimmingFailure`, so nothing downstream ever runs.
+        //  2. Stripes are not set back at the shared vertex — each runs to the
+        //     vertex plane, leaving no tangency circle for a patch to meet.
+        //  3. Corner patches mint their own boundary edges instead of reusing
+        //     those set-back boundaries, so stripe-to-corner adjacency would be
+        //     coincidental rather than topological.
+        //  4. The trimmer does not let a base face consume the corner patch's
+        //     arc boundary when its wire is rewritten.
+        //
+        // Until all four are addressed the shell has free edges by
+        // construction. The planar fast path in `fillet_rolling_ball` closes
+        // these corners today — which is why a plain box and a drilled plate
+        // both fillet corner chains and whole perimeters — so what this guard
+        // still blocks is corner chains on curved or imported geometry the fast
+        // path declines.
+        {
+            let mut chains_at_vertex: HashMap<usize, (brepkit_topology::vertex::VertexId, usize)> =
+                HashMap::new();
+            for (chain_idx, (chain, _)) in chain_work.iter().enumerate() {
+                let mut seen_here: HashSet<usize> = HashSet::new();
+                for &eid in chain {
+                    let Ok(edge) = topo.edge(eid) else { continue };
+                    for vid in [edge.start(), edge.end()] {
+                        if !seen_here.insert(vid.index()) {
+                            continue; // count each chain once per vertex
+                        }
+                        let entry = chains_at_vertex
+                            .entry(vid.index())
+                            .or_insert((vid, chain_idx));
+                        if entry.1 != chain_idx {
+                            return Err(BlendError::UnsupportedVertexBlend {
+                                vertex: entry.0,
+                                stripes: 2,
+                            });
+                        }
+                    }
+                }
+            }
+        }
+
+        for (chain, law_idx) in &chain_work {
+            // Report against the edges the caller asked for, not the ones the
+            // chain expansion pulled in.
+            let requested: Vec<EdgeId> = chain
+                .iter()
+                .copied()
+                .filter(|eid| seeds_by_law[*law_idx].contains(eid))
+                .collect();
+            let report_edge = requested
+                .first()
+                .copied()
+                .or_else(|| chain.first().copied());
+
+            let spine = match Spine::from_chain(topo, chain.clone()) {
+                Ok(spine) => spine,
+                Err(e) => {
+                    if let Some(edge) = report_edge {
+                        failed.push((edge, e));
+                    }
+                    continue;
+                }
+            };
+            match compute_stripe_for_spine(topo, &adjacency, spine, &laws[*law_idx]) {
                 Ok(sr) => {
                     touched_faces.insert(sr.stripe.face1);
                     touched_faces.insert(sr.stripe.face2);
                     stripe_results.push(sr);
-                    succeeded.push(edge_id);
+                    succeeded.extend(requested.iter().copied());
                 }
+                // A radius the geometry cannot accommodate is a verdict on the
+                // radius, not on this engine, so it must reach the caller as
+                // itself. Filed among `failed` it becomes a bare partial
+                // result, which reads exactly like an internal failure and
+                // leaves the caller no way to say "try a smaller radius".
+                // Same treatment the rim assembler's own bound already gets.
+                Err(e @ BlendError::RadiusTooLarge { .. }) => return Err(e),
                 Err(e) => {
-                    failed.push((edge_id, e));
+                    if let Some(edge) = report_edge {
+                        failed.push((edge, e));
+                    }
                 }
             }
         }
@@ -160,9 +245,10 @@ impl<'a> FilletBuilder<'a> {
                 succeeded: Vec::new(),
                 failed,
                 is_partial,
-                // No fillet was produced, so every input face survives as itself.
+                // Nothing was blended, so the input solid is the result and
+                // every face is itself.
                 face_origins: Some(BlendFaceOrigins {
-                    survived: original_faces.iter().map(|&face| (face, face)).collect(),
+                    survived: original_faces.iter().map(|&f| (f, f)).collect(),
                     deleted: Vec::new(),
                     created: Vec::new(),
                     created_unattributed: Vec::new(),
@@ -178,6 +264,8 @@ impl<'a> FilletBuilder<'a> {
         // contact circle crosses no boundary edge). Regular stripes still flow
         // through the trim + corner + blend-face path below.
         let mut blend_face_ids: Vec<FaceId> = Vec::new();
+        // Every blend face beside the two base faces it was built between —
+        // exact provenance, taken from the stripe that produced it.
         let mut blend_face_origins: Vec<(FaceId, Vec<FaceId>)> = Vec::new();
         let mut face_replacements: std::collections::HashMap<FaceId, FaceId> =
             std::collections::HashMap::new();
@@ -189,6 +277,11 @@ impl<'a> FilletBuilder<'a> {
                         blend_face_ids.push(band);
                         blend_face_origins.push((band, vec![sr.stripe.face1, sr.stripe.face2]));
                     }
+                    // A radius the geometry cannot accommodate is a verdict,
+                    // not a reason to try another assembler: no engine below
+                    // can fit a blend that does not fit. Report it and let the
+                    // caller lower the radius.
+                    Err(e @ BlendError::RadiusTooLarge { .. }) => return Err(e),
                     Err(e) => {
                         log::warn!("closed-rim assembly failed: {e}, falling back to trim path");
                         regular_results.push(sr);
@@ -199,24 +292,12 @@ impl<'a> FilletBuilder<'a> {
             }
         }
 
-        // Closed-rim faces: when every edge of a face's outer wire is some
-        // stripe's spine edge, the face's boundary is consumed whole by the
-        // fillet and its trimmed form is the CHAINED CONTACT LOOP. The
-        // per-stripe trims cannot build that (each cuts with an infinite
-        // contact line, and on a non-convex outline stripe k's line
-        // amputates territory stripe j needs). Rebuild such faces directly
-        // and record the loop edges so the blend walls share them.
-        let (rim_contact_edges, rim_notches) =
-            rebuild_closed_rim_loop_faces(topo, &regular_results, &mut face_replacements)?;
-
         let stripes: Vec<Stripe> = regular_results.iter().map(|sr| sr.stripe.clone()).collect();
-        let corner_results = match corner::compute_corners(topo, &stripes, self.solid) {
-            Ok(results) => results,
-            Err(e) => {
-                log::warn!("corner computation failed: {e}, proceeding without corner patches");
-                Vec::new()
-            }
-        };
+        let corner_results = corner::compute_corners(topo, &stripes, self.solid)?;
+
+        // Trim results per regular stripe, kept so the blend faces can share
+        // the trimmer's contact edges instead of minting duplicates.
+        let mut trim_pairs: Vec<(trimmer::TrimResult, trimmer::TrimResult)> = Vec::new();
 
         let mut corner_face_ids: Vec<FaceId> = Vec::new();
         for cr in &corner_results {
@@ -227,16 +308,9 @@ impl<'a> FilletBuilder<'a> {
             Option<brepkit_topology::edge::EdgeId>,
             Option<brepkit_topology::edge::EdgeId>,
         )> = Vec::new();
-        for (si, sr) in regular_results.iter().enumerate() {
+        for sr in &regular_results {
             let stripe = &sr.stripe;
-            stripe_contact_edges.push((
-                rim_contact_edges.get(&(stripe.face1, si)).copied(),
-                rim_contact_edges.get(&(stripe.face2, si)).copied(),
-            ));
-            let (rim1, rim2) = (
-                rim_contact_edges.contains_key(&(stripe.face1, si)),
-                rim_contact_edges.contains_key(&(stripe.face2, si)),
-            );
+            stripe_contact_edges.push((None, None));
 
             let contact1_pts = sample_nurbs_endpoints(&stripe.contact1);
             let contact2_pts = sample_nurbs_endpoints(&stripe.contact2);
@@ -255,71 +329,52 @@ impl<'a> FilletBuilder<'a> {
                 .get(&stripe.face1)
                 .copied()
                 .unwrap_or(stripe.face1);
-            let trim1 = if rim1 {
-                Ok(trimmer::TrimResult {
-                    trimmed_face: current_face1,
-                    new_edges: Vec::new(),
-                    new_vertices: Vec::new(),
-                    contact_edge: None,
-                })
-            } else {
-                trimmer::trim_face_general(
-                    topo,
-                    current_face1,
-                    &contact1_pts,
-                    keep,
-                    stripe.spine.edges(),
-                )
-            };
+            let trim1 = trimmer::trim_face_general(
+                topo,
+                current_face1,
+                &contact1_pts,
+                keep,
+                stripe.spine.edges(),
+            );
 
-            match trim1 {
+            let tr1 = match trim1 {
                 Ok(tr) if tr.trimmed_face != current_face1 => {
                     if let Some(slot) = stripe_contact_edges.last_mut() {
                         slot.0 = tr.contact_edge;
                     }
                     face_replacements.insert(stripe.face1, tr.trimmed_face);
+                    tr
                 }
-                Ok(_) => {} // untrimmed (non-planar), keep original
-                Err(e) => {
-                    log::warn!("trimming failed on face {:?}: {e}", stripe.face1);
-                    // Trimming is best-effort in v1. Non-planar faces and complex
-                    // geometries may fail to trim. We continue with the original face.
+                Ok(_) | Err(_) => {
+                    return Err(BlendError::TrimmingFailure { face: stripe.face1 });
                 }
-            }
+            };
 
             let current_face2 = face_replacements
                 .get(&stripe.face2)
                 .copied()
                 .unwrap_or(stripe.face2);
-            let trim2 = if rim2 {
-                Ok(trimmer::TrimResult {
-                    trimmed_face: current_face2,
-                    new_edges: Vec::new(),
-                    new_vertices: Vec::new(),
-                    contact_edge: None,
-                })
-            } else {
-                trimmer::trim_face_general(
-                    topo,
-                    current_face2,
-                    &contact2_pts,
-                    keep,
-                    stripe.spine.edges(),
-                )
-            };
+            let trim2 = trimmer::trim_face_general(
+                topo,
+                current_face2,
+                &contact2_pts,
+                keep,
+                stripe.spine.edges(),
+            );
 
-            match trim2 {
+            let tr2 = match trim2 {
                 Ok(tr) if tr.trimmed_face != current_face2 => {
                     if let Some(slot) = stripe_contact_edges.last_mut() {
                         slot.1 = tr.contact_edge;
                     }
                     face_replacements.insert(stripe.face2, tr.trimmed_face);
+                    tr
                 }
-                Ok(_) => {}
-                Err(e) => {
-                    log::warn!("trimming failed on face {:?}: {e}", stripe.face2);
+                Ok(_) | Err(_) => {
+                    return Err(BlendError::TrimmingFailure { face: stripe.face2 });
                 }
-            }
+            };
+            trim_pairs.push((tr1, tr2));
         }
 
         let mut blend_cross_edges: Vec<(
@@ -327,8 +382,26 @@ impl<'a> FilletBuilder<'a> {
             brepkit_topology::vertex::VertexId,
             brepkit_topology::vertex::VertexId,
         )> = Vec::new();
-        for (si, sr) in regular_results.iter().enumerate() {
+        for (si, (sr, (tr1, tr2))) in regular_results.iter().zip(&trim_pairs).enumerate() {
             let stripe = &sr.stripe;
+
+            // Preserve the fork's stitched planar path when it can close the
+            // spine ends directly; otherwise reuse the upstream trimmer
+            // contact edges and notch the remaining end caps below.
+            match stitch_planar_blend(topo, stripe, tr1, tr2, &face_replacements) {
+                Ok(Some(mut faces)) => {
+                    blend_face_origins
+                        .extend(faces.iter().map(|&f| (f, vec![stripe.face1, stripe.face2])));
+                    blend_face_ids.append(&mut faces);
+                    continue;
+                }
+                Ok(None) => {}
+                Err(e) => {
+                    log::warn!(
+                        "stitched blend assembly failed ({e}); using shared-contact blend face"
+                    );
+                }
+            }
 
             // Reuse the trimmed neighbours' contact edges so the blend flank
             // shares one edge entity per contact instead of minting a
@@ -342,106 +415,6 @@ impl<'a> FilletBuilder<'a> {
             blend_face_origins.push((info.face, vec![stripe.face1, stripe.face2]));
             blend_cross_edges.extend(info.cross_end);
             blend_cross_edges.extend(info.cross_start);
-        }
-
-        // Faces using each vertex, over the ORIGINAL shell: a stripe end
-        // whose outline vertex belongs to a third face (a perpendicular
-        // end face) is closed by the notch-arc path, not by a cap.
-        let mut vertex_face_count: std::collections::HashMap<
-            brepkit_topology::vertex::VertexId,
-            usize,
-        > = std::collections::HashMap::new();
-        for &fid in &original_faces {
-            let face = topo.face(fid)?;
-            let mut wires = vec![face.outer_wire()];
-            wires.extend_from_slice(face.inner_wires());
-            let mut seen: HashSet<brepkit_topology::vertex::VertexId> = HashSet::new();
-            for wid in wires {
-                for oe in topo.wire(wid)?.edges() {
-                    let e = topo.edge(oe.edge())?;
-                    seen.insert(e.start());
-                    seen.insert(e.end());
-                }
-            }
-            for v in seen {
-                *vertex_face_count.entry(v).or_insert(0) += 1;
-            }
-        }
-
-        // Cap each abrupt stripe end that produced notch edges on BOTH
-        // adjacent faces: the cap is the cross-section wedge [notch on one
-        // face, terminal section arc, notch on the other face] sharing the
-        // original outline vertex. The arc is minted from the terminal
-        // section; the weld pass then unifies it with the blend wall's own
-        // cross edge (identical geometry, both use-1).
-        for (si, sr) in regular_results.iter().enumerate() {
-            let stripe = &sr.stripe;
-            let ends: [Option<&crate::section::CircSection>; 2] =
-                [stripe.sections.first(), stripe.sections.last()];
-            for sec in ends.into_iter().flatten() {
-                let pair: Vec<&NotchRecord> = rim_notches
-                    .iter()
-                    .filter(|nr| {
-                        nr.stripe == si
-                            && ((nr.contact_pt - sec.p1).length() < 1e-6
-                                || (nr.contact_pt - sec.p2).length() < 1e-6)
-                    })
-                    .collect();
-                if pair.len() != 2 || pair[0].outline_vid != pair[1].outline_vid {
-                    continue;
-                }
-                if vertex_face_count
-                    .get(&pair[0].outline_vid)
-                    .copied()
-                    .unwrap_or(0)
-                    > 2
-                {
-                    continue;
-                }
-                let (na, nb) = if (pair[0].contact_pt - sec.p1).length() < 1e-6 {
-                    (pair[0], pair[1])
-                } else {
-                    (pair[1], pair[0])
-                };
-                let outline_pt = topo.vertex(na.outline_vid)?.point();
-                let n_raw = (sec.p1 - outline_pt).cross(sec.p2 - outline_pt);
-                let Ok(plane_n) = n_raw.normalize() else {
-                    continue;
-                };
-                let Ok(circle_n) = (sec.p1 - sec.center).cross(sec.p2 - sec.center).normalize()
-                else {
-                    continue;
-                };
-                let Ok(circle) = Circle3D::new(sec.center, circle_n, sec.radius) else {
-                    continue;
-                };
-                let arc = topo.add_edge(Edge::new(
-                    na.contact_vid,
-                    nb.contact_vid,
-                    EdgeCurve::Circle(circle),
-                ));
-                let fwd_of = |topo: &Topology,
-                              eid: EdgeId,
-                              from: brepkit_topology::vertex::VertexId|
-                 -> Result<bool, BlendError> {
-                    Ok(topo.edge(eid)?.start() == from)
-                };
-                let oe1 = OrientedEdge::new(na.edge, fwd_of(topo, na.edge, na.outline_vid)?);
-                let oe2 = OrientedEdge::new(arc, true);
-                let oe3 = OrientedEdge::new(nb.edge, fwd_of(topo, nb.edge, nb.contact_vid)?);
-                let Ok(wire) = Wire::new(vec![oe1, oe2, oe3], true) else {
-                    continue;
-                };
-                let wid = topo.add_wire(wire);
-                let d = plane_n.dot(Vec3::new(outline_pt.x(), outline_pt.y(), outline_pt.z()));
-                let cap = topo.add_face(Face::new(
-                    wid,
-                    Vec::new(),
-                    FaceSurface::Plane { normal: plane_n, d },
-                ));
-                blend_face_ids.push(cap);
-                log::debug!("stripe {si} end cap built at {outline_pt:?}");
-            }
         }
 
         // Notch the fillet's end cross-section arcs out of the faces that
@@ -480,46 +453,22 @@ impl<'a> FilletBuilder<'a> {
         result_faces.extend(&blend_face_ids);
         result_faces.extend(&corner_face_ids);
 
+        // Provenance, straight from the bookkeeping above: an untouched face is
+        // itself, a trimmed one is its replacement, and each blend band names
+        // the two base faces its stripe ran between. Corner patches are the one
+        // thing this builder cannot name a source for — `CornerResult` records
+        // no stripe — so they are reported as created-with-no-origin rather
+        // than attributed to whichever face happens to be nearest.
+        let mut survived: Vec<(FaceId, FaceId)> = Vec::with_capacity(original_faces.len());
+        for &fid in &original_faces {
+            survived.push((fid, face_replacements.get(&fid).copied().unwrap_or(fid)));
+        }
         let face_origins = BlendFaceOrigins {
-            survived: original_faces
-                .iter()
-                .map(|&face| (face, face_replacements.get(&face).copied().unwrap_or(face)))
-                .collect(),
+            survived,
             deleted: Vec::new(),
             created: blend_face_origins,
             created_unattributed: corner_face_ids.clone(),
         };
-
-        // Adjacent stripes whose terminal sections coincide (a tangent
-        // junction's shared arc, or a tangency point where the section
-        // collapses) each mint their own copy of the shared cross edge —
-        // two use-1 edges with identical geometry. Weld those: two open
-        // rims tracing the same curve can only be a stitching failure.
-        crate::builder_utils::weld_coincident_free_edges(topo, &result_faces)?;
-        crate::builder_utils::close_residual_free_loops(topo, &mut result_faces)?;
-
-        if repair_radius_law_orientation {
-            // Faces carried over from the input solid keep their (correct)
-            // orientation: they seed the sense propagation and calibrate the
-            // boundary-walk convention. Only faces built by THIS pass — walls,
-            // corner patches, bands, fills, and rebuilt originals — are
-            // eligible for repair; a previous fillet's NURBS wall arriving as
-            // an input face must never be re-judged.
-            let original_set: std::collections::HashSet<FaceId> =
-                original_faces.iter().copied().collect();
-            let seeds: Vec<FaceId> = result_faces
-                .iter()
-                .filter(|f| original_set.contains(f))
-                .copied()
-                .collect();
-            let new_faces: Vec<FaceId> = result_faces
-                .iter()
-                .filter(|f| !original_set.contains(f))
-                .copied()
-                .collect();
-            crate::builder_utils::propagate_orientation(topo, &result_faces, &seeds)?;
-            crate::builder_utils::normalize_face_normals(topo, &new_faces, &seeds)?;
-        }
 
         let new_shell = Shell::new(result_faces)?;
         let new_shell_id = topo.add_shell(new_shell);
@@ -537,35 +486,489 @@ impl<'a> FilletBuilder<'a> {
     }
 }
 
+/// Find how `edge` is traversed (forward flag) in `face`'s outer wire.
+fn wire_traversal_of(topo: &Topology, face: FaceId, edge: EdgeId) -> Option<bool> {
+    let wire_id = topo.face(face).ok()?.outer_wire();
+    let wire = topo.wire(wire_id).ok()?;
+    wire.edges()
+        .iter()
+        .find(|oe| oe.edge() == edge)
+        .map(OrientedEdge::is_forward)
+}
+
+/// Create the circular end-arc edge of a straight-spine fillet, ordered so
+/// the CCW span from the edge's start vertex traces the quarter arc nearest
+/// the removed corner vertex `v_pt` (Circle edges sample the CCW span from
+/// start to end around the circle normal).
+fn make_end_arc(
+    topo: &mut Topology,
+    c_a: VertexId,
+    c_b: VertexId,
+    center: Point3,
+    axis: Vec3,
+    radius: f64,
+    v_pt: Point3,
+) -> Result<Option<EdgeId>, BlendError> {
+    use brepkit_math::traits::ParametricCurve;
+    const TAU: f64 = std::f64::consts::TAU;
+
+    let pa = topo.vertex(c_a)?.point();
+    let pb = topo.vertex(c_b)?.point();
+    let Ok(circle) = Circle3D::new(center, axis, radius) else {
+        return Ok(None);
+    };
+    let mid_of = |from: Point3, to: Point3| -> Point3 {
+        let a0 = circle.project(from);
+        let delta = (circle.project(to) - a0).rem_euclid(TAU);
+        let delta = if delta < 1e-12 { TAU } else { delta };
+        ParametricCurve::evaluate(&circle, a0 + delta / 2.0)
+    };
+    let (start, end) = if (mid_of(pa, pb) - v_pt).length() <= (mid_of(pb, pa) - v_pt).length() {
+        (c_a, c_b)
+    } else {
+        (c_b, c_a)
+    };
+    Ok(Some(topo.add_edge(Edge::new(
+        start,
+        end,
+        EdgeCurve::Circle(circle),
+    ))))
+}
+
+/// Close one spine end of a straight-edge fillet against the surrounding
+/// faces.
+///
+/// After the two side faces are trimmed, the corner vertex `v_id` survives
+/// only in the wires of end faces. Two configurations occur:
+///
+/// - **Cap trim**: one wire holds both sub-edges `c → v → c'` (a
+///   perpendicular cap face, e.g. the bottom of a plate). The pair is
+///   replaced in place by the end arc.
+/// - **Corner patch**: the sub-edges live in two different wires (coplanar
+///   neighbor faces continuing past the spine end, e.g. a wall seated on the
+///   plate). A new planar patch face `arc → sub → v → sub` is created,
+///   reusing the existing sub-edges so the shell stays manifold. Its outward
+///   normal is `cap_normal` (pointing back along the spine, into the removed
+///   corner column).
+///
+/// Returns a newly created patch face, if any. Logs and returns `Ok(None)`
+/// without mutation when neither pattern matches.
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::too_many_arguments)]
+fn stitch_end(
+    topo: &mut Topology,
+    spine_edges: &[EdgeId],
+    v_id: VertexId,
+    arc: EdgeId,
+    arc_blend_from: VertexId,
+    c1: VertexId,
+    c2: VertexId,
+    cap_normal: Vec3,
+) -> Result<Option<FaceId>, BlendError> {
+    // --- Case A: a single wire traverses c → v → c' consecutively. ---
+    let wire_ids: Vec<_> = topo.wires().iter().map(|(id, _)| id).collect();
+    let mut case_a: Option<(
+        brepkit_topology::wire::WireId,
+        usize,
+        usize,
+        VertexId,
+        VertexId,
+    )> = None;
+    'outer: for &wid in &wire_ids {
+        let wire = topo.wire(wid)?;
+        let oes = wire.edges();
+        if oes
+            .iter()
+            .any(|oe| spine_edges.contains(&oe.edge()) || oe.edge() == arc)
+        {
+            continue;
+        }
+        let n = oes.len();
+        for i in 0..n {
+            let j = (i + 1) % n;
+            let ei = topo.edge(oes[i].edge())?;
+            let ej = topo.edge(oes[j].edge())?;
+            if oes[i].oriented_end(ei) == v_id && oes[j].oriented_start(ej) == v_id {
+                let xa = oes[i].oriented_start(ei);
+                let yb = oes[j].oriented_end(ej);
+                if (xa == c1 && yb == c2) || (xa == c2 && yb == c1) {
+                    case_a = Some((wid, i, j, xa, yb));
+                    break 'outer;
+                }
+            }
+        }
+    }
+
+    if let Some((wid, i, j, xa, _yb)) = case_a {
+        let arc_forward = topo.edge(arc)?.start() == xa;
+        let oes = topo.wire(wid)?.edges().to_vec();
+        let mut new_edges = Vec::with_capacity(oes.len() - 1);
+        for (pos, oe) in oes.iter().enumerate() {
+            if pos == i {
+                new_edges.push(OrientedEdge::new(arc, arc_forward));
+            } else if pos == j {
+                // consumed by the arc
+            } else {
+                new_edges.push(*oe);
+            }
+        }
+        *topo.wire_mut(wid)? = Wire::new(new_edges, true)?;
+        return Ok(None);
+    }
+
+    // --- Case B: the sub-edges live in two separate live wires. ---
+    let mut sub1: Option<EdgeId> = None;
+    let mut sub2: Option<EdgeId> = None;
+    for &wid in &wire_ids {
+        let wire = topo.wire(wid)?;
+        let oes = wire.edges();
+        if oes
+            .iter()
+            .any(|oe| spine_edges.contains(&oe.edge()) || oe.edge() == arc)
+        {
+            continue;
+        }
+        for oe in oes {
+            let e = topo.edge(oe.edge())?;
+            let ends = (e.start(), e.end());
+            if ends == (v_id, c1) || ends == (c1, v_id) {
+                sub1 = Some(oe.edge());
+            } else if ends == (v_id, c2) || ends == (c2, v_id) {
+                sub2 = Some(oe.edge());
+            }
+        }
+    }
+    let (Some(sub1), Some(sub2)) = (sub1, sub2) else {
+        log::warn!("fillet end stitch: no cap pattern found at spine end vertex {v_id:?}");
+        return Ok(None);
+    };
+
+    // Traverse the arc opposite to the blend face; then chain through v_id.
+    let cap_from = if arc_blend_from == c1 { c2 } else { c1 };
+    let cap_to = if cap_from == c1 { c2 } else { c1 };
+    let arc_e = topo.edge(arc)?;
+    let arc_forward = arc_e.start() == cap_from;
+
+    let (first_sub, second_sub) = if cap_to == c1 {
+        (sub1, sub2)
+    } else {
+        (sub2, sub1)
+    };
+    let fs = topo.edge(first_sub)?;
+    let first_forward = fs.start() == cap_to && fs.end() == v_id;
+    let ss = topo.edge(second_sub)?;
+    let second_forward = ss.start() == v_id && ss.end() == cap_from;
+
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(arc, arc_forward),
+            OrientedEdge::new(first_sub, first_forward),
+            OrientedEdge::new(second_sub, second_forward),
+        ],
+        true,
+    )?;
+    let wire_id = topo.add_wire(wire);
+    let d = {
+        let p = topo.vertex(v_id)?.point();
+        cap_normal.dot(Vec3::new(p.x(), p.y(), p.z()))
+    };
+    let face = Face::new(
+        wire_id,
+        Vec::new(),
+        FaceSurface::Plane {
+            normal: cap_normal,
+            d,
+        },
+    );
+    Ok(Some(topo.add_face(face)))
+}
+
+/// Watertight assembly for a finite straight-edge fillet: reuse the
+/// trimmer's contact edges as the blend wall's long boundaries, close the
+/// two spine ends with exact circular arcs, and stitch those arcs into the
+/// surrounding cap faces.
+///
+/// Returns `Ok(None)` (caller falls back to the detached quad) when the
+/// stripe is not a single open line-edge spine or the topology does not
+/// match the expected pattern. Only mutates after all applicability checks
+/// pass.
+#[allow(clippy::too_many_lines)]
+#[allow(clippy::similar_names)]
+fn stitch_planar_blend(
+    topo: &mut Topology,
+    stripe: &Stripe,
+    tr1: &trimmer::TrimResult,
+    tr2: &trimmer::TrimResult,
+    face_replacements: &std::collections::HashMap<FaceId, FaceId>,
+) -> Result<Option<Vec<FaceId>>, BlendError> {
+    // A straight run: every edge on the chain is a line, and the chain is an
+    // open path so it has two free ends to close against. A single edge is
+    // the degenerate case of this.
+    let spine_edges = stripe.spine.edges();
+    if spine_edges.is_empty() {
+        return Ok(None);
+    }
+    let mut ends: std::collections::HashMap<VertexId, usize> = std::collections::HashMap::new();
+    for &eid in spine_edges {
+        let e = topo.edge(eid)?;
+        if e.start() == e.end() || !matches!(e.curve(), EdgeCurve::Line) {
+            return Ok(None);
+        }
+        *ends.entry(e.start()).or_insert(0) += 1;
+        *ends.entry(e.end()).or_insert(0) += 1;
+    }
+    if ends.values().filter(|count| **count == 1).count() != 2 {
+        // A closed ridgeline has no free end; that is the closed-rim path.
+        return Ok(None);
+    }
+    // Take the ends from the ordered chain rather than from the incidence
+    // map, whose iteration order is not stable — `v0`/`v1` set the spine
+    // direction, and flipping it between runs would flip the end arcs with it.
+    let first = topo.edge(spine_edges[0])?;
+    let (v0, v1) = if spine_edges.len() == 1 {
+        (first.start(), first.end())
+    } else {
+        let second = topo.edge(spine_edges[1])?;
+        let joins_second = [second.start(), second.end()];
+        let v0 = if joins_second.contains(&first.start()) {
+            first.end()
+        } else {
+            first.start()
+        };
+        let last = topo.edge(spine_edges[spine_edges.len() - 1])?;
+        let prev = topo.edge(spine_edges[spine_edges.len() - 2])?;
+        let joins_prev = [prev.start(), prev.end()];
+        let v1 = if joins_prev.contains(&last.start()) {
+            last.end()
+        } else {
+            last.start()
+        };
+        (v0, v1)
+    };
+    let (Some(ce1), Some(ce2)) = (tr1.contact_edge, tr2.contact_edge) else {
+        return Ok(None);
+    };
+    if stripe.sections.is_empty() {
+        return Ok(None);
+    }
+
+    let p0 = topo.vertex(v0)?.point();
+    let p1 = topo.vertex(v1)?.point();
+    let Ok(dir) = (p1 - p0).normalize() else {
+        return Ok(None);
+    };
+
+    // Classify each contact-edge endpoint to a spine end by axial position.
+    let classify = |topo: &Topology, ce: EdgeId| -> Result<[VertexId; 2], BlendError> {
+        let e = topo.edge(ce)?;
+        let (s, t) = (e.start(), e.end());
+        let ps = topo.vertex(s)?.point();
+        let pt = topo.vertex(t)?.point();
+        Ok(if dir.dot(ps - p0) <= dir.dot(pt - p0) {
+            [s, t]
+        } else {
+            [t, s]
+        })
+    };
+    let c1 = classify(topo, ce1)?;
+    let c2 = classify(topo, ce2)?;
+    if c1[0] == c2[0] || c1[1] == c2[1] {
+        return Ok(None);
+    }
+
+    // Pick the walker section nearest each spine end for the arc centers.
+    let (Some(sec_first), Some(sec_last)) = (stripe.sections.first(), stripe.sections.last())
+    else {
+        return Ok(None);
+    };
+    let (sec0, sec1) =
+        if (dir.dot(sec_first.center - p0)).abs() <= (dir.dot(sec_last.center - p0)).abs() {
+            (sec_first, sec_last)
+        } else {
+            (sec_last, sec_first)
+        };
+
+    // Blend wall traverses each contact edge opposite to its trimmed face.
+    let f1_now = face_replacements
+        .get(&stripe.face1)
+        .copied()
+        .unwrap_or(tr1.trimmed_face);
+    let f2_now = face_replacements
+        .get(&stripe.face2)
+        .copied()
+        .unwrap_or(tr2.trimmed_face);
+    let (Some(f1_fwd), Some(f2_fwd)) = (
+        wire_traversal_of(topo, f1_now, ce1),
+        wire_traversal_of(topo, f2_now, ce2),
+    ) else {
+        return Ok(None);
+    };
+
+    let ce1_e = topo.edge(ce1)?;
+    let ce2_e = topo.edge(ce2)?;
+    let ce1_pair = (ce1_e.start(), ce1_e.end());
+    let ce2_pair = (ce2_e.start(), ce2_e.end());
+    // Traversal start/end of ce1 in the blend wire.
+    let (b1_from, b1_to) = if f1_fwd {
+        (ce1_pair.1, ce1_pair.0)
+    } else {
+        ce1_pair
+    };
+    let (b2_from, b2_to) = if f2_fwd {
+        (ce2_pair.1, ce2_pair.0)
+    } else {
+        ce2_pair
+    };
+    // The loop ce1 → arc → ce2 → arc must alternate ends: after traversing
+    // ce1 to its end-k vertex, ce2 must start from ITS end-k vertex.
+    let end_of = |v: VertexId| -> Option<usize> {
+        if v == c1[0] || v == c2[0] {
+            Some(0)
+        } else if v == c1[1] || v == c2[1] {
+            Some(1)
+        } else {
+            None
+        }
+    };
+    let (Some(k1), Some(k2)) = (end_of(b1_to), end_of(b2_from)) else {
+        return Ok(None);
+    };
+    if k1 != k2 {
+        // The two trimmed faces traverse their contact edges in a pattern
+        // that cannot close a quad loop; leave to the fallback.
+        log::warn!("fillet stitch: contact edge traversals do not alternate; skipping");
+        return Ok(None);
+    }
+
+    // Arcs at both ends (created before any wire mutation).
+    let radius0 = sec0.radius;
+    let radius1 = sec1.radius;
+    let Some(arc_at_k1) = make_end_arc(
+        topo,
+        b1_to,
+        b2_from,
+        if k1 == 0 { sec0.center } else { sec1.center },
+        dir,
+        if k1 == 0 { radius0 } else { radius1 },
+        if k1 == 0 { p0 } else { p1 },
+    )?
+    else {
+        return Ok(None);
+    };
+    let Some(arc_at_other) = make_end_arc(
+        topo,
+        b2_to,
+        b1_from,
+        if k1 == 0 { sec1.center } else { sec0.center },
+        dir,
+        if k1 == 0 { radius1 } else { radius0 },
+        if k1 == 0 { p1 } else { p0 },
+    )?
+    else {
+        return Ok(None);
+    };
+
+    // Blend wall wire: ce1, arc, ce2, arc.
+    let fwd_between = |topo: &Topology, e: EdgeId, from: VertexId| -> Result<bool, BlendError> {
+        Ok(topo.edge(e)?.start() == from)
+    };
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(ce1, !f1_fwd),
+            OrientedEdge::new(arc_at_k1, fwd_between(topo, arc_at_k1, b1_to)?),
+            OrientedEdge::new(ce2, !f2_fwd),
+            OrientedEdge::new(arc_at_other, fwd_between(topo, arc_at_other, b2_to)?),
+        ],
+        true,
+    )?;
+    let wire_id = topo.add_wire(wire);
+
+    // Orient the blend wall: outward is radially away from the ball center
+    // for a convex edge, toward it for a concave edge.
+    let secm = &stripe.sections[stripe.sections.len() / 2];
+    let f1_face = topo.face(stripe.face1)?;
+    let n1_stored = f1_face.surface().normal(0.0, 0.0);
+    let n1_out = if f1_face.is_reversed() {
+        -n1_stored
+    } else {
+        n1_stored
+    };
+    let convex = n1_out.dot(secm.center - secm.p1) < 0.0;
+    let Ok(radial) = (secm.p1 - secm.center).normalize() else {
+        return Ok(None);
+    };
+    let desired = if convex { radial } else { -radial };
+    let reversed = match stripe.surface.project_point(secm.p1) {
+        Some((u, v)) => stripe.surface.normal(u, v).dot(desired) < 0.0,
+        None => false,
+    };
+
+    let mut blend_face = Face::new(wire_id, Vec::new(), stripe.surface.clone());
+    blend_face.set_reversed(reversed);
+    let blend_face_id = topo.add_face(blend_face);
+
+    let mut faces = vec![blend_face_id];
+
+    // Close both spine ends. Arc endpoints at end k: c1[k] / c2[k]; the
+    // blend traverses arc_at_k1 from b1_to, and arc_at_other from b2_to.
+    let ends = [
+        (
+            if k1 == 0 { v0 } else { v1 },
+            arc_at_k1,
+            b1_to,
+            if k1 == 0 { dir } else { -dir },
+            k1,
+        ),
+        (
+            if k1 == 0 { v1 } else { v0 },
+            arc_at_other,
+            b2_to,
+            if k1 == 0 { -dir } else { dir },
+            1 - k1,
+        ),
+    ];
+    for &(v_end, arc, arc_from, cap_normal, k) in &ends {
+        if let Some(patch) = stitch_end(
+            topo,
+            spine_edges,
+            v_end,
+            arc,
+            arc_from,
+            c1[k],
+            c2[k],
+            cap_normal,
+        )? {
+            faces.push(patch);
+        }
+    }
+
+    Ok(Some(faces))
+}
+
 /// Geometry of a full-revolution rim fillet (a closed circular edge between a
-/// bounded disc cap and an axisymmetric wall), recovered from a stripe whose
-/// blend surface is a torus.
+/// planar cap and an axisymmetric wall), recovered from a stripe whose blend
+/// surface is a torus.
 struct ClosedRimInfo {
-    /// The bounded disc cap face (a `Plane`).
+    /// The planar cap face.
     plane_face: FaceId,
     /// The axisymmetric wall face (`Cylinder` or `Cone`).
     wall_face: FaceId,
     /// The original closed rim edge on the wall, to be replaced by the
     /// wall-contact circle.
     rim_edge: EdgeId,
-    /// Contact circle on the plate (radius `r_c − r`), in the plane.
+    /// Whether the rim is one of the cap's INNER loops (a hole drilled through
+    /// a plate) rather than its outer boundary (a bounded disc cap).
+    ///
+    /// The two differ in which way the setback runs. On a disc cap the contact
+    /// circle shrinks the outer boundary to `r_c − r`; on a hole rim it grows
+    /// the inner loop to `r_c + r`, replacing that loop and leaving the outer
+    /// wire and the cap's other holes alone.
+    rim_is_inner: bool,
+    /// Contact circle on the plate (radius `r_c ∓ r`), in the plane.
     plate_circle: Circle3D,
     /// Contact circle on the wall (radius `r_c` for a cylinder), one fillet
     /// radius along the axis from the plate.
     wall_circle: Circle3D,
-}
-
-/// Project a point onto the infinite axis line through `origin` with unit
-/// direction `axis`, returning the foot of the perpendicular.
-fn project_onto_axis(p: Point3, origin: Point3, axis: Vec3) -> Point3 {
-    let d = p - origin;
-    origin + axis * axis.dot(d)
-}
-
-/// Radial distance from a point to the axis line.
-fn radial_distance(p: Point3, origin: Point3, axis: Vec3) -> f64 {
-    let d = p - origin;
-    (d - axis * axis.dot(d)).length()
 }
 
 /// Detect a full-revolution rim-fillet stripe and recover its annular geometry.
@@ -613,21 +1016,35 @@ fn closed_rim_info(topo: &Topology, stripe: &Stripe) -> Result<Option<ClosedRimI
         _ => return Ok(None),
     };
 
-    // The annular rebuild replaces the cap's whole outer wire with the
-    // plate-contact circle, so it only applies when the cap is a bare disc
-    // whose sole boundary is this rim (no inner wires). A more complex cap
-    // falls back to the normal trim path.
-    {
+    // The annular rebuild replaces exactly one of the cap's loops with the
+    // plate-contact circle, so it applies whenever some loop is precisely this
+    // rim and nothing else.
+    //
+    //   * the OUTER wire — a bounded disc cap, e.g. a primitive cylinder's end
+    //     face. The cap may still carry holes (a drilled flange's rim cap is an
+    //     annulus with a central opening and bolt holes) and those are
+    //     preserved verbatim by the rebuild.
+    //   * an INNER wire — a hole drilled through a plate. Here the rim IS a
+    //     hole, so the rebuild swaps that one loop and leaves the outer wire
+    //     and the cap's other holes untouched.
+    //
+    // Anything else falls back to the normal trim path.
+    let rim_is_inner = {
         let cap = topo.face(plane_face)?;
-        if !cap.inner_wires().is_empty() {
+        let is_lone_rim = |wid| -> Result<bool, BlendError> {
+            let edges = topo.wire(wid)?.edges();
+            Ok(edges.len() == 1 && edges[0].edge() == rim_edge)
+        };
+        if is_lone_rim(cap.outer_wire())? {
+            false
+        } else if cap.inner_wires().iter().try_fold(false, |acc, &wid| {
+            Ok::<_, BlendError>(acc || is_lone_rim(wid)?)
+        })? {
+            true
+        } else {
             return Ok(None);
         }
-        let cap_wire = topo.wire(cap.outer_wire())?;
-        let edges = cap_wire.edges();
-        if edges.len() != 1 || edges[0].edge() != rim_edge {
-            return Ok(None);
-        }
-    }
+    };
 
     // The plane-side contact curve is the one whose face is the plane.
     let (plate_contact, wall_contact) = if plane_face == stripe.face1 {
@@ -657,13 +1074,125 @@ fn closed_rim_info(topo: &Topology, stripe: &Stripe) -> Result<Option<ClosedRimI
     let wall_center = project_onto_axis(wall_pt, axis_origin, axis);
     let wall_radius = radial_distance(wall_pt, axis_origin, axis);
 
-    let plate_circle = Circle3D::new(plate_center, axis, plate_radius)?;
-    let wall_circle = Circle3D::new(wall_center, axis, wall_radius)?;
+    // Pin both contact circles' `evaluate(0)` to the ray the rim's own seam
+    // vertex sits on. The rebuild shortens the wall by swapping the rim circle
+    // for the wall-contact circle and re-pointing the wall's seam edge at the
+    // new circle's seam vertex — while keeping the seam's CURVE. A circle built
+    // without a reference direction puts its seam wherever `Frame3::from_normal`
+    // happens to land (for an axis of `+z`, a quarter turn away), so the seam
+    // line was re-pointed at a vertex a quarter turn from where it starts: a
+    // straight chord through the inside of the wall, an edge of the wall face
+    // that is not on the wall surface. It survives every topological check —
+    // the shell closes, nothing is free or non-manifold, and the tessellator
+    // and volume integrator both work from the surface rather than that edge —
+    // but any consumer that reads the wire as the face's real boundary sees a
+    // face a fraction of its true size. `mass_properties` does, and reported
+    // half the volume of a rim-filleted cylinder.
+    let seam_dir = {
+        let v = topo.vertex(topo.edge(rim_edge)?.start())?.point() - axis_origin;
+        v - axis * axis.dot(v)
+    };
+    let plate_circle = Circle3D::new_with_ref(plate_center, axis, plate_radius, seam_dir)?;
+    let wall_circle = Circle3D::new_with_ref(wall_center, axis, wall_radius, seam_dir)?;
+
+    // When the contact moves INTO the wall, the rebuild shortens the wall to
+    // meet it — and can only do that with material the wall HAS. On a 6 mm
+    // plate an R9 hole-rim fillet puts the contact 3 mm below the underside,
+    // and the rebuild emits it happily: the shell still closes, no edge is
+    // free, and the tessellation is still watertight, because every one of
+    // those checks is topological. Only the wall's own axial extent says the
+    // geometry is nonsense.
+    //
+    // A concave rim blend moves the contact the other way and EXTENDS the wall
+    // instead — a cone's base rim flares into a foot below its own base plane,
+    // which is legitimate and has no such bound. That case shows up as the wall
+    // having no extent at all in the setback direction, and is left alone.
+    {
+        let setback = axis.dot(wall_center - plate_center);
+        let wall_wire = topo.face(wall_face)?.outer_wire();
+        let (s_min, s_max) = wire_axial_range(topo, wall_wire, plate_center, axis)?;
+        // The rim sits at s = 0 (the cap's plane); `available` is how far the
+        // wall reaches from there in the direction the contact moved.
+        let available = if setback >= 0.0 { s_max } else { -s_min };
+        let shortening = available > 1e-9 * (1.0 + setback.abs());
+        if shortening && setback.abs() >= available {
+            // Report the achievable fillet radius, not the axial setback: they
+            // coincide for a cylinder and differ by the generator slope on a
+            // cone.
+            let radius = match &stripe.surface {
+                FaceSurface::Torus(t) => t.minor_radius(),
+                _ => setback.abs(),
+            };
+            let scale = if setback.abs() > 0.0 {
+                available / setback.abs()
+            } else {
+                0.0
+            };
+            return Err(BlendError::RadiusTooLarge {
+                edge: rim_edge,
+                max_radius: (radius * scale).max(0.0),
+            });
+        }
+    }
+
+    // The cap's other loops survive the rebuild unchanged, which is only
+    // correct if the moved contact circle still clears every one of them. A
+    // radius that reaches past one would need the fillet and that loop to merge
+    // into a single surface — real geometry this rebuild cannot express — and
+    // the resulting cap wire would cross its own boundary while still passing
+    // the closed-shell and Euler checks, i.e. ship as a self-intersecting body.
+    //
+    // Which loops are obstacles, and on which side, follows from the direction
+    // the contact moved:
+    //
+    //   * disc cap (rim is the outer wire): the boundary SHRINKS to `r_c − r`,
+    //     so the cap's holes must all stay inside it.
+    //   * hole rim (rim is an inner wire): the loop GROWS to `r_c + r`, so the
+    //     outer wire and every other hole must stay outside it.
+    {
+        let cap = topo.face(plane_face)?;
+        let others: Vec<WireId> = if rim_is_inner {
+            std::iter::once(cap.outer_wire())
+                .chain(cap.inner_wires().iter().copied())
+                .filter(|&wid| {
+                    topo.wire(wid)
+                        .is_ok_and(|w| w.edges().first().is_none_or(|oe| oe.edge() != rim_edge))
+                })
+                .collect()
+        } else {
+            cap.inner_wires().to_vec()
+        };
+        for wid in others {
+            let clearance = wire_radial_extremum(topo, wid, axis_origin, axis, rim_is_inner)?;
+            let collides = if rim_is_inner {
+                clearance <= plate_radius
+            } else {
+                clearance >= plate_radius
+            };
+            if !collides {
+                continue;
+            }
+            if rim_is_inner {
+                // The cause is genuinely the radius: the same rim rounds fine
+                // below the clearance, so say so with the achievable maximum
+                // rather than failing as a trimming problem.
+                return Err(BlendError::RadiusTooLarge {
+                    edge: rim_edge,
+                    max_radius: (clearance - wall_radius).max(0.0),
+                });
+            }
+            // The shrinking-disc direction keeps its established behaviour:
+            // defer to the trim path rather than change how existing shapes
+            // report.
+            return Ok(None);
+        }
+    }
 
     Ok(Some(ClosedRimInfo {
         plane_face,
         wall_face,
         rim_edge,
+        rim_is_inner,
         plate_circle,
         wall_circle,
     }))
@@ -703,9 +1232,44 @@ fn assemble_closed_rim(
     let wall_inner = topo.face(current_wall)?.inner_wires().to_vec();
     let wall_oriented: Vec<OrientedEdge> = topo.wire(wall_outer_wire)?.edges().to_vec();
 
+    let torus = match &stripe.surface {
+        FaceSurface::Torus(t) => t.clone(),
+        _ => {
+            return Err(BlendError::TrimmingFailure {
+                face: rim.wall_face,
+            });
+        }
+    };
+
+    // `closed_rim_info` measured the setback against the wall as it was; by the
+    // time this runs, an earlier rim on the SAME wall may already have eaten
+    // into it. Two R2 fillets on the two rims of a 3 mm bore each pass on their
+    // own and together invert the wall, so re-measure what is actually left.
+    {
+        let ax = torus.z_axis();
+        let setback = ax.dot(rim.wall_circle.center() - rim.plate_circle.center());
+        let (s_min, s_max) =
+            wire_axial_range(topo, wall_outer_wire, rim.plate_circle.center(), ax)?;
+        let available = if setback >= 0.0 { s_max } else { -s_min };
+        let shortening = available > 1e-9 * (1.0 + setback.abs());
+        if shortening && setback.abs() >= available {
+            let scale = if setback.abs() > 0.0 {
+                available / setback.abs()
+            } else {
+                0.0
+            };
+            return Err(BlendError::RadiusTooLarge {
+                edge: rim.rim_edge,
+                max_radius: (torus.minor_radius() * scale).max(0.0),
+            });
+        }
+    }
+
     // Vertices for the two closed contact circles (start == end → degenerate).
-    let plate_v = topo.add_vertex(Vertex::new(rim.plate_circle.evaluate(0.0), TOL));
-    let wall_v = topo.add_vertex(Vertex::new(rim.wall_circle.evaluate(0.0), TOL));
+    let plate_point = rim.plate_circle.evaluate(0.0);
+    let wall_point = rim.wall_circle.evaluate(0.0);
+    let plate_v = topo.add_vertex(Vertex::new(plate_point, TOL));
+    let wall_v = topo.add_vertex(Vertex::new(wall_point, TOL));
 
     // Shared contact-circle edges.
     let plate_edge = topo.add_edge(Edge::new(
@@ -718,30 +1282,72 @@ fn assemble_closed_rim(
         wall_v,
         EdgeCurve::Circle(rim.wall_circle.clone()),
     ));
-    // Seam connecting the two circles (degenerate-seam band, as the primitive
-    // cylinder lateral uses).
-    let seam_edge = topo.add_edge(Edge::new(plate_v, wall_v, EdgeCurve::Line));
+    // Exact minor-circle seam connecting the two contacts. A straight chord is
+    // not on the torus and makes paired rim fillets lose volume during surface
+    // integration. Choose the circle normal from the ordered contact vectors
+    // so the edge follows the short blend arc from plate to wall.
+    let axis = torus.z_axis();
+    let radial = wall_point - torus.center();
+    let radial = (radial - axis * axis.dot(radial)).normalize()?;
+    let seam_center = torus.center() + radial * torus.major_radius();
+    let seam_normal = (plate_point - seam_center)
+        .cross(wall_point - seam_center)
+        .normalize()?;
+    let seam_circle = Circle3D::new(seam_center, seam_normal, torus.minor_radius())?;
+    let seam_edge = topo.add_edge(Edge::new(plate_v, wall_v, EdgeCurve::Circle(seam_circle)));
 
-    // --- Rebuild the disc cap bounded by the plate-contact circle. ---
-    // The cap originally borders the rim via a single closed-circle wire; the
-    // new cap reuses the plate-contact circle with the same orientation the cap
-    // had on the original rim edge.
-    let cap_orig_wire = topo.face(
+    // --- Rebuild the cap with the rim loop replaced by the plate contact. ---
+    // Exactly one of the cap's loops is the rim; that loop becomes the
+    // plate-contact circle with the orientation the cap had on the original rim
+    // edge, and every other loop is carried through verbatim. Handing the
+    // rebuilt face an empty inner-wire list would fill in every hole — a
+    // drilled flange's rim cap would lose its bore and bolt openings, and each
+    // bore wall would lose the face it pairs with, opening the shell.
+    let cap_orig = topo.face(
         face_replacements
             .get(&rim.plane_face)
             .copied()
             .unwrap_or(rim.plane_face),
     )?;
-    let cap_orig_wire_id = cap_orig_wire.outer_wire();
+    let cap_orig_outer = cap_orig.outer_wire();
+    let cap_orig_inner = cap_orig.inner_wires().to_vec();
+    let rim_loop = if rim.rim_is_inner {
+        *cap_orig_inner
+            .iter()
+            .find(|&&wid| {
+                topo.wire(wid)
+                    .is_ok_and(|w| w.edges().iter().any(|oe| oe.edge() == rim.rim_edge))
+            })
+            .ok_or(BlendError::TrimmingFailure {
+                face: rim.plane_face,
+            })?
+    } else {
+        cap_orig_outer
+    };
     let cap_forward = topo
-        .wire(cap_orig_wire_id)?
+        .wire(rim_loop)?
         .edges()
         .iter()
         .find(|oe| oe.edge() == rim.rim_edge)
         .is_some_and(OrientedEdge::is_forward);
-    let cap_wire = Wire::new(vec![OrientedEdge::new(plate_edge, cap_forward)], true)?;
-    let cap_wire_id = topo.add_wire(cap_wire);
-    let mut cap_face = Face::new(cap_wire_id, Vec::new(), plane_surf);
+    let contact_wire = Wire::new(vec![OrientedEdge::new(plate_edge, cap_forward)], true)?;
+    let contact_wire_id = topo.add_wire(contact_wire);
+    let (cap_wire_id, cap_inner) = if rim.rim_is_inner {
+        let inner = cap_orig_inner
+            .iter()
+            .map(|&wid| {
+                if wid == rim_loop {
+                    contact_wire_id
+                } else {
+                    wid
+                }
+            })
+            .collect();
+        (cap_orig_outer, inner)
+    } else {
+        (contact_wire_id, cap_orig_inner)
+    };
+    let mut cap_face = Face::new(cap_wire_id, cap_inner, plane_surf);
     cap_face.set_reversed(plane_reversed);
     let cap_face_id = topo.add_face(cap_face);
     face_replacements.insert(rim.plane_face, cap_face_id);
@@ -759,13 +1365,11 @@ fn assemble_closed_rim(
     // two copies each become a free edge).
     let mut rebuilt: std::collections::HashMap<EdgeId, EdgeId> = std::collections::HashMap::new();
     let mut new_wall_edges: Vec<OrientedEdge> = Vec::with_capacity(wall_oriented.len());
-    let mut replaced = false;
-    let mut wall_forward = true;
+    let mut wall_forward = None;
     for oe in &wall_oriented {
         if oe.edge() == rim.rim_edge {
             new_wall_edges.push(OrientedEdge::new(wall_edge, oe.is_forward()));
-            wall_forward = oe.is_forward();
-            replaced = true;
+            wall_forward = Some(oe.is_forward());
             continue;
         }
         let e = topo.edge(oe.edge())?;
@@ -795,11 +1399,11 @@ fn assemble_closed_rim(
             new_wall_edges.push(*oe);
         }
     }
-    if !replaced {
+    let Some(wall_forward) = wall_forward else {
         return Err(BlendError::TrimmingFailure {
             face: rim.wall_face,
         });
-    }
+    };
     let new_wall_wire = Wire::new(new_wall_edges, true)?;
     let new_wall_wire_id = topo.add_wire(new_wall_wire);
     let mut new_wall_face = Face::new(new_wall_wire_id, wall_inner, wall_surf);
@@ -813,14 +1417,22 @@ fn assemble_closed_rim(
     // (plate_v → plate_v → wall_v → wall_v → plate_v). The shared circle edges
     // are used opposite to the standard-wound cap and wall, keeping the shell
     // manifold.
-    let torus = match &stripe.surface {
-        FaceSurface::Torus(t) => t.clone(),
-        _ => {
-            return Err(BlendError::TrimmingFailure {
-                face: rim.wall_face,
-            });
-        }
-    };
+    let band_reversed = torus_band_needs_reversal(&torus, rim);
+    let cap_effective_forward = cap_forward != plane_reversed;
+    let wall_effective_forward = wall_forward != wall_reversed;
+    let band_plate_forward = cap_effective_forward == band_reversed;
+    let band_wall_forward = wall_effective_forward == band_reversed;
+    let band_wire = Wire::new(
+        vec![
+            OrientedEdge::new(plate_edge, band_plate_forward),
+            OrientedEdge::new(seam_edge, true),
+            OrientedEdge::new(wall_edge, band_wall_forward),
+            OrientedEdge::new(seam_edge, false),
+        ],
+        true,
+    )?;
+    let band_wire_id = topo.add_wire(band_wire);
+    let mut band_face = Face::new(band_wire_id, Vec::new(), stripe.surface.clone());
     // Orient the band so its outward normal points away from the solid. The
     // solid tessellator orients a torus band's triangles from the surface's
     // intrinsic (u, v) frame, then applies the face `reversed` flag; pick the
@@ -838,20 +1450,6 @@ fn assemble_closed_rim(
     // for any sense choice and the two senses are picked independently. A
     // fixed wire order cannot serve both rims of a cylinder — their caps
     // traverse the shared circles in opposite directions.
-    let band_reversed = torus_band_needs_reversal(&torus, rim);
-    let plate_sense = (cap_forward == plane_reversed) != band_reversed;
-    let wall_sense = (wall_forward == wall_reversed) != band_reversed;
-    let band_wire = Wire::new(
-        vec![
-            OrientedEdge::new(plate_edge, plate_sense),
-            OrientedEdge::new(seam_edge, true),
-            OrientedEdge::new(wall_edge, wall_sense),
-            OrientedEdge::new(seam_edge, false),
-        ],
-        true,
-    )?;
-    let band_wire_id = topo.add_wire(band_wire);
-    let mut band_face = Face::new(band_wire_id, Vec::new(), stripe.surface.clone());
     if band_reversed {
         band_face.set_reversed(true);
     }
@@ -901,12 +1499,19 @@ fn torus_band_needs_reversal(
 /// Returns [`BlendError`] if the edge is non-manifold, if topology lookups
 /// fail, or if neither the analytic nor walking path can produce a result.
 #[allow(clippy::too_many_lines)]
-fn compute_stripe_for_edge(
+fn compute_stripe_for_spine(
     topo: &Topology,
     adjacency: &brepkit_topology::adjacency::AdjacencyIndex,
-    edge_id: EdgeId,
+    spine: Spine,
     law: &RadiusLaw,
 ) -> Result<StripeResult, BlendError> {
+    // Every edge on a G1 chain shares one face pair (that is what makes it a
+    // ridgeline), so the first edge speaks for the whole spine.
+    let edge_id = spine.edges().first().copied().ok_or(BlendError::Topology(
+        brepkit_topology::TopologyError::Empty {
+            entity: "fillet spine",
+        },
+    ))?;
     let adj_faces = adjacency.faces_for_edge(edge_id);
     if adj_faces.len() != 2 {
         // Non-manifold (3+ faces) or boundary (0-1 faces) edge cannot be filleted.
@@ -929,8 +1534,6 @@ fn compute_stripe_for_edge(
     let face2_data = topo.face(face2)?;
     let surf2 = face2_data.surface().clone();
     let face2_reversed = face2_data.is_reversed();
-
-    let spine = Spine::from_single_edge(topo, edge_id)?;
 
     // Get radius at the spine midpoint for the analytic path.
     let radius = law.evaluate(0.5);
@@ -1228,511 +1831,6 @@ fn build_pcurve_from_contact(
     Ok(brepkit_math::curves2d::Curve2D::Line(line))
 }
 
-/// Rebuild faces whose entire outer wire is consumed by fillet spine edges.
-///
-/// For a closed rim, the face's post-fillet boundary is the chained loop of
-/// the stripes' contact curves on that face. Returns the loop edge chosen
-/// for each `(face, stripe index)` so the blend walls share those edges.
-/// Faces that fail any structural requirement (an outer-wire edge with no
-/// stripe, or a junction gap wider than weld distance) are left for the
-/// per-stripe trim path.
-#[allow(clippy::type_complexity, clippy::too_many_lines)]
-/// A line edge bridging a fillet stripe's abrupt end: from the original
-/// outline vertex to the stripe's terminal contact point on one face.
-struct NotchRecord {
-    stripe: usize,
-    edge: EdgeId,
-    outline_vid: brepkit_topology::vertex::VertexId,
-    contact_vid: brepkit_topology::vertex::VertexId,
-    contact_pt: Point3,
-}
-
-/// The vertex shared by two stripes' spine edges, if any.
-fn shared_spine_vertex(
-    topo: &Topology,
-    a: &Stripe,
-    b: &Stripe,
-) -> Option<brepkit_topology::vertex::VertexId> {
-    let verts = |st: &Stripe| -> Vec<brepkit_topology::vertex::VertexId> {
-        let mut v = Vec::new();
-        for &eid in st.spine.edges() {
-            if let Ok(e) = topo.edge(eid) {
-                v.push(e.start());
-                v.push(e.end());
-            }
-        }
-        v
-    };
-    let va = verts(a);
-    verts(b).into_iter().find(|v| va.contains(v))
-}
-
-#[allow(
-    clippy::items_after_statements,
-    clippy::too_many_lines,
-    clippy::type_complexity,
-    clippy::match_wildcard_for_single_variants,
-    clippy::single_match_else,
-    clippy::collapsible_if
-)]
-fn rebuild_closed_rim_loop_faces(
-    topo: &mut Topology,
-    regular_results: &[&StripeResult],
-    face_replacements: &mut std::collections::HashMap<FaceId, FaceId>,
-) -> Result<
-    (
-        std::collections::HashMap<(FaceId, usize), EdgeId>,
-        Vec<NotchRecord>,
-    ),
-    BlendError,
-> {
-    use std::collections::HashMap;
-
-    const WELD: f64 = 1e-6;
-    let mut out: HashMap<(FaceId, usize), EdgeId> = HashMap::new();
-    let mut notches: Vec<NotchRecord> = Vec::new();
-
-    // Spine edge -> stripe index.
-    let mut spine_owner: HashMap<EdgeId, usize> = HashMap::new();
-    for (si, sr) in regular_results.iter().enumerate() {
-        for &eid in sr.stripe.spine.edges() {
-            spine_owner.insert(eid, si);
-        }
-    }
-
-    // Candidate faces: those adjacent to any stripe.
-    let mut candidates: Vec<FaceId> = Vec::new();
-    for sr in regular_results {
-        for f in [sr.stripe.face1, sr.stripe.face2] {
-            if !candidates.contains(&f) {
-                candidates.push(f);
-            }
-        }
-    }
-
-    'faces: for face_id in candidates {
-        let face = topo.face(face_id)?;
-        let surface = face.surface().clone();
-        let reversed = face.is_reversed();
-        let inner_wires = face.inner_wires().to_vec();
-        let wire = topo.wire(face.outer_wire())?;
-        let oriented: Vec<OrientedEdge> = wire.edges().to_vec();
-        if oriented.len() < 2 {
-            continue;
-        }
-
-        // Owner per outer-wire edge: Some(stripe) for spine edges, None for
-        // edges the fillet does not touch (kept verbatim, preserving their
-        // shared-edge identity with neighbouring faces).
-        let owners: Vec<Option<usize>> = oriented
-            .iter()
-            .map(|oe| spine_owner.get(&oe.edge()).copied())
-            .collect();
-        if !owners.iter().any(Option::is_some) {
-            continue 'faces;
-        }
-
-        // Rotate so the walk starts at a stripe-run boundary.
-        let n = oriented.len();
-        let start = (0..n)
-            .find(|&i| owners[i] != owners[(i + n - 1) % n])
-            .unwrap_or(0);
-
-        // Group consecutive edges into runs (same stripe, or untouched), in
-        // wire order.
-        let mut runs: Vec<Option<usize>> = Vec::new();
-        for k in 0..n {
-            let si = owners[(start + k) % n];
-            if runs.last() != Some(&si) {
-                runs.push(si);
-            }
-        }
-        if runs.len() >= 2 && runs.first() == runs.last() {
-            runs.pop();
-        }
-
-        // Collect pieces per run: a contact curve for a stripe run
-        // (oriented to follow the wire traversal), or the original oriented
-        // edges kept verbatim for an untouched run.
-        enum RunPiece {
-            Contact {
-                stripe: usize,
-                forward: bool,
-                from: Point3,
-                to: Point3,
-                curve: brepkit_math::nurbs::curve::NurbsCurve,
-                from_vid: Option<brepkit_topology::vertex::VertexId>,
-                to_vid: Option<brepkit_topology::vertex::VertexId>,
-            },
-            Original {
-                edges: Vec<OrientedEdge>,
-                to_vid: brepkit_topology::vertex::VertexId,
-                from_vid: brepkit_topology::vertex::VertexId,
-                from: Point3,
-                to: Point3,
-            },
-        }
-        let mut pieces: Vec<RunPiece> = Vec::with_capacity(runs.len());
-        let mut cursor = start;
-        for &owner in &runs {
-            let run_len = (0..n)
-                .take_while(|&k| owners[(cursor + k) % n] == owner)
-                .count();
-            let run_edges: Vec<OrientedEdge> =
-                (0..run_len).map(|k| oriented[(cursor + k) % n]).collect();
-            let first_oe = run_edges[0];
-            cursor += run_len;
-
-            let first_edge = topo.edge(first_oe.edge())?;
-            let from_vid = if first_oe.is_forward() {
-                first_edge.start()
-            } else {
-                first_edge.end()
-            };
-            let run_start = topo.vertex(from_vid)?.point();
-
-            match owner {
-                Some(si) => {
-                    let stripe = &regular_results[si].stripe;
-                    let contact = if stripe.face1 == face_id {
-                        stripe.contact1.clone()
-                    } else {
-                        stripe.contact2.clone()
-                    };
-                    let (c0, c1) = {
-                        let (d0, d1) = contact.domain();
-                        (contact.evaluate(d0), contact.evaluate(d1))
-                    };
-                    let forward = (c0 - run_start).length() <= (c1 - run_start).length();
-                    let (from, to) = if forward { (c0, c1) } else { (c1, c0) };
-                    pieces.push(RunPiece::Contact {
-                        stripe: si,
-                        forward,
-                        from,
-                        to,
-                        curve: contact,
-                        from_vid: Option::None,
-                        to_vid: Option::None,
-                    });
-                }
-                Option::None => {
-                    let last_oe = run_edges[run_edges.len() - 1];
-                    let last_edge = topo.edge(last_oe.edge())?;
-                    let to_vid = if last_oe.is_forward() {
-                        last_edge.end()
-                    } else {
-                        last_edge.start()
-                    };
-                    let to = topo.vertex(to_vid)?.point();
-                    pieces.push(RunPiece::Original {
-                        edges: run_edges,
-                        to_vid,
-                        from_vid,
-                        from: run_start,
-                        to,
-                    });
-                }
-            }
-        }
-
-        if std::env::var("BK_PIECES").is_ok() {
-            for (k, piece) in pieces.iter().enumerate() {
-                match piece {
-                    RunPiece::Contact {
-                        stripe, from, to, ..
-                    } => log::warn!(
-                        "PIECES face={face_id:?} [{k}] Contact s{stripe} ({from:?})->({to:?})"
-                    ),
-                    RunPiece::Original {
-                        edges, from, to, ..
-                    } => log::warn!(
-                        "PIECES face={face_id:?} [{k}] Original n={} ({from:?})->({to:?})",
-                        edges.len()
-                    ),
-                }
-            }
-        }
-
-        let m = pieces.len();
-        let piece_end = |p: &RunPiece| match p {
-            RunPiece::Contact { to, .. } | RunPiece::Original { to, .. } => *to,
-        };
-        let piece_start = |p: &RunPiece| match p {
-            RunPiece::Contact { from, .. } | RunPiece::Original { from, .. } => *from,
-        };
-
-        // Contact-to-contact junctions must weld (a failed corner leaves a
-        // gap; those faces keep the trim path). Junctions INVOLVING an
-        // original run are bridged with a line notch edge — the fillet band
-        // ends abruptly there and the notch is the end cap's floor edge.
-        // Contact-to-contact gaps (a corner whose vertex patch failed or a
-        // mixed-radius junction) are bridged with a chord edge below —
-        // the corner region's floor. Only unreasonably large gaps bail.
-        let max_bridge = 4.0
-            * regular_results
-                .iter()
-                .flat_map(|sr| sr.stripe.sections.iter().map(|s| s.radius))
-                .fold(0.0_f64, f64::max);
-        for k in 0..m {
-            let a = &pieces[k];
-            let b = &pieces[(k + 1) % m];
-            let both_contact =
-                matches!(a, RunPiece::Contact { .. }) && matches!(b, RunPiece::Contact { .. });
-            let gap = (piece_end(a) - piece_start(b)).length();
-            if both_contact && gap > max_bridge {
-                continue 'faces;
-            }
-        }
-
-        // Where a contact endpoint lands ON a neighbouring original LINE
-        // edge (a full-edge fillet whose contact ends on the perpendicular
-        // boundary), split that edge there — the classic trim behaviour,
-        // propagated into neighbour wires — instead of overlaying a notch
-        // line on top of the boundary.
-        let seg_dist = |a: Point3, b: Point3, q: Point3| -> f64 {
-            let ab = b - a;
-            let len2 = ab.dot(ab);
-            if len2 < 1e-18 {
-                return (q - a).length();
-            }
-            let t = (ab.dot(q - a) / len2).clamp(0.0, 1.0);
-            (q - (a + ab * t)).length()
-        };
-        for k in 0..m {
-            let next = (k + 1) % m;
-            // contact (k) -> original (next): contact END may lie on the
-            // original run's FIRST edge.
-            let (cp, is_end_side) = match (&pieces[k], &pieces[next]) {
-                (RunPiece::Contact { to, .. }, RunPiece::Original { .. }) => (*to, true),
-                (RunPiece::Original { .. }, RunPiece::Contact { from, .. }) => (*from, false),
-                _ => continue,
-            };
-            let (orig_idx, edge_pos) = if is_end_side {
-                (next, 0usize)
-            } else {
-                (k, usize::MAX)
-            };
-            let RunPiece::Original { edges, .. } = &pieces[orig_idx] else {
-                continue;
-            };
-            let epos = if edge_pos == usize::MAX {
-                edges.len() - 1
-            } else {
-                0
-            };
-            let oe = edges[epos];
-            let edge = topo.edge(oe.edge())?;
-            let (pa, pb) = (
-                topo.vertex(edge.start())?.point(),
-                topo.vertex(edge.end())?.point(),
-            );
-            // Endpoint coincidence is the weld case, not a split.
-            if (cp - pa).length() <= WELD || (cp - pb).length() <= WELD {
-                continue;
-            }
-            enum SplitPlan {
-                Line,
-                Curve(
-                    brepkit_math::nurbs::curve::NurbsCurve,
-                    brepkit_math::nurbs::curve::NurbsCurve,
-                ),
-            }
-            let plan = match edge.curve() {
-                EdgeCurve::Line => {
-                    if seg_dist(pa, pb, cp) > WELD {
-                        continue;
-                    }
-                    SplitPlan::Line
-                }
-                EdgeCurve::NurbsCurve(nc) => {
-                    let Ok(proj) =
-                        brepkit_math::nurbs::projection::project_point_to_curve(nc, cp, 1e-9)
-                    else {
-                        continue;
-                    };
-                    if (proj.point - cp).length() > WELD {
-                        continue;
-                    }
-                    let Ok((left, right)) =
-                        brepkit_math::nurbs::knot_ops::curve_split(nc, proj.parameter)
-                    else {
-                        continue;
-                    };
-                    SplitPlan::Curve(left, right)
-                }
-                _ => continue,
-            };
-            let v_split = topo.add_vertex(Vertex::new(cp, 1e-7));
-            let (pre, post) = match plan {
-                SplitPlan::Line => trimmer::split_edge_at(topo, &oe, v_split)?,
-                SplitPlan::Curve(left, right) => {
-                    trimmer::split_edge_at_with_curves(topo, &oe, v_split, left, right)?
-                }
-            };
-            // The kept sub-piece: the part AWAY from the contact junction.
-            match (&mut pieces[orig_idx], is_end_side) {
-                (
-                    RunPiece::Original {
-                        edges,
-                        from_vid,
-                        from,
-                        ..
-                    },
-                    true,
-                ) => {
-                    edges[0] = post;
-                    *from_vid = v_split;
-                    *from = cp;
-                }
-                (
-                    RunPiece::Original {
-                        edges, to_vid, to, ..
-                    },
-                    false,
-                ) => {
-                    let last = edges.len() - 1;
-                    edges[last] = pre;
-                    *to_vid = v_split;
-                    *to = cp;
-                }
-                _ => {}
-            }
-            let contact_idx = if is_end_side { k } else { next };
-            match &mut pieces[contact_idx] {
-                RunPiece::Contact { to_vid, .. } if is_end_side => {
-                    *to_vid = Some(v_split);
-                }
-                RunPiece::Contact { from_vid, .. } if !is_end_side => {
-                    *from_vid = Some(v_split);
-                }
-                _ => {}
-            }
-        }
-
-        // Start vertex per piece: original runs reuse their existing outline
-        // vertex; contact runs mint one.
-        let mut junction_vids: Vec<brepkit_topology::vertex::VertexId> = Vec::with_capacity(m);
-        for piece in &pieces {
-            let vid = match piece {
-                RunPiece::Original { from_vid, .. } => *from_vid,
-                RunPiece::Contact {
-                    from_vid: Some(v), ..
-                } => *v,
-                RunPiece::Contact { from, .. } => topo.add_vertex(Vertex::new(*from, 1e-7)),
-            };
-            junction_vids.push(vid);
-        }
-
-        let mut loop_edges: Vec<OrientedEdge> = Vec::with_capacity(m * 2);
-        let mut notch_count = 0usize;
-        for k in 0..m {
-            let next = (k + 1) % m;
-            let next_start = piece_start(&pieces[next]);
-            match &pieces[k] {
-                RunPiece::Contact {
-                    stripe,
-                    forward,
-                    curve,
-                    to,
-                    to_vid,
-                    ..
-                } => {
-                    let v_from = junction_vids[k];
-                    let welds = (*to - next_start).length() <= WELD;
-                    let v_to = if let Some(v) = to_vid {
-                        *v
-                    } else if welds {
-                        junction_vids[next]
-                    } else {
-                        topo.add_vertex(Vertex::new(*to, 1e-7))
-                    };
-                    let curve_e = EdgeCurve::NurbsCurve(curve.clone());
-                    let eid = if *forward {
-                        topo.add_edge(Edge::new(v_from, v_to, curve_e))
-                    } else {
-                        topo.add_edge(Edge::new(v_to, v_from, curve_e))
-                    };
-                    loop_edges.push(OrientedEdge::new(eid, *forward));
-                    out.insert((face_id, *stripe), eid);
-                    if !welds {
-                        // Contact-to-contact junction: the true boundary at
-                        // an equal-radius corner is the OFFSET CORNER ARC
-                        // centred on the shared spine vertex — the sphere
-                        // corner patch's own bottom rim, so the weld pass
-                        // pairs them. Mixed radii fall back to a chord.
-                        let mut bridge_curve = EdgeCurve::Line;
-                        if let RunPiece::Contact {
-                            stripe: nsi,
-                            from: nfrom,
-                            ..
-                        } = &pieces[next]
-                        {
-                            if let Some(cv) = shared_spine_vertex(
-                                topo,
-                                &regular_results[*stripe].stripe,
-                                &regular_results[*nsi].stripe,
-                            ) {
-                                let c = topo.vertex(cv)?.point();
-                                let r1 = (*to - c).length();
-                                let r2 = (*nfrom - c).length();
-                                if (r1 - r2).abs() <= 1e-6
-                                    && let Ok(nrm) = (*to - c).cross(*nfrom - c).normalize()
-                                    && let Ok(circle) = Circle3D::new(c, nrm, r1)
-                                {
-                                    bridge_curve = EdgeCurve::Circle(circle);
-                                }
-                            }
-                        }
-                        let notch =
-                            topo.add_edge(Edge::new(v_to, junction_vids[next], bridge_curve));
-                        loop_edges.push(OrientedEdge::new(notch, true));
-                        notch_count += 1;
-                        if matches!(pieces[next], RunPiece::Original { .. }) {
-                            notches.push(NotchRecord {
-                                stripe: *stripe,
-                                edge: notch,
-                                outline_vid: junction_vids[next],
-                                contact_vid: v_to,
-                                contact_pt: *to,
-                            });
-                        }
-                    }
-                }
-                RunPiece::Original { edges, to_vid, .. } => {
-                    loop_edges.extend(edges.iter().copied());
-                    if (piece_end(&pieces[k]) - next_start).length() > WELD {
-                        let notch =
-                            topo.add_edge(Edge::new(*to_vid, junction_vids[next], EdgeCurve::Line));
-                        loop_edges.push(OrientedEdge::new(notch, true));
-                        notch_count += 1;
-                        if let RunPiece::Contact { stripe: nsi, .. } = &pieces[next] {
-                            notches.push(NotchRecord {
-                                stripe: *nsi,
-                                edge: notch,
-                                outline_vid: *to_vid,
-                                contact_vid: junction_vids[next],
-                                contact_pt: next_start,
-                            });
-                        }
-                    }
-                }
-            }
-        }
-
-        let new_wire = Wire::new(loop_edges, true)?;
-        let new_wire_id = topo.add_wire(new_wire);
-        let mut new_face = Face::new(new_wire_id, inner_wires, surface);
-        new_face.set_reversed(reversed);
-        let new_face_id = topo.add_face(new_face);
-        face_replacements.insert(face_id, new_face_id);
-        log::debug!(
-            "mixed-loop rebuild: face {face_id:?} -> {new_face_id:?} pieces={m} notches={notch_count}"
-        );
-    }
-
-    Ok((out, notches))
-}
-
 #[cfg(test)]
 mod tests {
     #![allow(clippy::unwrap_used, clippy::expect_used)]
@@ -1833,6 +1931,7 @@ mod tests {
 
         assert!(result.failed.len() == 1);
         assert_eq!(result.failed[0].0, fake_edge);
+        assert!(result.is_partial);
         // With no successes, the original solid is returned.
         assert_eq!(result.solid, solid);
     }

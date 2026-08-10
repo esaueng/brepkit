@@ -936,7 +936,7 @@ impl PhaseTimer {
 
     #[cfg(target_arch = "wasm32")]
     #[allow(clippy::unused_self)]
-    fn lap(&mut self, _label: &str) {}
+    fn lap(&self, _label: &str) {}
 }
 
 /// `BK_TESS_TRACE` (any value): log each face's mesher-arm dispatch.

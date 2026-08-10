@@ -710,7 +710,7 @@ pub fn fillet_v2(
     edges: &[EdgeId],
     radius: f64,
 ) -> Result<BlendResult, OperationsError> {
-    if radius <= 0.0 {
+    if !radius.is_finite() || radius <= 0.0 {
         return Err(OperationsError::InvalidInput {
             reason: "radius must be positive".into(),
         });
