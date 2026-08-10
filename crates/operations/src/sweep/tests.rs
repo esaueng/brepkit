@@ -1026,9 +1026,12 @@ fn sweep_miter_l_shaped_volume_correct() {
     let solid = sweep_with_options(&mut topo, profile, &path, &options).unwrap();
 
     let vol = crate::measure::solid_volume(&topo, solid, 0.1).unwrap();
+    // Exact mitered volume: each leg is shortened by the positioned profile's
+    // 0.5-unit centroid offset at the bisector, so V = 10 - 2*0.5 = 9.
+    let expected = 9.0;
     assert!(
-        (vol - 10.0).abs() < 0.1,
-        "L-sweep volume should be 10 (two 5-unit mitered legs), got {vol}"
+        (vol - expected).abs() < 1e-6,
+        "L-sweep mitered volume should be exactly {expected}, got {vol}"
     );
 
     let mesh = crate::tessellate::tessellate_solid(&topo, solid, 0.1).unwrap();
@@ -1072,9 +1075,12 @@ fn sweep_miter_u_shaped_path() {
     let solid = sweep_with_options(&mut topo, profile, &path, &options).unwrap();
 
     let vol = crate::measure::solid_volume(&topo, solid, 0.1).unwrap();
+    // As-positioned semantics shorten the three-leg path by one unit at each
+    // of its two interior miters: V = 15 - 2 = 13 for a unit-square profile.
+    let expected = 13.0;
     assert!(
-        (vol - 15.0).abs() < 0.1,
-        "U-sweep volume should be 15 (three 5-unit mitered legs), got {vol}"
+        (vol - expected).abs() < 1e-6,
+        "U-sweep mitered volume should be exactly {expected}, got {vol}"
     );
 
     let mesh = crate::tessellate::tessellate_solid(&topo, solid, 0.1).unwrap();
@@ -1855,4 +1861,851 @@ fn multi_section_sweep_nonplanar_sections_is_valid_solid() {
         vol > 80.0 && vol < 110.0,
         "non-planar multi-section sweep volume should be ~96, got {vol}"
     );
+}
+
+/// Helper: an L-ish lip profile positioned AT a path point, the way brepjs
+/// sketches a sweep profile on the plane through the spine start: 2D (u, v)
+/// maps to `start + u*x_dir + v*z`, with `x_dir` pointing radially outward.
+fn make_positioned_lip_profile(topo: &mut Topology, start: Point3, x_dir: Vec3) -> FaceId {
+    let uv = [
+        (-2.6, 0.0),
+        (-1.9, 0.7),
+        (-1.9, 2.5),
+        (0.0, 4.4),
+        (0.0, 0.0),
+    ];
+    let t = 1e-7;
+    let z = Vec3::new(0.0, 0.0, 1.0);
+    let verts: Vec<VertexId> = uv
+        .iter()
+        .map(|&(u, v)| topo.add_vertex(Vertex::new(start + x_dir * u + z * v, t)))
+        .collect();
+    let n = verts.len();
+    let edges: Vec<_> = (0..n)
+        .map(|i| topo.add_edge(Edge::new(verts[i], verts[(i + 1) % n], EdgeCurve::Line)))
+        .collect();
+    let wire = Wire::new(
+        edges.iter().map(|&e| OrientedEdge::new(e, true)).collect(),
+        true,
+    )
+    .unwrap();
+    let wid = topo.add_wire(wire);
+    let normal = x_dir.cross(z).normalize().unwrap();
+    let d = normal.dot(Vec3::new(start.x(), start.y(), start.z()));
+    topo.add_face(Face::new(wid, vec![], FaceSurface::Plane { normal, d }))
+}
+
+#[test]
+fn sweep_keeps_offset_profile_position_on_straight_path() {
+    // A profile away from the path must be swept from where it lies (the
+    // reference-kernel pipe semantic), not re-centered onto the path start.
+    let mut topo = Topology::new();
+    let t = 1e-7;
+    let v0 = topo.add_vertex(Vertex::new(Point3::new(5.0, 5.0, 0.0), t));
+    let v1 = topo.add_vertex(Vertex::new(Point3::new(6.0, 5.0, 0.0), t));
+    let v2 = topo.add_vertex(Vertex::new(Point3::new(6.0, 6.0, 0.0), t));
+    let v3 = topo.add_vertex(Vertex::new(Point3::new(5.0, 6.0, 0.0), t));
+    let e0 = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+    let e1 = topo.add_edge(Edge::new(v1, v2, EdgeCurve::Line));
+    let e2 = topo.add_edge(Edge::new(v2, v3, EdgeCurve::Line));
+    let e3 = topo.add_edge(Edge::new(v3, v0, EdgeCurve::Line));
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(e0, true),
+            OrientedEdge::new(e1, true),
+            OrientedEdge::new(e2, true),
+            OrientedEdge::new(e3, true),
+        ],
+        true,
+    )
+    .unwrap();
+    let wid = topo.add_wire(wire);
+    let profile = topo.add_face(Face::new(
+        wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    let path = straight_z_path(2.0);
+
+    let solid = sweep(&mut topo, profile, &path).unwrap();
+
+    let bb = crate::measure::solid_bounding_box(&topo, solid).unwrap();
+    assert!(
+        (bb.min.x() - 5.0).abs() < 1e-9
+            && (bb.max.x() - 6.0).abs() < 1e-9
+            && (bb.min.y() - 5.0).abs() < 1e-9
+            && (bb.max.y() - 6.0).abs() < 1e-9,
+        "offset profile must stay at x,y in [5,6], got {bb:?}"
+    );
+    assert!(
+        bb.min.z().abs() < 1e-9 && (bb.max.z() - 2.0).abs() < 1e-9,
+        "prism must span z in [0,2], got {bb:?}"
+    );
+}
+
+#[test]
+fn sweep_closed_path_keeps_profile_position() {
+    // The gridfinity stacking-lip construction: a profile sketched on the
+    // plane through the spine start (v=0 at the spine's z, u extending
+    // inward from the spine) swept along a closed loop. Re-centering the
+    // profile's centroid onto the path start shifted the lip down by the
+    // centroid height (~2.88) and pushed it radially outward; as-positioned
+    // placement keeps the solid spanning exactly v in [0, 4.4].
+    let mut topo = Topology::new();
+    let radius = 42.0;
+
+    // Closed circular-ish path through interpolated samples, starting at
+    // (42, 0, 0) with tangent +Y, matching the sweepAlongEdges fitting path.
+    let n_pts = 32;
+    let mut pts: Vec<Point3> = (0..=n_pts)
+        .map(|i| {
+            let theta = std::f64::consts::TAU * f64::from(i) / f64::from(n_pts);
+            Point3::new(radius * theta.cos(), radius * theta.sin(), 0.0)
+        })
+        .collect();
+    // Exact closure.
+    let last = pts.len() - 1;
+    pts[last] = pts[0];
+    let path = brepkit_math::nurbs::fitting::interpolate(&pts, 3).unwrap();
+
+    let profile = make_positioned_lip_profile(
+        &mut topo,
+        Point3::new(radius, 0.0, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+    );
+
+    let solid = sweep(&mut topo, profile, &path).unwrap();
+
+    let bb = crate::measure::solid_bounding_box(&topo, solid).unwrap();
+    assert!(
+        bb.min.z() > -0.05 && bb.min.z() < 0.05,
+        "lip bottom must stay at the sketch plane z=0, got {}",
+        bb.min.z()
+    );
+    assert!(
+        (bb.max.z() - 4.4).abs() < 0.05,
+        "lip top must reach the profile height 4.4, got {}",
+        bb.max.z()
+    );
+    assert!(
+        bb.max.x() < radius + 0.05,
+        "profile extends inward from the spine, so x must not exceed the spine radius, got {}",
+        bb.max.x()
+    );
+    assert!(
+        crate::validate::validate_solid(&topo, solid)
+            .unwrap()
+            .is_valid(),
+        "closed-path as-positioned sweep must be a valid solid"
+    );
+    // Pappus: profile area 6.8 × centroid circumference 2π·(42 − 1.41) ≈ 1735.
+    let vol = crate::measure::solid_volume(&topo, solid, 0.05).unwrap();
+    assert!(
+        vol > 1500.0 && vol < 2000.0,
+        "lip ring volume should be ~1735, got {vol}"
+    );
+}
+
+/// Helper: rounded-rectangle spine edges (width x depth, corner radius r) in
+/// the XY plane, CCW, starting mid-right-edge like brepjs's rounded rect.
+/// Returns the ordered edge ids (4 lines + 4 arcs).
+fn make_rounded_rect_spine(
+    topo: &mut Topology,
+    w: f64,
+    d: f64,
+    r: f64,
+) -> Vec<brepkit_topology::edge::EdgeId> {
+    use brepkit_math::curves::Circle3D;
+    let hw = w / 2.0;
+    let hd = d / 2.0;
+    let cx = hw - r;
+    let cy = hd - r;
+    let t = 1e-7;
+    let z = Vec3::new(0.0, 0.0, 1.0);
+    let v = |topo: &mut Topology, x: f64, y: f64| {
+        topo.add_vertex(Vertex::new(Point3::new(x, y, 0.0), t))
+    };
+    let v0 = v(topo, hw, -cy);
+    let v1 = v(topo, hw, cy);
+    let v2 = v(topo, cx, hd);
+    let v3 = v(topo, -cx, hd);
+    let v4 = v(topo, -hw, cy);
+    let v5 = v(topo, -hw, -cy);
+    let v6 = v(topo, -cx, -hd);
+    let v7 = v(topo, cx, -hd);
+    let arc = |topo: &mut Topology, a, b, ccx: f64, ccy: f64| {
+        let circle = Circle3D::new(Point3::new(ccx, ccy, 0.0), z, r).unwrap();
+        topo.add_edge(Edge::new(a, b, EdgeCurve::Circle(circle)))
+    };
+    vec![
+        topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line)),
+        arc(topo, v1, v2, cx, cy),
+        topo.add_edge(Edge::new(v2, v3, EdgeCurve::Line)),
+        arc(topo, v3, v4, -cx, cy),
+        topo.add_edge(Edge::new(v4, v5, EdgeCurve::Line)),
+        arc(topo, v5, v6, -cx, -cy),
+        topo.add_edge(Edge::new(v6, v7, EdgeCurve::Line)),
+        arc(topo, v7, v0, cx, -cy),
+    ]
+}
+
+#[test]
+fn analytic_spine_sweep_lip_ring_is_exact() {
+    // The gridfinity stacking-lip: rounded-rect spine, all-line profile at the
+    // spine start. The analytic path emits one exact face per profile edge per
+    // segment: 5 edges x 8 segments = 40 faces (24 planes from the straight
+    // runs and horizontal corner annuli, 8 cylinders, 8 cones), instead of the
+    // fitted path's thousands of facet quads.
+    let mut topo = Topology::new();
+    let spine = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    let profile = make_positioned_lip_profile(
+        &mut topo,
+        Point3::new(42.0, -38.25, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+    );
+
+    let solid = crate::sweep::sweep_along_edges(&mut topo, profile, &spine).unwrap();
+
+    let solid_data = topo.solid(solid).unwrap();
+    let shell = topo.shell(solid_data.outer_shell()).unwrap();
+    assert_eq!(
+        shell.faces().len(),
+        40,
+        "5 profile edges x 8 spine segments"
+    );
+
+    let mut planes = 0;
+    let mut cylinders = 0;
+    let mut cones = 0;
+    let mut other = 0;
+    for &fid in shell.faces() {
+        match topo.face(fid).unwrap().surface() {
+            FaceSurface::Plane { .. } => planes += 1,
+            FaceSurface::Cylinder(_) => cylinders += 1,
+            FaceSurface::Cone(_) => cones += 1,
+            _ => other += 1,
+        }
+    }
+    assert_eq!(
+        (planes, cylinders, cones, other),
+        (24, 8, 8, 0),
+        "surface mix must be exact analytic"
+    );
+
+    // Watertight: every edge used by exactly two faces.
+    let mut edge_uses: HashMap<usize, usize> = HashMap::new();
+    for &fid in shell.faces() {
+        let f = topo.face(fid).unwrap();
+        for oe in topo.wire(f.outer_wire()).unwrap().edges() {
+            *edge_uses.entry(oe.edge().index()).or_insert(0) += 1;
+        }
+    }
+    for (&e, &c) in &edge_uses {
+        assert_eq!(c, 2, "edge {e} used {c} times");
+    }
+
+    assert!(
+        crate::validate::validate_solid(&topo, solid)
+            .unwrap()
+            .is_valid(),
+        "lip ring must be a valid solid"
+    );
+
+    // Pappus: straights contribute area x run length; each 90-degree corner
+    // contributes area x arc length of the centroid path about its center.
+    let uv = [
+        (-2.6, 0.0),
+        (-1.9, 0.7),
+        (-1.9, 2.5),
+        (0.0, 4.4),
+        (0.0, 0.0),
+    ];
+    let n = uv.len();
+    let mut a2: f64 = 0.0;
+    let mut cx6: f64 = 0.0;
+    for i in 0..n {
+        let (x0, y0) = uv[i];
+        let (x1, y1) = uv[(i + 1) % n];
+        let cross = x0 * y1 - x1 * y0;
+        a2 += cross;
+        cx6 += (x0 + x1) * cross;
+    }
+    let area = (a2 / 2.0).abs();
+    let centroid_u = cx6 / (3.0 * a2);
+    let run = 84.0 - 2.0 * 3.75;
+    let corner_radius_of_centroid = 3.75 + centroid_u;
+    let expected =
+        4.0 * area * run + 4.0 * area * (std::f64::consts::FRAC_PI_2 * corner_radius_of_centroid);
+
+    let vol = crate::measure::solid_volume(&topo, solid, 0.01).unwrap();
+    assert!(
+        (vol - expected).abs() / expected < 1e-3,
+        "lip ring volume: expected ~{expected}, got {vol}"
+    );
+}
+
+#[test]
+fn analytic_spine_sweep_handles_flipped_chain_edges() {
+    // Edges stored end-to-start must be re-oriented by the chain extraction;
+    // an unflipped line direction transports the ring backwards and silently
+    // loses the analytic path.
+    let mut topo = Topology::new();
+    let spine = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    // Flip the third segment (a line edge) in place: rebuild it end-to-start.
+    let flipped = {
+        let e = topo.edge(spine[2]).unwrap();
+        let (a, b) = (e.start(), e.end());
+        topo.add_edge(Edge::new(b, a, EdgeCurve::Line))
+    };
+    let mut edges = spine;
+    edges[2] = flipped;
+    let profile = make_positioned_lip_profile(
+        &mut topo,
+        Point3::new(42.0, -38.25, 0.0),
+        Vec3::new(1.0, 0.0, 0.0),
+    );
+    let solid = crate::sweep::sweep_along_edges(&mut topo, profile, &edges).unwrap();
+    let solid_data = topo.solid(solid).unwrap();
+    let shell = topo.shell(solid_data.outer_shell()).unwrap();
+    assert_eq!(
+        shell.faces().len(),
+        40,
+        "the analytic path must still fire with a flipped chain edge"
+    );
+}
+
+#[test]
+fn sweep_along_edges_open_chain_falls_back() {
+    // An open chain is outside the analytic gate and must still sweep via the
+    // fitted path.
+    let mut topo = Topology::new();
+    let t = 1e-7;
+    let a = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 0.0), t));
+    let b = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 10.0), t));
+    let c = topo.add_vertex(Vertex::new(Point3::new(5.0, 0.0, 20.0), t));
+    let e0 = topo.add_edge(Edge::new(a, b, EdgeCurve::Line));
+    let e1 = topo.add_edge(Edge::new(b, c, EdgeCurve::Line));
+    let profile = make_unit_square_face(&mut topo);
+    let solid = crate::sweep::sweep_along_edges(&mut topo, profile, &[e0, e1]).unwrap();
+    let vol = crate::measure::solid_volume(&topo, solid, 0.1).unwrap();
+    assert!(vol > 0.0, "fallback sweep must produce volume, got {vol}");
+}
+
+#[test]
+fn analytic_lip_ring_fuses_onto_hollow_box() {
+    // The full gridfinity-smoke chain, native: hollow rounded box + analytic
+    // swept lip sitting on the rim (coincident-plane contact). With the
+    // analytic sweep the fuse sees ~40 typed faces instead of ~2730 facet
+    // quads. Volume must be the exact sum (contact, no overlap).
+    let mut topo = Topology::new();
+
+    // Hollow box: extrude the rounded rect, shell open at the top.
+    let spine_for_face = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    let base_wire = Wire::new(
+        spine_for_face
+            .iter()
+            .map(|&e| OrientedEdge::new(e, true))
+            .collect(),
+        true,
+    )
+    .unwrap();
+    let base_wid = topo.add_wire(base_wire);
+    let base_face = topo.add_face(Face::new(
+        base_wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    let box_solid =
+        crate::extrude::extrude(&mut topo, base_face, Vec3::new(0.0, 0.0, 1.0), 21.0).unwrap();
+    let top_faces: Vec<FaceId> = {
+        let s = topo.solid(box_solid).unwrap();
+        let sh = topo.shell(s.outer_shell()).unwrap();
+        sh.faces()
+            .iter()
+            .copied()
+            .filter(|&fid| {
+                matches!(
+                    topo.face(fid).unwrap().surface(),
+                    FaceSurface::Plane { normal, d }
+                        if normal.z() > 0.99 && (*d - 21.0).abs() < 1e-6
+                )
+            })
+            .collect()
+    };
+    assert_eq!(top_faces.len(), 1, "one top cap expected");
+    let hollow = crate::shell_op::shell(&mut topo, box_solid, 1.2, &top_faces).unwrap();
+    let hollow_vol = crate::measure::solid_volume(&topo, hollow, 0.01).unwrap();
+
+    // Analytic lip on the rim: spine at z=0, profile sketched at z=21. The
+    // profile is inset 0.25 from the outer wall so the fuse's coincidences are
+    // limited to the coplanar bottom-on-rim contact: the EXACT configuration
+    // (outer walls and corner cylinders coincident too) nondeterministically
+    // falls to the mesh fallback and is pinned as an ignored ready-repro
+    // below.
+    let spine = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    let profile = make_positioned_lip_profile(
+        &mut topo,
+        Point3::new(41.75, -38.25, 21.0),
+        Vec3::new(1.0, 0.0, 0.0),
+    );
+    let lip = crate::sweep::sweep_along_edges(&mut topo, profile, &spine).unwrap();
+    {
+        let s = topo.solid(lip).unwrap();
+        let sh = topo.shell(s.outer_shell()).unwrap();
+        assert_eq!(sh.faces().len(), 40, "lip must be the analytic ring");
+    }
+    let lip_vol = crate::measure::solid_volume(&topo, lip, 0.01).unwrap();
+
+    let fused =
+        crate::boolean::boolean(&mut topo, crate::boolean::BooleanOp::Fuse, hollow, lip).unwrap();
+
+    let faces = brepkit_topology::explorer::solid_faces(&topo, fused).unwrap();
+    let mut planar = 0;
+    let mut curved = 0;
+    for &fid in &faces {
+        match topo.face(fid).unwrap().surface() {
+            FaceSurface::Plane { .. } => planar += 1,
+            _ => curved += 1,
+        }
+    }
+    assert!(
+        faces.len() < 200,
+        "analytic fuse expected (tens of faces), got {} ({planar} planar, {curved} curved) — a \
+         hundreds-planar result is the mesh-fallback tell",
+        faces.len()
+    );
+    assert!(curved > 0, "corner cylinders/cones must survive the fuse");
+
+    let fused_vol = crate::measure::solid_volume(&topo, fused, 0.01).unwrap();
+    let expected = hollow_vol + lip_vol;
+    assert!(
+        (fused_vol - expected).abs() / expected < 1e-3,
+        "contact fuse volume must be the sum: expected ~{expected}, got {fused_vol}"
+    );
+
+    let report = crate::validate::validate_solid(&topo, fused).unwrap();
+    assert!(
+        report.is_valid(),
+        "fused lip+box must be a valid solid: {report:?}"
+    );
+}
+
+#[test]
+fn exact_coincident_lip_fuse_stays_analytic() {
+    let mut topo = Topology::new();
+    let spine_for_face = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    let base_wire = Wire::new(
+        spine_for_face
+            .iter()
+            .map(|&e| OrientedEdge::new(e, true))
+            .collect(),
+        true,
+    )
+    .unwrap();
+    let base_wid = topo.add_wire(base_wire);
+    let base_face = topo.add_face(Face::new(
+        base_wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    let box_solid =
+        crate::extrude::extrude(&mut topo, base_face, Vec3::new(0.0, 0.0, 1.0), 21.0).unwrap();
+    let top_faces: Vec<FaceId> = {
+        let s = topo.solid(box_solid).unwrap();
+        let sh = topo.shell(s.outer_shell()).unwrap();
+        sh.faces()
+            .iter()
+            .copied()
+            .filter(|&fid| {
+                matches!(
+                    topo.face(fid).unwrap().surface(),
+                    FaceSurface::Plane { normal, d }
+                        if normal.z() > 0.99 && (*d - 21.0).abs() < 1e-6
+                )
+            })
+            .collect()
+    };
+    let hollow = crate::shell_op::shell(&mut topo, box_solid, 1.2, &top_faces).unwrap();
+    let spine = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    let profile = make_positioned_lip_profile(
+        &mut topo,
+        Point3::new(42.0, -38.25, 21.0),
+        Vec3::new(1.0, 0.0, 0.0),
+    );
+    let lip = crate::sweep::sweep_along_edges(&mut topo, profile, &spine).unwrap();
+    let fused =
+        crate::boolean::boolean(&mut topo, crate::boolean::BooleanOp::Fuse, hollow, lip).unwrap();
+    let faces = brepkit_topology::explorer::solid_faces(&topo, fused).unwrap();
+    let curved = faces
+        .iter()
+        .filter(|&&fid| !matches!(topo.face(fid).unwrap().surface(), FaceSurface::Plane { .. }))
+        .count();
+    assert!(
+        faces.len() < 200 && curved > 0,
+        "exact-coincidence fuse must stay analytic, got {} faces ({curved} curved)",
+        faces.len()
+    );
+}
+
+#[test]
+fn shelled_rounded_box_is_orientation_clean() {
+    let mut topo = Topology::new();
+    let spine_for_face = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
+    let base_wire = Wire::new(
+        spine_for_face
+            .iter()
+            .map(|&e| OrientedEdge::new(e, true))
+            .collect(),
+        true,
+    )
+    .unwrap();
+    let base_wid = topo.add_wire(base_wire);
+    let base_face = topo.add_face(Face::new(
+        base_wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    let box_solid =
+        crate::extrude::extrude(&mut topo, base_face, Vec3::new(0.0, 0.0, 1.0), 21.0).unwrap();
+    let top_faces: Vec<FaceId> = {
+        let s = topo.solid(box_solid).unwrap();
+        let sh = topo.shell(s.outer_shell()).unwrap();
+        sh.faces()
+            .iter()
+            .copied()
+            .filter(|&fid| {
+                matches!(
+                    topo.face(fid).unwrap().surface(),
+                    FaceSurface::Plane { normal, d }
+                        if normal.z() > 0.99 && (*d - 21.0).abs() < 1e-6
+                )
+            })
+            .collect()
+    };
+    let hollow = crate::shell_op::shell(&mut topo, box_solid, 1.2, &top_faces).unwrap();
+    let report = crate::validate::validate_solid(&topo, hollow).unwrap();
+    assert!(report.is_valid(), "shelled rounded box: {report:?}");
+}
+
+#[test]
+fn pipe_keeps_offset_profile_position() {
+    // A perpendicular profile away from the path must pipe from where it
+    // lies, not be translated onto the path start.
+    let mut topo = Topology::new();
+    let t = 1e-7;
+    let v0 = topo.add_vertex(Vertex::new(Point3::new(5.0, 5.0, 0.0), t));
+    let v1 = topo.add_vertex(Vertex::new(Point3::new(6.0, 5.0, 0.0), t));
+    let v2 = topo.add_vertex(Vertex::new(Point3::new(6.0, 6.0, 0.0), t));
+    let v3 = topo.add_vertex(Vertex::new(Point3::new(5.0, 6.0, 0.0), t));
+    let e0 = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+    let e1 = topo.add_edge(Edge::new(v1, v2, EdgeCurve::Line));
+    let e2 = topo.add_edge(Edge::new(v2, v3, EdgeCurve::Line));
+    let e3 = topo.add_edge(Edge::new(v3, v0, EdgeCurve::Line));
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(e0, true),
+            OrientedEdge::new(e1, true),
+            OrientedEdge::new(e2, true),
+            OrientedEdge::new(e3, true),
+        ],
+        true,
+    )
+    .unwrap();
+    let wid = topo.add_wire(wire);
+    let profile = topo.add_face(Face::new(
+        wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    // A gently curved path so the pipe's general ring machinery runs.
+    let path = NurbsCurve::new(
+        2,
+        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+        vec![
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.1, 0.0, 5.0),
+            Point3::new(0.0, 0.0, 10.0),
+        ],
+        vec![1.0, 1.0, 1.0],
+    )
+    .unwrap();
+
+    let solid = crate::pipe::pipe(&mut topo, profile, &path, None).unwrap();
+    let bb = crate::measure::solid_bounding_box(&topo, solid).unwrap();
+    assert!(
+        bb.min.x() > 4.5 && bb.max.x() < 6.7 && bb.min.y() > 4.5 && bb.max.y() < 6.5,
+        "offset profile must stay near x,y in [5,6], got {bb:?}"
+    );
+}
+
+#[test]
+fn sweep_with_options_keeps_offset_profile_position() {
+    // Same contract for the options family (scale law absent, curved path).
+    let mut topo = Topology::new();
+    let t = 1e-7;
+    let v0 = topo.add_vertex(Vertex::new(Point3::new(5.0, 5.0, 0.0), t));
+    let v1 = topo.add_vertex(Vertex::new(Point3::new(6.0, 5.0, 0.0), t));
+    let v2 = topo.add_vertex(Vertex::new(Point3::new(6.0, 6.0, 0.0), t));
+    let v3 = topo.add_vertex(Vertex::new(Point3::new(5.0, 6.0, 0.0), t));
+    let e0 = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+    let e1 = topo.add_edge(Edge::new(v1, v2, EdgeCurve::Line));
+    let e2 = topo.add_edge(Edge::new(v2, v3, EdgeCurve::Line));
+    let e3 = topo.add_edge(Edge::new(v3, v0, EdgeCurve::Line));
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(e0, true),
+            OrientedEdge::new(e1, true),
+            OrientedEdge::new(e2, true),
+            OrientedEdge::new(e3, true),
+        ],
+        true,
+    )
+    .unwrap();
+    let wid = topo.add_wire(wire);
+    let profile = topo.add_face(Face::new(
+        wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    let path = NurbsCurve::new(
+        2,
+        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+        vec![
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.1, 0.0, 5.0),
+            Point3::new(0.0, 0.0, 10.0),
+        ],
+        vec![1.0, 1.0, 1.0],
+    )
+    .unwrap();
+
+    let solid = sweep_with_options(&mut topo, profile, &path, &SweepOptions::default()).unwrap();
+    let bb = crate::measure::solid_bounding_box(&topo, solid).unwrap();
+    assert!(
+        bb.min.x() > 4.5 && bb.max.x() < 6.7 && bb.min.y() > 4.5 && bb.max.y() < 6.5,
+        "offset profile must stay near x,y in [5,6], got {bb:?}"
+    );
+}
+
+#[test]
+fn miter_sweep_keeps_offset_profile_position() {
+    // The miter family joins the as-positioned contract: a perpendicular
+    // offset profile swept along a kinked path keeps its lateral placement,
+    // and both legs share one exact kink ring on the bisector plane.
+    let mut topo = Topology::new();
+    let t = 1e-7;
+    let v0 = topo.add_vertex(Vertex::new(Point3::new(5.0, 5.0, 0.0), t));
+    let v1 = topo.add_vertex(Vertex::new(Point3::new(6.0, 5.0, 0.0), t));
+    let v2 = topo.add_vertex(Vertex::new(Point3::new(6.0, 6.0, 0.0), t));
+    let v3 = topo.add_vertex(Vertex::new(Point3::new(5.0, 6.0, 0.0), t));
+    let e0 = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+    let e1 = topo.add_edge(Edge::new(v1, v2, EdgeCurve::Line));
+    let e2 = topo.add_edge(Edge::new(v2, v3, EdgeCurve::Line));
+    let e3 = topo.add_edge(Edge::new(v3, v0, EdgeCurve::Line));
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(e0, true),
+            OrientedEdge::new(e1, true),
+            OrientedEdge::new(e2, true),
+            OrientedEdge::new(e3, true),
+        ],
+        true,
+    )
+    .unwrap();
+    let wid = topo.add_wire(wire);
+    let profile = topo.add_face(Face::new(
+        wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    // Polyline path with one kink: up 5, then slanted up 5.
+    let path = NurbsCurve::new(
+        1,
+        vec![0.0, 0.0, 0.5, 1.0, 1.0],
+        vec![
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 5.0),
+            Point3::new(2.0, 0.0, 10.0),
+        ],
+        vec![1.0, 1.0, 1.0],
+    )
+    .unwrap();
+
+    let solid = sweep_with_options(
+        &mut topo,
+        profile,
+        &path,
+        &SweepOptions {
+            corner_mode: SweepCornerMode::Miter,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+    let bb = crate::measure::solid_bounding_box(&topo, solid).unwrap();
+    // The tube rides the kinked path in x/z; the y placement is the
+    // discriminating pin (centroid placement would center it on y=0).
+    assert!(
+        (bb.min.y() - 5.0).abs() < 0.1 && (bb.max.y() - 6.0).abs() < 0.1,
+        "offset profile must keep its y placement, got {bb:?}"
+    );
+    let vol = crate::measure::solid_volume(&topo, solid, 0.05).unwrap();
+    // Exact mitered volume, NOT area x path length: each leg is a prism cut
+    // by the bisector plane at the kink, and a profile offset toward the
+    // inside of the bend shortens BOTH legs by (centroid . n)/(n . t1) with
+    // n = t1 + t2 (the offset's component against the miter normal).
+    let t2 = Vec3::new(2.0, 0.0, 5.0).normalize().unwrap();
+    let n = Vec3::new(0.0, 0.0, 1.0) + t2;
+    let deficit = 5.5 * n.x() / n.z();
+    let expected = 5.0 + 29.0_f64.sqrt() - 2.0 * deficit;
+    assert!(
+        (vol - expected).abs() < 1e-6,
+        "miter tube volume should be exactly {expected}, got {vol}"
+    );
+}
+#[test]
+#[ignore = "diagnostic — face inventory, watertightness, and volume for the offset miter elbow"]
+#[allow(
+    clippy::cast_possible_truncation,
+    clippy::too_many_lines,
+    clippy::print_stderr
+)]
+fn miter_offset_elbow_dissect() {
+    let mut topo = Topology::new();
+    let t = 1e-7;
+    let v0 = topo.add_vertex(Vertex::new(Point3::new(5.0, 5.0, 0.0), t));
+    let v1 = topo.add_vertex(Vertex::new(Point3::new(6.0, 5.0, 0.0), t));
+    let v2 = topo.add_vertex(Vertex::new(Point3::new(6.0, 6.0, 0.0), t));
+    let v3 = topo.add_vertex(Vertex::new(Point3::new(5.0, 6.0, 0.0), t));
+    let e0 = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+    let e1 = topo.add_edge(Edge::new(v1, v2, EdgeCurve::Line));
+    let e2 = topo.add_edge(Edge::new(v2, v3, EdgeCurve::Line));
+    let e3 = topo.add_edge(Edge::new(v3, v0, EdgeCurve::Line));
+    let wire = Wire::new(
+        vec![
+            OrientedEdge::new(e0, true),
+            OrientedEdge::new(e1, true),
+            OrientedEdge::new(e2, true),
+            OrientedEdge::new(e3, true),
+        ],
+        true,
+    )
+    .unwrap();
+    let wid = topo.add_wire(wire);
+    let profile = topo.add_face(Face::new(
+        wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    ));
+    let path = NurbsCurve::new(
+        1,
+        vec![0.0, 0.0, 0.5, 1.0, 1.0],
+        vec![
+            Point3::new(0.0, 0.0, 0.0),
+            Point3::new(0.0, 0.0, 5.0),
+            Point3::new(2.0, 0.0, 10.0),
+        ],
+        vec![1.0, 1.0, 1.0],
+    )
+    .unwrap();
+    let solid = sweep_with_options(
+        &mut topo,
+        profile,
+        &path,
+        &SweepOptions {
+            corner_mode: SweepCornerMode::Miter,
+            ..Default::default()
+        },
+    )
+    .unwrap();
+
+    let report = crate::validate::validate_solid(&topo, solid).unwrap();
+    eprintln!("VALID: {:?}", report.is_valid());
+    for defl in [0.1, 0.01, 0.001] {
+        let vol = crate::measure::solid_volume(&topo, solid, defl).unwrap();
+        eprintln!("VOL defl={defl}: {vol:.4}");
+    }
+    let ovol = crate::measure::oriented_solid_volume(&topo, solid, 0.01).unwrap();
+    eprintln!("ORIENTED VOL: {ovol:.4}");
+    let mesh = crate::tessellate::tessellate_solid(&topo, solid, 0.01).unwrap();
+    let mut edge_count: HashMap<(u64, u64), usize> = HashMap::new();
+    let q = |p: Point3| -> u64 {
+        let s = 1.0e4_f64;
+        let xi = (p.x() * s).round() as i64;
+        let yi = (p.y() * s).round() as i64;
+        let zi = (p.z() * s).round() as i64;
+        ((xi as u64) & 0x001F_FFFF)
+            | (((yi as u64) & 0x001F_FFFF) << 21)
+            | (((zi as u64) & 0x001F_FFFF) << 42)
+    };
+    for tri in mesh.indices.chunks(3) {
+        for k in 0..3 {
+            let a = mesh.positions[tri[k] as usize];
+            let b = mesh.positions[tri[(k + 1) % 3] as usize];
+            let (qa, qb) = (q(a), q(b));
+            let key = if qa <= qb { (qa, qb) } else { (qb, qa) };
+            *edge_count.entry(key).or_insert(0) += 1;
+        }
+    }
+    let bnd = edge_count.values().filter(|&&c| c == 1).count();
+    let nm = edge_count.values().filter(|&&c| c > 2).count();
+    eprintln!(
+        "MESH boundary={bnd} nonmanifold={nm} tris={}",
+        mesh.indices.len() / 3
+    );
+
+    // Per-face inventory: normal/plane + area-ish via bbox
+    let faces = brepkit_topology::explorer::solid_faces(&topo, solid).unwrap();
+    eprintln!("FACES: {}", faces.len());
+    for &fid in &faces {
+        let f = topo.face(fid).unwrap();
+        let w = topo.wire(f.outer_wire()).unwrap();
+        let pts: Vec<Point3> = w
+            .edges()
+            .iter()
+            .map(|oe| {
+                let e = topo.edge(oe.edge()).unwrap();
+                topo.vertex(oe.oriented_start(e)).unwrap().point()
+            })
+            .collect();
+        let zs: Vec<f64> = pts.iter().map(|p| p.z()).collect();
+        let zmin = zs.iter().copied().fold(f64::MAX, f64::min);
+        let zmax = zs.iter().copied().fold(f64::MIN, f64::max);
+        if let FaceSurface::Plane { normal, d } = f.surface() {
+            eprintln!(
+                "  F{:?} n=({:.2},{:.2},{:.2}) d={:.2} z=[{:.2},{:.2}] nv={}",
+                fid,
+                normal.x(),
+                normal.y(),
+                normal.z(),
+                d,
+                zmin,
+                zmax,
+                pts.len()
+            );
+        }
+    }
 }

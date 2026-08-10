@@ -13,10 +13,11 @@
     "brepkit_wasm.js",
     "brepkit_wasm_bg.js",
     "brepkit_wasm.d.ts",
-    "LICENSE-MIT",
-    "LICENSE-APACHE",
-    "brepkit_wasm_node.cjs"
+    "brepkit_wasm_node.cjs",
+    "LICENSE",
+    "COMMERCIAL-LICENSE.md"
   ],
+  "homepage": "https://github.com/esaueng/brepkit",
   "keywords": [
     "cad",
     "brep",
@@ -24,7 +25,7 @@
     "geometry",
     "solid-modeling"
   ],
-  "license": "MIT OR Apache-2.0",
+  "license": "AGPL-3.0-only",
   "main": "brepkit_wasm_node.cjs",
   "module": "brepkit_wasm.js",
   "name": "brepkit-wasm",
@@ -38,6 +39,5 @@
   ],
   "type": "module",
   "types": "brepkit_wasm.d.ts",
-  "version": "3.0.1",
-  "homepage": "https://github.com/esaueng/brepkit"
+  "version": "3.2.18"
 }
