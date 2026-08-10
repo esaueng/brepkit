@@ -2091,6 +2091,18 @@ pub(super) fn tessellate_nonplanar_cdt(
             .map_err(crate::OperationsError::Math)?;
     }
 
+    // A single closed NURBS rim is the clipped boundary of a tangential
+    // analytic face. Keep the interior curvature grid for that narrow case:
+    // without it, adjacent developable faces can select the same internal
+    // edge and leave a four-triangle branch at the tangency. Other
+    // developable faces retain the tolerance-driven sparse path.
+    let single_closed_nurbs_boundary = if wire.edges().len() == 1 {
+        let edge = topo.edge(wire.edges()[0].edge())?;
+        edge.start() == edge.end() && matches!(edge.curve(), EdgeCurve::NurbsCurve(_))
+    } else {
+        false
+    };
+
     if du > 1e-15 && dv > 1e-15 {
         let (n_u, n_v) = interior_grid_resolution(
             face_data.surface(),
@@ -2100,7 +2112,8 @@ pub(super) fn tessellate_nonplanar_cdt(
             angular_tol,
             circle_floor
                 || !face_data.inner_wires().is_empty()
-                || angular_tol >= brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+                || angular_tol >= brepkit_math::chord::DEFAULT_ANGULAR_TOL
+                || single_closed_nurbs_boundary,
         );
 
         let boundary_uv_ref = &boundary_uv;
