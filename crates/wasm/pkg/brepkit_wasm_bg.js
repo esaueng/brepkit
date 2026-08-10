@@ -5147,8 +5147,10 @@ export class BrepKernel {
     /**
      * Sweep a face along a path defined by a chain of edges.
      *
-     * Collects points from the edges, fits an interpolating NURBS curve,
-     * then sweeps the profile along that curve.
+     * A closed planar chain of lines and tangent arcs with an all-line
+     * perpendicular profile is swept analytically (exact plane / cylinder /
+     * cone faces); anything else falls back to fitting an interpolating
+     * NURBS curve through sampled chain points and sweeping along that.
      *
      * Returns a solid handle (`u32`).
      *
@@ -6152,10 +6154,10 @@ export function __wbg___wbindgen_string_get_b0ca35b86a603356(arg0, arg1) {
 export function __wbg___wbindgen_throw_344f42d3211c4765(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_error_3af138b8302c8683(arg0, arg1) {
+export function __wbg_error_f940349173d3d976(arg0, arg1) {
     console.error(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_log_06260087600e4997(arg0, arg1) {
+export function __wbg_log_d5f895461e646dce(arg0, arg1) {
     console.log(getStringFromWasm0(arg0, arg1));
 }
 export function __wbg_new_32b398fb48b6d94a() {
@@ -6172,7 +6174,7 @@ export function __wbg_set_6be42768c690e380(arg0, arg1, arg2) {
 export function __wbg_set_8a16b38e4805b298(arg0, arg1, arg2) {
     arg0[arg1 >>> 0] = arg2;
 }
-export function __wbg_warn_78cf9e8f576306bc(arg0, arg1) {
+export function __wbg_warn_1fd49ae53d125e18(arg0, arg1) {
     console.warn(getStringFromWasm0(arg0, arg1));
 }
 export function __wbindgen_cast_0000000000000001(arg0) {
