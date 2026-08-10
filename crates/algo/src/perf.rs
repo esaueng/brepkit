@@ -34,6 +34,7 @@ std::thread_local! {
     static RAY_GEOM_BUILDS: Cell<u64> = const { Cell::new(0) };
     static FACE_SPLIT_PROBES: Cell<u64> = const { Cell::new(0) };
     static LOCAL_VERTEX_INSERTS: Cell<u64> = const { Cell::new(0) };
+    static SECTION_FIT_POINTS: Cell<u64> = const { Cell::new(0) };
 }
 
 #[cfg(feature = "perf-counters")]
@@ -93,6 +94,20 @@ pub(crate) fn bump_local_vertex_insert() {
     increment(&LOCAL_VERTEX_INSERTS);
 }
 
+/// Count the points fed to a section-curve NURBS interpolation in the FF
+/// phase's sampled plane-analytic path. The sampled chain spans the unbounded
+/// section conic; `clip_chain_to_pair_boxes` keeps only the runs that can
+/// reach the face pair's AABB overlap, so a tangent graze fits a handful of
+/// points. Reverting the clip feeds the full ~512-point chain to the dense
+/// O(n^3) solve per grazing pair — the baseplate fuse regression (#1488).
+/// Crate-internal.
+#[inline]
+#[allow(clippy::used_underscore_binding)]
+pub(crate) fn bump_section_fit_points(_n: u64) {
+    #[cfg(feature = "perf-counters")]
+    SECTION_FIT_POINTS.with(|value| value.set(value.get().saturating_add(_n)));
+}
+
 /// A snapshot of every work counter since the last [`reset`]. Only available
 /// with `perf-counters`.
 #[cfg(feature = "perf-counters")]
@@ -109,6 +124,8 @@ pub struct PerfSnapshot {
     pub face_split_probes: u64,
     /// Sub-face-local vertex materializations in `build_topology_face`.
     pub local_vertex_inserts: u64,
+    /// Points fed to section-curve NURBS interpolation in the FF phase.
+    pub section_fit_points: u64,
 }
 
 /// Reset all counters to zero. Only available with `perf-counters`.
@@ -119,6 +136,7 @@ pub fn reset() {
     RAY_GEOM_BUILDS.set(0);
     FACE_SPLIT_PROBES.set(0);
     LOCAL_VERTEX_INSERTS.set(0);
+    SECTION_FIT_POINTS.set(0);
 }
 
 /// Every work counter since the last [`reset`]. Only available with
@@ -132,6 +150,7 @@ pub fn snapshot() -> PerfSnapshot {
         ray_geom_builds: RAY_GEOM_BUILDS.get(),
         face_split_probes: FACE_SPLIT_PROBES.get(),
         local_vertex_inserts: LOCAL_VERTEX_INSERTS.get(),
+        section_fit_points: SECTION_FIT_POINTS.get(),
     }
 }
 

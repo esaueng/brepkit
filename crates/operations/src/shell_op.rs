@@ -537,17 +537,27 @@ pub fn shell(
         return gate(topo, solid);
     }
 
+    // `edge_to_face_map` iterates in hash order, so without this sort the rim
+    // loop's starting edge — and with it the rim face's wire origin, which
+    // downstream consumers use as a plane-frame anchor — varied run to run.
+    boundary_edge_ids.sort_by_key(|e| e.index());
+
     // Determine the oriented direction of each boundary edge relative to its single face.
     // The rim face must use the OPPOSITE orientation so the edge is shared correctly.
     let mut boundary_oriented: Vec<OrientedEdge> = Vec::new();
     for &eid in &boundary_edge_ids {
         let face_id = edge_face_map[&eid.index()][0];
         let face = topo.face(face_id)?;
+        // The rim must traverse the shared edge opposite to the owner's
+        // EFFECTIVE sense — stored direction XOR the face's reversal flag —
+        // not merely its stored direction (a reversed cavity face traverses
+        // its wire backwards).
+        let rev = face.is_reversed();
         let wire = topo.wire(face.outer_wire())?;
         let mut found = false;
         for oe in wire.edges() {
             if oe.edge() == eid {
-                boundary_oriented.push(OrientedEdge::new(eid, !oe.is_forward()));
+                boundary_oriented.push(OrientedEdge::new(eid, oe.is_forward() == rev));
                 found = true;
                 break;
             }
@@ -557,7 +567,7 @@ pub fn shell(
                 let iw = topo.wire(iw_id)?;
                 for oe in iw.edges() {
                     if oe.edge() == eid {
-                        boundary_oriented.push(OrientedEdge::new(eid, !oe.is_forward()));
+                        boundary_oriented.push(OrientedEdge::new(eid, oe.is_forward() == rev));
                         found = true;
                         break;
                     }
@@ -815,8 +825,14 @@ fn sort_edges_into_loops(
         return Ok(Vec::new());
     }
 
-    let mut start_map: HashMap<usize, Vec<usize>> = HashMap::new();
-    let mut edge_endpoints: Vec<(VertexId, VertexId)> = Vec::new();
+    // Chain UNDIRECTED and assign each edge's orientation from the chain
+    // direction. The old chaining followed the given orientations strictly, so
+    // a boundary whose faces traverse their shared rim in mixed senses (the
+    // corrected cavity wires vs the outer wall wires) dead-ended into open
+    // wires. The first edge's given orientation seeds each loop's direction,
+    // preserving the rim winding convention.
+    let mut endpoints: Vec<(VertexId, VertexId)> = Vec::with_capacity(edges.len());
+    let mut incident: HashMap<usize, Vec<usize>> = HashMap::new();
     for (i, oe) in edges.iter().enumerate() {
         let edge = topo.edge(oe.edge())?;
         let (sv, ev) = if oe.is_forward() {
@@ -824,8 +840,9 @@ fn sort_edges_into_loops(
         } else {
             (edge.end(), edge.start())
         };
-        start_map.entry(sv.index()).or_default().push(i);
-        edge_endpoints.push((sv, ev));
+        incident.entry(sv.index()).or_default().push(i);
+        incident.entry(ev.index()).or_default().push(i);
+        endpoints.push((sv, ev));
     }
 
     let mut used = vec![false; edges.len()];
@@ -833,38 +850,55 @@ fn sort_edges_into_loops(
 
     while let Some(start_idx) = used.iter().position(|&u| !u) {
         let mut current_loop = Vec::new();
-        let mut current = start_idx;
-        let chain_start_vid = edge_endpoints[current].0.index();
+        used[start_idx] = true;
+        current_loop.push(edges[start_idx]);
+        let chain_start = endpoints[start_idx].0.index();
+        let mut at = endpoints[start_idx].1.index();
 
-        loop {
-            if used[current] {
-                break;
-            }
-            used[current] = true;
-            current_loop.push(edges[current]);
-            let end_vid = edge_endpoints[current].1.index();
-
-            if end_vid == chain_start_vid {
-                break; // Loop closed.
-            }
-
-            let mut found = false;
-            if let Some(candidates) = start_map.get(&end_vid) {
+        let mut closed = at == chain_start;
+        while at != chain_start {
+            let mut next: Option<(usize, bool)> = None;
+            if let Some(candidates) = incident.get(&at) {
                 for &idx in candidates {
-                    if !used[idx] {
-                        current = idx;
-                        found = true;
-                        break;
+                    if used[idx] {
+                        continue;
                     }
+                    let (sv, ev) = endpoints[idx];
+                    if sv.index() == at {
+                        next = Some((idx, true));
+                    } else if ev.index() == at {
+                        next = Some((idx, false));
+                    } else {
+                        continue;
+                    }
+                    break;
                 }
             }
-            if !found {
+            let Some((idx, as_given)) = next else {
                 break; // Broken chain — give up on this loop.
-            }
+            };
+            used[idx] = true;
+            let oe = edges[idx];
+            let oriented = if as_given {
+                oe
+            } else {
+                brepkit_topology::wire::OrientedEdge::new(oe.edge(), !oe.is_forward())
+            };
+            current_loop.push(oriented);
+            let (sv, ev) = endpoints[idx];
+            at = if as_given { ev.index() } else { sv.index() };
+            closed = at == chain_start;
         }
 
-        if !current_loop.is_empty() {
+        // A partial (unclosed) chain would make the rim face carry an open
+        // wire; drop it and leave the boundary open for validation to flag.
+        if closed && !current_loop.is_empty() {
             loops.push(current_loop);
+        } else if !current_loop.is_empty() {
+            log::warn!(
+                "shell rim: dropping an unclosed boundary chain of {} edge(s)",
+                current_loop.len()
+            );
         }
     }
 

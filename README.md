@@ -7,10 +7,10 @@ Solid modeling kernel for Rust and WebAssembly.
 [![CI](https://github.com/esaueng/brepkit/actions/workflows/ci.yml/badge.svg)](https://github.com/esaueng/brepkit/actions/workflows/ci.yml)
 [![npm](https://img.shields.io/npm/v/brepkit-wasm)](https://www.npmjs.com/package/brepkit-wasm)
 [![Commit activity](https://img.shields.io/github/commit-activity/m/esaueng/brepkit?label=commits%2Fmonth)](https://github.com/esaueng/brepkit/commits/main)
-[![License: MIT OR Apache-2.0](https://img.shields.io/badge/License-MIT%20OR%20Apache--2.0-blue.svg)](#license)
+[![License: AGPL-3.0-only or commercial](https://img.shields.io/badge/License-AGPL--3.0%20%2F%20Commercial-blue.svg)](#license)
 [![Rust 1.88+](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org/) [![unsafe denied](https://img.shields.io/badge/unsafe-denied-success.svg)](#why-a-cad-kernel)
 
-**[Architecture](#architecture)** · **[Performance](#performance)** · **[Getting Started](#getting-started)** · **[Known Limitations](#known-limitations)** · **[Contributing](./CONTRIBUTING.md)**
+**[Architecture](#architecture)** · **[Performance](#performance)** · **[Getting Started](#getting-started)** · **[Known Limitations](#known-limitations)** · **[Stability](./STABILITY.md)** · **[Contributing](./CONTRIBUTING.md)**
 
 </div>
 
@@ -69,6 +69,8 @@ their boundary. See the [tolerance and robustness guide](book/src/tolerances.md)
 ## Status
 
 brepkit is in active development. Core modeling is solid. Each feature below is marked stable, beta, planned, or experimental, and [Known Limitations](#known-limitations) covers the gaps.
+
+The table below rates *features*. For *API* stability per crate, and what the shared `2.x` version does and does not promise, see [STABILITY.md](./STABILITY.md).
 
 | Category                | Feature                                                                      | Status       |
 | ----------------------- | ---------------------------------------------------------------------------- | ------------ |
@@ -153,23 +155,30 @@ Layered Cargo workspace. Each crate depends only on the same or lower layers, an
 
 ## Performance
 
-Median times from the [brepjs benchmark suite](https://github.com/andymai/brepjs/tree/main/benchmarks) (5 iterations, Node.js, Linux x86_64). WASM is single-threaded. Native benchmarks use criterion.
+Median times from [brepkit-bench](https://github.com/andymai/brepkit-bench), the public repro harness (5 iterations, Node.js, Linux x86_64). WASM is single-threaded. Native benchmarks use criterion. Reproduce the WASM columns yourself:
+
+```bash
+git clone https://github.com/andymai/brepkit-bench && cd brepkit-bench
+npm ci && npm run bench
+```
 
 | Operation                | brepkit (WASM) | OCCT (WASM) | Speedup | brepkit (native) |
 | ------------------------ | -------------- | ----------- | ------- | ---------------- |
-| fuse(box, box) (×10)     | 0.5 ms         | 43.7 ms     | 87x     | 122 µs           |
-| cut(box, cylinder) (×10) | 28.3 ms        | 64.3 ms     | 2.3x    | 9.3 ms           |
-| box + chamfer            | 0.2 ms         | 5.4 ms      | 27x     | 46 µs            |
-| box + fillet             | 0.3 ms         | 6.2 ms      | 21x     | 127 µs           |
-| multi-boolean (16 holes) | 4.7 ms         | 30.1 ms     | 6.4x    | 2.8 ms           |
-| mesh sphere (tol=0.01)   | 7.1 ms         | 51.9 ms     | 7.3x    | 6.0 ms           |
-| exportSTEP (×10)         | 0.9 ms         | 14.3 ms     | 16x     | n/a              |
+| fuse(box, box) (×10)     | 0.43 ms        | 44.9 ms     | 103x    | 122 µs           |
+| cut(box, cylinder) (×10) | 19.2 ms        | 64.9 ms     | 3.4x    | 9.3 ms           |
+| box + chamfer            | 0.10 ms        | 5.6 ms      | 55x     | 46 µs            |
+| box + fillet             | 0.33 ms        | 6.1 ms      | 18x     | 127 µs           |
+| intersect(box, sphere) (×10) | 0.23 ms    | 59.1 ms     | 252x    | 98 µs            |
+| multi-boolean (16 holes) | 4.6 ms         | 30.3 ms     | 6.6x    | 2.8 ms           |
+| mesh sphere (tol=0.01)   | 6.2 ms         | 49.4 ms     | 7.9x    | 6.0 ms           |
+| volume (box) (×100)      | 0.18 ms        | 9.8 ms      | 54x     | 56 µs            |
+| exportSTEP (×10)         | 0.85 ms        | 14.3 ms     | 17x     | n/a              |
 
-Every quoted row is output-verified across both kernels before timing is compared: fuse, chamfer, and sphere volumes match exactly; cut, fillet, and multi-boolean volumes agree within 0.004%. The sphere mesh densities are comparable at equal tolerance (9,800 triangles vs 10,176). The `intersect(box, sphere)` row is excluded: brepkit currently keeps the wrong sphere region for that configuration (an open, pinned defect), so its ~200x timing would not be a like-for-like comparison.
+Every row is output-verified before timing, enforced by the harness itself: it refuses to time a row whose result is wrong. Fuse, chamfer, and box volumes must match exactly; cut, fillet, and multi-boolean volumes are checked against closed-form or cross-kernel values (measured fillet agreement: 0.004%); the intersect result must match the closed-form spherical-octant volume (also pinned by a regression test); exported STEP must re-import to the correct volume. The sphere mesh densities are comparable at equal tolerance (9,800 triangles vs 10,176).
 
 Booleans preserve analytic surfaces, so face counts stay low across chained operations. A nine-step compound boolean settles at 72 faces while a mesh-based approach would reach roughly 7,000. The same holds for blends: a straight edge filleted between two planar faces keeps an exact cylindrical wall rather than a NURBS approximation of one.
 
-> The OCCT comparison uses [occt-wasm](https://www.npmjs.com/package/occt-wasm), an OpenCASCADE build compiled to WebAssembly. Both kernels run single-threaded in Node.js. Boolean and `exportSTEP` rows are timed as batches of ten operations. WASM figures are medians of `kernel-comparison.bench.test.ts` (5 iterations) against a local `cargo xtask wasm-build` package, hash-verified at the require path. Native figures: `cargo bench -p brepkit-operations --bench cad_operations`, except the mesh-sphere row, which is measured at the same parameters as the WASM row (`tessellate_solid_with_tolerance`, deflection 0.01, angular 0.1 rad) via `crates/operations/examples/perf_probe.rs` — the criterion suite's sphere case meshes per-face and is not comparable. Full benchmark source: [brepjs/benchmarks](https://github.com/andymai/brepjs/tree/main/benchmarks). Measured 2026-08-06 on brepkit main (post-2.129.8, with the display-sphere tessellation fix).
+> The OCCT comparison uses [occt-wasm](https://www.npmjs.com/package/occt-wasm), an OpenCASCADE build compiled to WebAssembly. Both kernels run single-threaded in Node.js through the same [brepjs](https://github.com/andymai/brepjs) adapter layer, so adapter overhead is identical on both sides. Boolean and `exportSTEP` rows are timed as batches of ten operations. Speedups are computed from unrounded medians. WASM figures measured 2026-08-07 via [brepkit-bench](https://github.com/andymai/brepkit-bench) on the released npm packages, exact-pinned in its lockfile: `brepkit-wasm` 3.0.0, `occt-wasm` 3.8.3, `brepjs` 18.120.0. Native figures: `cargo bench -p brepkit-operations --bench cad_operations`, except the mesh-sphere row, which is measured at the same parameters as the WASM row (`tessellate_solid_with_tolerance`, deflection 0.01, angular 0.1 rad) via `crates/operations/examples/perf_probe.rs` — the criterion suite's sphere case meshes per-face and is not comparable.
 
 ## Data Exchange
 
@@ -198,6 +207,8 @@ avoidable large allocations. The WASM batch API separately limits JSON to
 
 ## Getting Started
 
+The Rust crates require Rust 1.88 or newer. The WASM package has no toolchain requirement.
+
 ### As a WASM package
 
 ```bash
@@ -215,7 +226,7 @@ For a higher-level TypeScript API, see [brepjs](https://github.com/andymai/brepj
 
 ### As a Rust dependency
 
-Not yet published to crates.io. Use git dependencies for now:
+Requires Rust 1.88 or newer.
 
 ```toml
 [dependencies]
@@ -272,9 +283,11 @@ Broad directions, no dates.
 
 ## License
 
-Licensed under either of
+brepkit is dual-licensed:
 
-- [Apache License, Version 2.0](./LICENSE-APACHE)
-- [MIT License](./LICENSE-MIT)
+- **[AGPL-3.0-only](./LICENSE)**: free for open-source use. You may use, modify, and redistribute brepkit, provided applications and network services built on it also make their source available under the AGPL.
+- **[Commercial license](./COMMERCIAL-LICENSE.md)**: for embedding brepkit in proprietary products, sold by Collective Context, LLC. Contact [hi@andymai.com](mailto:hi@andymai.com).
 
-at your option.
+Versions through 2.129.x were published under MIT OR Apache-2.0 and remain available under those terms. Versions 3.0.0 and later are AGPL-3.0-only with a commercial option.
+
+Contributions require a signed [CLA](./.github/CLA.md); see [CONTRIBUTING](./CONTRIBUTING.md).

@@ -1,368 +1,529 @@
 # Changelog
 
-## [3.0.1](https://github.com/esaueng/brepkit/compare/v3.0.0...v3.0.1) (2026-08-08)
+## [3.2.18](https://github.com/andymai/brepkit/compare/v3.2.17...v3.2.18) (2026-08-09)
 
 
 ### Bug Fixes
 
-* **algo:** band-split a lateral drilled clean through ([#115](https://github.com/esaueng/brepkit/issues/115)) ([f44a033](https://github.com/esaueng/brepkit/commit/f44a0331bb1e05d0d3801e4bf2ff1e4ee139aa0d))
-* **algo:** keep the protruding cap crescent when a cylinder fuses past a box corner ([#116](https://github.com/esaueng/brepkit/issues/116)) ([8caa538](https://github.com/esaueng/brepkit/commit/8caa538be4ae87ecbde45ee25229614369e749d4))
-* **algo:** veto line sections that only graze a plane face's rim ([#113](https://github.com/esaueng/brepkit/issues/113)) ([dbb033f](https://github.com/esaueng/brepkit/commit/dbb033f3c5ed7dccfafecf96cba1525df921924d))
-* **boolean:** parallel-cylinder sections, circular cap boundaries, and tangent-pinch fuse acceptance ([#117](https://github.com/esaueng/brepkit/issues/117)) ([1e37d75](https://github.com/esaueng/brepkit/commit/1e37d75c0590a7a33006d9d0d0a7a0cdd8e753ab))
-* **math:** emit one breakout loop per angular window in cylinder-cylinder ([#112](https://github.com/esaueng/brepkit/issues/112)) ([db17ef6](https://github.com/esaueng/brepkit/commit/db17ef6d2c28819da7b477b1a2bf5fbd43b41cd2))
-* **operations:** a corner-diagonal disjoint union is not debris ([#110](https://github.com/esaueng/brepkit/issues/110)) ([483883d](https://github.com/esaueng/brepkit/commit/483883d4b9ac3f037b1ff08d0bbefe2bbe090fb0))
+* **algo:** clip a holed face's section to the true arc, not its chord ([#1510](https://github.com/andymai/brepkit/issues/1510)) ([#1514](https://github.com/andymai/brepkit/issues/1514)) ([12f85f6](https://github.com/andymai/brepkit/commit/12f85f6ca8a328ef097c2e3b667cd32341f36c35))
 
-## [3.0.0](https://github.com/esaueng/brepkit/compare/v2.129.0...v3.0.0) (2026-08-07)
+## [3.2.17](https://github.com/andymai/brepkit/compare/v3.2.16...v3.2.17) (2026-08-09)
+
+
+### Bug Fixes
+
+* **io:** pin the [#1510](https://github.com/andymai/brepkit/issues/1510) label-bracket fuse repro and the probes that found it ([#1512](https://github.com/andymai/brepkit/issues/1512)) ([c59f0db](https://github.com/andymai/brepkit/commit/c59f0db16d8a5ea053639c26cc187676b5284d54))
+
+## [3.2.16](https://github.com/andymai/brepkit/compare/v3.2.15...v3.2.16) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** make the tessellation phase timer a wasm no-op ([#1506](https://github.com/andymai/brepkit/issues/1506)) ([b04e0bf](https://github.com/andymai/brepkit/commit/b04e0bfda9725b52fe81064fffe5263e83343d9c))
+
+## [3.2.15](https://github.com/andymai/brepkit/compare/v3.2.14...v3.2.15) (2026-08-09)
+
+
+### Performance
+
+* **operations:** spatial-hash the circle T-junction splice in solid tessellation ([#1502](https://github.com/andymai/brepkit/issues/1502)) ([b9f37f3](https://github.com/andymai/brepkit/commit/b9f37f3958a5ff375ddd78053e2aee74ca901e14))
+
+## [3.2.14](https://github.com/andymai/brepkit/compare/v3.2.13...v3.2.14) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** false trivial-containment on thin revolved cutters + untrimmed-arc volume misreads ([#1501](https://github.com/andymai/brepkit/issues/1501)) ([ca8c1ad](https://github.com/andymai/brepkit/commit/ca8c1ad35e406e4510c20a889b63977afb2c360f))
+
+## [3.2.13](https://github.com/andymai/brepkit/compare/v3.2.12...v3.2.13) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** bail compound_cut batching on fallback-tainted cluster fuses ([#1495](https://github.com/andymai/brepkit/issues/1495)) ([e78d905](https://github.com/andymai/brepkit/commit/e78d905cd85cd07b640d90fab8d65aef06a24c73))
+
+## [3.2.12](https://github.com/andymai/brepkit/compare/v3.2.11...v3.2.12) (2026-08-09)
+
+
+### Performance
+
+* **algo:** clip sampled plane-analytic section chains to the face-pair overlap ([#1490](https://github.com/andymai/brepkit/issues/1490)) ([c295975](https://github.com/andymai/brepkit/commit/c2959752573233a95b20bf8efbc0ca57099acf51))
+
+## [3.2.11](https://github.com/andymai/brepkit/compare/v3.2.10...v3.2.11) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** cover constraint-recovery Steiner vertices in the CDT lift ([#1489](https://github.com/andymai/brepkit/issues/1489)) ([5358552](https://github.com/andymai/brepkit/commit/5358552b7067cd021603972e8e3c9e94b1121149))
+
+## [3.2.10](https://github.com/andymai/brepkit/compare/v3.2.9...v3.2.10) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** map pipe sampling into the path's domain ([#1483](https://github.com/andymai/brepkit/issues/1483)) ([d0c746a](https://github.com/andymai/brepkit/commit/d0c746ad65ac61f22574bd62281728c4a8883739))
+
+## [3.2.9](https://github.com/andymai/brepkit/compare/v3.2.8...v3.2.9) (2026-08-09)
+
+
+### Performance
+
+* **operations:** tolerance-driven display tessellation for developable faces ([#1478](https://github.com/andymai/brepkit/issues/1478)) ([2ecfced](https://github.com/andymai/brepkit/commit/2ecfced115c9a4c9c52e0d42c94d23d2523da5ed))
+
+## [3.2.8](https://github.com/andymai/brepkit/compare/v3.2.7...v3.2.8) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** give degenerate-locus points their predecessor's u in the CDT unwrap ([#1475](https://github.com/andymai/brepkit/issues/1475)) ([52fbb88](https://github.com/andymai/brepkit/commit/52fbb886f0c23967f742da34205074c00ef1c3e9))
+
+## [3.2.7](https://github.com/andymai/brepkit/compare/v3.2.6...v3.2.7) (2026-08-09)
+
+
+### Performance
+
+* **operations:** resolve BK_TESS_TRACE once per process ([#1471](https://github.com/andymai/brepkit/issues/1471)) ([0d25f73](https://github.com/andymai/brepkit/commit/0d25f73bd1946219fee5459c28927f0e14248123))
+
+## [3.2.6](https://github.com/andymai/brepkit/compare/v3.2.5...v3.2.6) (2026-08-09)
+
+
+### Bug Fixes
+
+* **operations:** orient CDT face meshes by an area-weighted normal vote ([#1469](https://github.com/andymai/brepkit/issues/1469)) ([a2e029e](https://github.com/andymai/brepkit/commit/a2e029e31e764f1c7f10572c9b96399226622585))
+
+
+### Performance
+
+* **blend:** O(E) sense lookup in orientation propagation ([#1468](https://github.com/andymai/brepkit/issues/1468)) ([8c21365](https://github.com/andymai/brepkit/commit/8c21365539dca93555d1c35321c1024f0d5633cb))
+
+## [3.2.5](https://github.com/andymai/brepkit/compare/v3.2.4...v3.2.5) (2026-08-08)
+
+
+### Bug Fixes
+
+* **blend:** close the fillet junction lens and pinch classes (grouped-scoop cases 2+3) ([#1465](https://github.com/andymai/brepkit/issues/1465)) ([b74c9ac](https://github.com/andymai/brepkit/commit/b74c9ac8b168bdc5eedf03d428755e19aa05eda8))
+* **blend:** emit orientation-consistent faces from the v2 fillet ([#1466](https://github.com/andymai/brepkit/issues/1466)) ([f1b2cd1](https://github.com/andymai/brepkit/commit/f1b2cd143e60b434ac7746441fbfbf0c1abe7de2))
+
+## [3.2.4](https://github.com/andymai/brepkit/compare/v3.2.3...v3.2.4) (2026-08-08)
+
+
+### Bug Fixes
+
+* **algo:** keep pinch-shim faces through within-rank same-domain dedup ([#1463](https://github.com/andymai/brepkit/issues/1463)) ([2d50f28](https://github.com/andymai/brepkit/commit/2d50f281cb6e12a2eb22cb8eef4bc5bf79e017d7))
+
+## [3.2.3](https://github.com/andymai/brepkit/compare/v3.2.2...v3.2.3) (2026-08-08)
+
+
+### Bug Fixes
+
+* **blend:** close the closed-rim and mixed-radius fillet classes (scoop repro 56 → 0 free) ([#1460](https://github.com/andymai/brepkit/issues/1460)) ([a128062](https://github.com/andymai/brepkit/commit/a1280628498e1f9147b93004cbc438771e3bf7cc))
+
+## [3.2.2](https://github.com/andymai/brepkit/compare/v3.2.1...v3.2.2) (2026-08-08)
+
+
+### Bug Fixes
+
+* **blend:** trimmer and corner hardening from the closed-rim scoop repro ([#1457](https://github.com/andymai/brepkit/issues/1457)) ([65096a2](https://github.com/andymai/brepkit/commit/65096a212634b11c24fa8133b0cd6d353247cf87))
+
+## [3.2.1](https://github.com/andymai/brepkit/compare/v3.2.0...v3.2.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* **algo:** DCEL rescue for non-periodic band grand tours ([#1453](https://github.com/andymai/brepkit/issues/1453)) ([53536cc](https://github.com/andymai/brepkit/commit/53536cc61751b378e454fde67d131ef86e550b89))
+
+
+### Performance
+
+* **algo:** materialize deduped sections only when a duplicate exists ([#1454](https://github.com/andymai/brepkit/issues/1454)) ([b94429e](https://github.com/andymai/brepkit/commit/b94429e727c73f50e2d62e2c71ce3718ecb1cb3d))
+
+## [3.2.0](https://github.com/andymai/brepkit/compare/v3.1.4...v3.2.0) (2026-08-08)
+
+
+### Features
+
+* **operations:** mesh-fallback counter and simplify-honoring boolean bindings ([#1450](https://github.com/andymai/brepkit/issues/1450)) ([62b4719](https://github.com/andymai/brepkit/commit/62b471918280eff4206e1f886e11cef4e0d8fef3))
+
+## [3.1.4](https://github.com/andymai/brepkit/compare/v3.1.3...v3.1.4) (2026-08-08)
+
+
+### Bug Fixes
+
+* **operations:** exact miter sweep via domain-correct frames and a shared bisector ring ([#1448](https://github.com/andymai/brepkit/issues/1448)) ([6cc0ab0](https://github.com/andymai/brepkit/commit/6cc0ab09e147c16ca55f1240e9b70df37fbc8261))
+
+## [3.1.3](https://github.com/andymai/brepkit/compare/v3.1.2...v3.1.3) (2026-08-08)
+
+
+### Bug Fixes
+
+* **operations:** sweep pipes and option sweeps as positioned ([#1438](https://github.com/andymai/brepkit/issues/1438)) ([621d4a8](https://github.com/andymai/brepkit/commit/621d4a8129c73787d0f47821e9f45b131ccfc759))
+
+## [3.1.2](https://github.com/andymai/brepkit/compare/v3.1.1...v3.1.2) (2026-08-08)
+
+
+### Bug Fixes
+
+* **operations:** assemble the shell rim from sorted boundary edges ([#1434](https://github.com/andymai/brepkit/issues/1434)) ([1799017](https://github.com/andymai/brepkit/commit/17990172da7e41f3beb47bb560f62145a79401e5))
+* **operations:** correct the shell cavity face senses end to end ([#1435](https://github.com/andymai/brepkit/issues/1435)) ([ea8204f](https://github.com/andymai/brepkit/commit/ea8204fab9144bf046fb23190fbc3ec024c54394))
+
+## [3.1.1](https://github.com/andymai/brepkit/compare/v3.1.0...v3.1.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* **algo:** peel pendant sections in deterministic order ([#1432](https://github.com/andymai/brepkit/issues/1432)) ([364d556](https://github.com/andymai/brepkit/commit/364d5569f5d818f52c358706e9d9279857b46067))
+
+## [3.1.0](https://github.com/andymai/brepkit/compare/v3.0.2...v3.1.0) (2026-08-08)
+
+
+### Features
+
+* **operations:** analytic sweep along closed planar line/arc spines ([#1427](https://github.com/andymai/brepkit/issues/1427)) ([1d8c4ad](https://github.com/andymai/brepkit/commit/1d8c4adb0d7d5042c827d6d77de16a237c1fda66))
+
+## [3.0.2](https://github.com/andymai/brepkit/compare/v3.0.1...v3.0.2) (2026-08-08)
+
+
+### Bug Fixes
+
+* **operations:** drop sub-resolution polygons in mixed boolean assembly ([#1423](https://github.com/andymai/brepkit/issues/1423)) ([56da284](https://github.com/andymai/brepkit/commit/56da2846891ccf3bcb45eb9ad8201a37e91c8579))
+
+## [3.0.1](https://github.com/andymai/brepkit/compare/v3.0.0...v3.0.1) (2026-08-08)
+
+
+### Bug Fixes
+
+* **operations:** sweep profiles as positioned instead of re-centering on the path ([#1421](https://github.com/andymai/brepkit/issues/1421)) ([c9d9298](https://github.com/andymai/brepkit/commit/c9d9298ca4bc3f51c91adac4a464ec655f6302e0))
+
+## [3.0.0](https://github.com/andymai/brepkit/compare/v2.129.15...v3.0.0) (2026-08-07)
 
 
 ### ⚠ BREAKING CHANGES
 
-* **io:** STEP files containing `.F.` EDGE_CURVEs on circular, elliptical or NURBS edges — which is most real-world CAD output — now import with different geometry than before. The previous geometry was wrong, but anything pinned to it moves: OpenZCAD's parity corpus will shift, and ADR-011 fingerprints of open conic edges change because their length and midpoint change. Closed conic edges keep their fingerprints, since ADR-011 hashes a four-sample centre and a sign-canonicalized axis, and reversal preserves both. Files written by brepkit are unaffected — the writer never emits `.F.`.
+* brepkit 3.0.0 and later are licensed AGPL-3.0-only with a commercial option; versions through 2.129.x remain MIT OR Apache-2.0.
 
 ### Features
 
-* add multi-root arena serialization ([aacbd65](https://github.com/esaueng/brepkit/commit/aacbd65f9e5325432c063dc6e2b56dfab2f21ed7))
-* add multi-root arena serialization v2 ([7b7197d](https://github.com/esaueng/brepkit/commit/7b7197ddc9ab6a3f1aaa97c5175fff2a28f4be64))
-* add per-solid retirement ([d7c6e2e](https://github.com/esaueng/brepkit/commit/d7c6e2e1b50c4b27622f5adea3da3e643c89ebd8))
-* add scoped batch operation parity ([579ba04](https://github.com/esaueng/brepkit/commit/579ba04a31ecc3c2733ad7eeb75d030816c7343f))
-* **blend:** chamfer closed circular rims ([#27](https://github.com/esaueng/brepkit/issues/27)) ([3d0c11c](https://github.com/esaueng/brepkit/commit/3d0c11c89e61fa7a2ae8d43e7a9d4b3e01cf3b6f))
-* **blend:** fillet drilled plates — corner chains, perimeters, and hole rims ([#38](https://github.com/esaueng/brepkit/issues/38)) ([95d38c2](https://github.com/esaueng/brepkit/commit/95d38c2a531baa33b5f51e6aac0625d1acfee7c1))
-* **blend:** follow G1 ridgelines when filleting, not just the named edges ([#23](https://github.com/esaueng/brepkit/issues/23)) ([638d141](https://github.com/esaueng/brepkit/commit/638d1415a3c1a60b14b5894c3f065450d63b3726))
-* harden fillet and chamfer evolution ([5b192e1](https://github.com/esaueng/brepkit/commit/5b192e1e6d099095660c528f1447e3d2bc798432))
-* harden fillet and chamfer evolution ([938fd11](https://github.com/esaueng/brepkit/commit/938fd115b03663ec06522a226341df537d7f6003))
-* **io:** STEP import/export fidelity — surface curves, units, voids, swept surfaces ([#37](https://github.com/esaueng/brepkit/issues/37)) ([7f0d8b0](https://github.com/esaueng/brepkit/commit/7f0d8b08d90bf827e6349f363fe8920b5bbc0584))
-* **operations:** expose shell orientation consistency in solid validation ([#1365](https://github.com/esaueng/brepkit/issues/1365)) ([fa06b86](https://github.com/esaueng/brepkit/commit/fa06b860b55a4d28f24c8c25c2ce23600b869b6f))
-* preserve rational STEP geometry ([d83dd25](https://github.com/esaueng/brepkit/commit/d83dd25044e58c8625d3d0a65dd97b488dc49f0f))
-* **sketch:** add five GCS constraints and truthful solve diagnostics ([2c048e9](https://github.com/esaueng/brepkit/commit/2c048e90f5ba4af906ae7f5a3c4ea8ae954952b3))
-* **step:** preserve rational STEP geometry exactly ([d491db1](https://github.com/esaueng/brepkit/commit/d491db1973a5d7300b403b2432f22fce4e91a170))
-* **wasm:** 2D polygon booleans, validated hole wires, makeFaceFromWires ([#63](https://github.com/esaueng/brepkit/issues/63)) ([0cb8661](https://github.com/esaueng/brepkit/commit/0cb86610076c988d82caca24162de86c78aae8ef))
-* **wasm:** add stable batch error codes ([1d99b1a](https://github.com/esaueng/brepkit/commit/1d99b1a296ee7613c2927e3dd65a2376b644212a))
-* **wasm:** add stable batch error codes ([fa109f4](https://github.com/esaueng/brepkit/commit/fa109f41da10ea076c03bd85ffe64b88e1ee371d))
-* **wasm:** add structured validation diagnostics ([a7d61b5](https://github.com/esaueng/brepkit/commit/a7d61b5308cfe231fa6f96951d5ad08309278214))
-* **wasm:** export several solids into one STEP file ([#36](https://github.com/esaueng/brepkit/issues/36)) ([5a12eaa](https://github.com/esaueng/brepkit/commit/5a12eaa1cb4a5635ed30509831c75b93b8923f70))
-* **wasm:** report typed fillet errors instead of the silent no-op ([#35](https://github.com/esaueng/brepkit/issues/35)) ([0772969](https://github.com/esaueng/brepkit/commit/077296998ec6328d176564290521d6116ba1bb50))
+* relicense under AGPL-3.0-only with commercial licensing option ([#1416](https://github.com/andymai/brepkit/issues/1416)) ([bd7d1ba](https://github.com/andymai/brepkit/commit/bd7d1ba7de6b88a5e997e5281e00a96be30f597f))
+
+## [2.129.15](https://github.com/andymai/brepkit/compare/v2.129.14...v2.129.15) (2026-08-07)
 
 
 ### Bug Fixes
 
-* **algo,operations:** clear the boundary in 2D interior sampling; miter a swallowed corner fillet ([08c4c0c](https://github.com/esaueng/brepkit/commit/08c4c0cecfffdec2077e495621a2b239ee0ea0e3))
-* **algo:** analytic torus arm for the ray-cast classifier ([#1300](https://github.com/esaueng/brepkit/issues/1300)) ([8c0c530](https://github.com/esaueng/brepkit/commit/8c0c530a74b248fc1d1623601c20be584576b5af))
-* **algo:** canonical same-domain key for closed edges ([#21](https://github.com/esaueng/brepkit/issues/21)) ([1dc4541](https://github.com/esaueng/brepkit/commit/1dc4541f7fbf39bfdf0e24862157d757c5bb8c92))
-* **algo:** clip sections to true NURBS boundary arcs, perf-safe ([#1343](https://github.com/esaueng/brepkit/issues/1343)) ([c465e90](https://github.com/esaueng/brepkit/commit/c465e90c3031587cb43af77435a1763f0b53f2ff))
-* **algo:** close the 2-tangency quadric-box fuse (parallel half-arc sections) ([#1257](https://github.com/esaueng/brepkit/issues/1257)) ([2024119](https://github.com/esaueng/brepkit/commit/202411973b4970f6e868475d025a4836325b228f))
-* **algo:** close the 2-tangency quadric-box fuse (parallel half-arc sections) ([#1257](https://github.com/esaueng/brepkit/issues/1257)) ([b468fcc](https://github.com/esaueng/brepkit/commit/b468fccdc7183549c5ea22d228531b27f85bc365))
-* **algo:** close the circle-outside cone∪box fuse (winding-chain band splitting) ([#1259](https://github.com/esaueng/brepkit/issues/1259)) ([c93d821](https://github.com/esaueng/brepkit/commit/c93d82155ac026152f54e2bdbe390bc1da7f3805))
-* **algo:** close the circle-outside cone∪box fuse (winding-chain band splitting) ([#1259](https://github.com/esaueng/brepkit/issues/1259)) ([4ac422d](https://github.com/esaueng/brepkit/commit/4ac422d81e44bbdeeeaca8a8e17bdf4bc32a689f))
-* **algo:** close the kumiko lattice band fuse ([#1302](https://github.com/esaueng/brepkit/issues/1302)) ([719585c](https://github.com/esaueng/brepkit/commit/719585c9264f20c3aa3262f5934a496c215ef0e0))
-* **algo:** close the quadric-box inscribed-rim fuse (4-tangency cone/cylinder ∪ box) ([#1254](https://github.com/esaueng/brepkit/issues/1254)) ([aeb752a](https://github.com/esaueng/brepkit/commit/aeb752afa1458584ca2f8a0aa7fb913328c1fb97))
-* **algo:** close the quadric-box inscribed-rim fuse (4-tangency cone/cylinder ∪ box) ([#1254](https://github.com/esaueng/brepkit/issues/1254)) ([20f2d44](https://github.com/esaueng/brepkit/commit/20f2d447ce432855bc772619fb48fe105fc07d1a))
-* **algo:** drop tangency-graze section circles riding the plane-extent margin band ([#102](https://github.com/esaueng/brepkit/issues/102)) ([4f93fc4](https://github.com/esaueng/brepkit/commit/4f93fc4d75d67730fd2b573829199689e035873b))
-* **algo:** emit ellipse section arcs in sub-π spans ([#1262](https://github.com/esaueng/brepkit/issues/1262)) ([93b93bf](https://github.com/esaueng/brepkit/commit/93b93bf80115112f885a6e444abb63297c888031))
-* **algo:** emit ellipse section arcs in sub-π spans ([#1262](https://github.com/esaueng/brepkit/issues/1262)) ([f427b46](https://github.com/esaueng/brepkit/commit/f427b46a84afb97eba9181484024fe1a2aefd2bc))
-* **algo:** exact polygon clip for plane-plane lines in the FF prefilter ([#1267](https://github.com/esaueng/brepkit/issues/1267)) ([3d1ae24](https://github.com/esaueng/brepkit/commit/3d1ae24e8438383a3bd4702781c876dde60fee11))
-* **algo:** exact polygon clip for plane-plane lines in the FF prefilter ([#1267](https://github.com/esaueng/brepkit/issues/1267)) ([c9847a4](https://github.com/esaueng/brepkit/commit/c9847a44e968a0c0d751c4c4502502d490b0f871))
-* **algo:** expand NURBS boundary images so coaxial revolve cuts split ([#1352](https://github.com/esaueng/brepkit/issues/1352)) ([6e2a55d](https://github.com/esaueng/brepkit/commit/6e2a55d316bb0e880c8755a7fd35f00e2cf1a915))
-* **algo:** keep exact operand geometry through arrangement emission and welds ([#1277](https://github.com/esaueng/brepkit/issues/1277)) ([2b676ed](https://github.com/esaueng/brepkit/commit/2b676edbe1386eb28ae8a1c0ab0ed521bd2b142b))
-* **algo:** keep exact operand geometry through arrangement emission and welds ([#1277](https://github.com/esaueng/brepkit/issues/1277)) ([dd152bd](https://github.com/esaueng/brepkit/commit/dd152bd6f057cb18408dcab24e924b9ef840cb86))
-* **algo:** line splits return the foot; pin the weld-band contract ([#1272](https://github.com/esaueng/brepkit/issues/1272)) ([db4c48f](https://github.com/esaueng/brepkit/commit/db4c48f4a8d707dc97b965ecd0952afd70e935bd))
-* **algo:** line splits return the foot; pin the weld-band contract ([#1272](https://github.com/esaueng/brepkit/issues/1272)) ([56de1ee](https://github.com/esaueng/brepkit/commit/56de1ee7e9bf3d716167d77e1e71300bd33f95b6))
-* **algo:** re-cast grazed cardinal rays when clean rays unanimously disagree ([#1357](https://github.com/esaueng/brepkit/issues/1357)) ([2f10967](https://github.com/esaueng/brepkit/commit/2f1096716e683ce949b74fe5f5066702ff3e0407))
-* **algo:** respect face holes in the EF containment test ([#25](https://github.com/esaueng/brepkit/issues/25)) ([d108788](https://github.com/esaueng/brepkit/commit/d10878809bfdb73545d07199ceed1efcc4e878ee))
-* **algo:** split plane faces carrying several closed section loops ([#24](https://github.com/esaueng/brepkit/issues/24)) ([9ce6cce](https://github.com/esaueng/brepkit/commit/9ce6cce7d6f857dadd8d6a02d2beb117d3adc43a))
-* **algo:** unify cross-solver junction anchors in the kumiko lattice fuse ([#1284](https://github.com/esaueng/brepkit/issues/1284)) ([887e6ad](https://github.com/esaueng/brepkit/commit/887e6ad0649731643d407c26581fa77a1cb1ef3d))
-* **algo:** unify cross-solver junction anchors in the kumiko lattice fuse ([#1284](https://github.com/esaueng/brepkit/issues/1284)) ([0a7837e](https://github.com/esaueng/brepkit/commit/0a7837ecf8b7ab73f046df5aa7fe3a38fa53679a))
-* **algo:** unwrap periodic wire UV per edge, not across the whole loop ([#106](https://github.com/esaueng/brepkit/issues/106)) ([772b817](https://github.com/esaueng/brepkit/commit/772b8171b5d42240c09ff4f44614e02a34aaf6c1))
-* **algo:** weld-scale boundary anchoring for line splits ([#1270](https://github.com/esaueng/brepkit/issues/1270)) ([84360d9](https://github.com/esaueng/brepkit/commit/84360d95fb8aa87f7bf1a890568a53c885f7ffe6))
-* **algo:** weld-scale boundary anchoring for line splits ([#1270](https://github.com/esaueng/brepkit/issues/1270)) ([5fbb836](https://github.com/esaueng/brepkit/commit/5fbb83612b5fc714fe9c3aa1399f20d95888a724))
-* **algo:** within-rank SD dedup must not drop a cross-shell coincident face ([#1360](https://github.com/esaueng/brepkit/issues/1360)) ([5997727](https://github.com/esaueng/brepkit/commit/599772784bc20583ba974282c7f2c807b12d1fbc))
-* **blend:** a bore rim in the selection refused a corner it never touched ([#47](https://github.com/esaueng/brepkit/issues/47)) ([c8557ed](https://github.com/esaueng/brepkit/commit/c8557ed37c296e5fe9101af1623ed259efb15186))
-* **blend:** a cap rim refused every radius past half, and seamed its wall across the axis ([#50](https://github.com/esaueng/brepkit/issues/50)) ([06eb9ce](https://github.com/esaueng/brepkit/commit/06eb9cebcb6b668e0cdaa10ca7bc5cdb23c8edaf))
-* **blend:** chamfer a bore mouth, and mesh the band it leaves ([#29](https://github.com/esaueng/brepkit/issues/29)) ([1565f0a](https://github.com/esaueng/brepkit/commit/1565f0a2e46cff4c2e46fcde3dafc189431769db))
-* **blend:** exact tangent-ball vertex blends, fence unsupported corners ([#34](https://github.com/esaueng/brepkit/issues/34)) ([08fa4d9](https://github.com/esaueng/brepkit/commit/08fa4d9b524df2271e58df4507870165022ef209))
-* **blend:** fill concave edges on the correct side of the analytic fillet ([#1319](https://github.com/esaueng/brepkit/issues/1319)) ([b0d6ed7](https://github.com/esaueng/brepkit/commit/b0d6ed7e8cf11d4cfbb0735a3b651a90a458d0ce))
-* **blend:** material-oriented chamfer contacts on concave edges ([#1312](https://github.com/esaueng/brepkit/issues/1312)) ([4996331](https://github.com/esaueng/brepkit/commit/499633177f707feec95bc0b4fd8aba1409a1238e))
-* **blend:** notch end caps with the fillet end cross-section arcs ([#1309](https://github.com/esaueng/brepkit/issues/1309)) ([453a7be](https://github.com/esaueng/brepkit/commit/453a7be9cd63a2f1e238f9a6c598eb0cfe98eed1))
-* **blend:** reuse trimmer contact edges in the v2 blend face ([#1305](https://github.com/esaueng/brepkit/issues/1305)) ([cc34788](https://github.com/esaueng/brepkit/commit/cc34788f0911cedf3d06ca1b8c528aedeaa0a75e))
-* **blend:** rim chamfer on a cap that carries holes ([#28](https://github.com/esaueng/brepkit/issues/28)) ([9117219](https://github.com/esaueng/brepkit/commit/91172190ad025afaf192b51a443e751382bbba20))
-* **blend:** rim fillet on a cap that carries holes ([#30](https://github.com/esaueng/brepkit/issues/30)) ([580badc](https://github.com/esaueng/brepkit/commit/580badc8db8f7f5aeeff5f3abcbd0bace3588ff4))
-* **blend:** the corner patch was inside out, and the binding returned a silent subset ([#44](https://github.com/esaueng/brepkit/issues/44)) ([80e78f3](https://github.com/esaueng/brepkit/commit/80e78f35fcb1e70432d357a62f70895d2dc4878c))
-* **blend:** thread chamfer trims into shared contact edges ([#1307](https://github.com/esaueng/brepkit/issues/1307)) ([243db8f](https://github.com/esaueng/brepkit/commit/243db8fa884945fc15ae27beee20b3414e1d3b2e))
-* **blend:** use the material wedge half-angle in the analytic plane fillet ([#1321](https://github.com/esaueng/brepkit/issues/1321)) ([b516ed4](https://github.com/esaueng/brepkit/commit/b516ed4381ba9cf010e946119bb5d0f3fd7b6bfe))
-* bound a solid's box by its faces, not their surfaces ([0ad93a1](https://github.com/esaueng/brepkit/commit/0ad93a1a369824c26411d2a9e33a404254622ba1))
-* bound a solid's box by its faces, not their surfaces ([b2100d8](https://github.com/esaueng/brepkit/commit/b2100d8be138217d59167e4daf7c7082fbf8a8bc))
-* **check:** a hole in a curved face was material, and a bore wall measured nothing ([#49](https://github.com/esaueng/brepkit/issues/49)) ([a33d557](https://github.com/esaueng/brepkit/commit/a33d5570b811a4ccda7e5329b61244626c69522a))
-* **check:** a wire's orientation flags must not change what a face measures ([#46](https://github.com/esaueng/brepkit/issues/46)) ([725610a](https://github.com/esaueng/brepkit/commit/725610af0695c514766df92e44dd4fda8a438b27))
-* **check:** planar fan triangulation uses signed areas ([#1385](https://github.com/esaueng/brepkit/issues/1385)) ([76e5054](https://github.com/esaueng/brepkit/commit/76e505450d70c549d23a78e008377ef63dde6a47))
-* decline unsupported conic band rims ([ebb6ff7](https://github.com/esaueng/brepkit/commit/ebb6ff75497d68c63419f688863bdea0264a6a06))
-* **fillet:** emit straight-edge plane-to-plane blends as exact cylinders ([#40](https://github.com/esaueng/brepkit/issues/40)) ([2d0b76f](https://github.com/esaueng/brepkit/commit/2d0b76ffb7a55898766ddc35534816bbbb6bf892))
-* **io:** honour EDGE_CURVE same_sense on STEP import ([8ea9522](https://github.com/esaueng/brepkit/commit/8ea952224ef32063148d08e2e6fc82575d714dd9))
-* keep disconnected coaxial blind holes separate ([6114aad](https://github.com/esaueng/brepkit/commit/6114aaddd6d49f198bb34969934afe4a46c3daf0))
-* **math:** CDT edge recovery must not claim success without the edge ([#1362](https://github.com/esaueng/brepkit/issues/1362)) ([a878bad](https://github.com/esaueng/brepkit/commit/a878bad644b2ce18b95247cb414ed2d9fd94ad5f))
-* **math:** extend plane-cone section chains to the v_max boundary ([#1379](https://github.com/esaueng/brepkit/issues/1379)) ([c6dbc14](https://github.com/esaueng/brepkit/commit/c6dbc14af736f9493acd81edd21798fad5cbaf47))
-* **math:** guard CDT constrained-crossing split against welded intersection vertices ([#1391](https://github.com/esaueng/brepkit/issues/1391)) ([4c72b07](https://github.com/esaueng/brepkit/commit/4c72b0742d10f0b78950598678df2c52cbc51359))
-* **measure:** volume must not depend on how a solid was decomposed ([#42](https://github.com/esaueng/brepkit/issues/42)) ([84ffa5f](https://github.com/esaueng/brepkit/commit/84ffa5f521d06982dc5c19732656f84356345656))
-* **operations:** a sweep asked for round corners got smooth ones instead ([#52](https://github.com/esaueng/brepkit/issues/52)) ([6d9e45b](https://github.com/esaueng/brepkit/commit/6d9e45b0753653b2443630fd8a4bb794f15f3c9a))
-* **operations:** accept multi-region booleans with rotated or ring pieces ([5399030](https://github.com/esaueng/brepkit/commit/5399030013391d9840ad21454496ecf2ddb023cc))
-* **operations:** accept multi-region booleans with rotated or ring pieces ([#1239](https://github.com/esaueng/brepkit/issues/1239)) ([c35c99a](https://github.com/esaueng/brepkit/commit/c35c99af840ef7d341fea37e217d1a6b768feb31))
-* **operations:** analytic revolve rim senses must account for face reversal ([#1367](https://github.com/esaueng/brepkit/issues/1367)) ([53c9063](https://github.com/esaueng/brepkit/commit/53c90631d4d2544bf9a8dcc4de023c97ad18e766))
-* **operations:** chamfer must keep the holes and close the shell ([#43](https://github.com/esaueng/brepkit/issues/43)) ([abe6da5](https://github.com/esaueng/brepkit/commit/abe6da5328bf810e74eb2df83ba502c3cb7da2f6))
-* **operations:** close the orientation-emission campaign; check_orientation defaults on ([#1377](https://github.com/esaueng/brepkit/issues/1377)) ([15fadd5](https://github.com/esaueng/brepkit/commit/15fadd58d8812b4051e3282cc3678e6451960494))
-* **operations:** close the shell on asymmetric chamfers ([2e4018d](https://github.com/esaueng/brepkit/commit/2e4018dc25e39a279bdb712f1107f8be859a0da8))
-* **operations:** collapse a shell fillet the thickness swallows to a sharp corner ([#1243](https://github.com/esaueng/brepkit/issues/1243)) ([dea642f](https://github.com/esaueng/brepkit/commit/dea642fb745a6825864310919607c38905705e9c))
-* **operations:** draft must close the shell it opens, and keep the holes ([#41](https://github.com/esaueng/brepkit/issues/41)) ([1f52d5e](https://github.com/esaueng/brepkit/commit/1f52d5e3e3b40df24b62a099c694352039b8a621))
-* **operations:** exact sphere corner caps for rolling-ball fillets ([#33](https://github.com/esaueng/brepkit/issues/33)) ([6071fd6](https://github.com/esaueng/brepkit/commit/6071fd6b416868b086b8a986d9a8a41036d8f0c1))
-* **operations:** extrude side wires must match cap traversal senses ([#1371](https://github.com/esaueng/brepkit/issues/1371)) ([fa78e5f](https://github.com/esaueng/brepkit/commit/fa78e5f4cc64acd2b71d7b8f6b56d4d4cff37984))
-* **operations:** face provenance changed answer with the modelling unit, and most operations had none ([#51](https://github.com/esaueng/brepkit/issues/51)) ([6fea227](https://github.com/esaueng/brepkit/commit/6fea2279b7e114e2c82ab95c2579b008705420f1))
-* **operations:** measure NURBS-faced solids off the closed mesh ([#26](https://github.com/esaueng/brepkit/issues/26)) ([55f2d51](https://github.com/esaueng/brepkit/commit/55f2d51f4a808c7708da96d414411d3e6cbabdac))
-* **operations:** per-face tessellation and classification of wavy-band faces ([#1265](https://github.com/esaueng/brepkit/issues/1265)) ([5c600cd](https://github.com/esaueng/brepkit/commit/5c600cd3e155f5dca7faf39326b1ab9a3d1caa5a))
-* **operations:** per-face tessellation and classification of wavy-band faces ([#1265](https://github.com/esaueng/brepkit/issues/1265)) ([458d0f7](https://github.com/esaueng/brepkit/commit/458d0f72276743b78c7443bce5dbcd972be23fd6))
-* **operations:** reject chamfer setbacks that do not fit the face ([3e7932d](https://github.com/esaueng/brepkit/commit/3e7932d0807773809b5bdf542726f18ce5f65e8c))
-* **operations:** reversed-traversal boundary samplers no longer drop polygon corners ([#1383](https://github.com/esaueng/brepkit/issues/1383)) ([7866b9e](https://github.com/esaueng/brepkit/commit/7866b9e7a02a29e5fca659b6ccef5e0dc09e77d6))
-* **operations:** segmented revolve side wires must reverse with the face ([#1369](https://github.com/esaueng/brepkit/issues/1369)) ([fe645a4](https://github.com/esaueng/brepkit/commit/fe645a44bd278e9bc3934cb892b6ee66c7842cd0))
-* **operations:** shell dropped the holes it hollowed and left the result open ([#48](https://github.com/esaueng/brepkit/issues/48)) ([04e3692](https://github.com/esaueng/brepkit/commit/04e369285810bab4b752e4081c049e4f0b86f78a))
-* **operations:** split must cut the topology, not the vertex positions ([#45](https://github.com/esaueng/brepkit/issues/45)) ([be781ee](https://github.com/esaueng/brepkit/commit/be781ee466cd319b9258990844a6ed3ec9864055))
-* **operations:** sweep and shared-cap wires reverse with their faces; strict orientation validation by default ([#1373](https://github.com/esaueng/brepkit/issues/1373)) ([e5f1109](https://github.com/esaueng/brepkit/commit/e5f1109edcf5879894d026160613fd693611c5d0))
-* **operations:** validate multi-component shells per component ([#103](https://github.com/esaueng/brepkit/issues/103)) ([c6d855e](https://github.com/esaueng/brepkit/commit/c6d855e41c81b2218f22c883006999e83b57b710))
-* **operations:** veto materially-overlapping genus-0 outer-shell components in validate ([#104](https://github.com/esaueng/brepkit/issues/104)) ([7619ae2](https://github.com/esaueng/brepkit/commit/7619ae2b603033cadb7ec04e71e204fa3d62136a))
-* place a truncated cone's apex from its declared radius ([#101](https://github.com/esaueng/brepkit/issues/101)) ([60bd81b](https://github.com/esaueng/brepkit/commit/60bd81b23dbbd2eae00a7f0360ec4669e853d039))
-* preserve exact cylindrical bore resize ([3f5f552](https://github.com/esaueng/brepkit/commit/3f5f5528f2e19bda2e21e003536706ff572b6f6c))
-* preserve exact cylindrical bore resize ([5ce060f](https://github.com/esaueng/brepkit/commit/5ce060f393ddd93847d3a996dc21337b16afd8f5))
-* preserve fork curve kinds in sync ([e33f083](https://github.com/esaueng/brepkit/commit/e33f08304161c13760cbc8067ed18c8a21af8a98))
-* preserve fork geometry invariants in sync ([d01d024](https://github.com/esaueng/brepkit/commit/d01d024107abaf857249c79952f37bb826d8d97c))
-* preserve solid retirement lifecycle ([c5c0e68](https://github.com/esaueng/brepkit/commit/c5c0e68fef23d9aba9343af4d52502f474f680a2))
-* read STEP placement attributes by position ([ebbc774](https://github.com/esaueng/brepkit/commit/ebbc7745f3a834522e8bd5f617a8de51b577d36d))
-* read STEP placement attributes by position ([37a1d96](https://github.com/esaueng/brepkit/commit/37a1d964adce85b7c87b8c029d06dee9dd9ab94a))
-* **shell:** emit the chamfer strip a swallowed corner fillet collapses to ([#1324](https://github.com/esaueng/brepkit/issues/1324)) ([b7f4cd3](https://github.com/esaueng/brepkit/commit/b7f4cd3dfad683fe5f3756addc60da8fc108b80e))
-* **sphere:** a disjoint cut is an identity; offsetting a sphere emits geometry ([#65](https://github.com/esaueng/brepkit/issues/65)) ([46fbcc7](https://github.com/esaueng/brepkit/commit/46fbcc750c815856f96b89fc404bdb25632faee6))
-* **step:** honour the declared AXIS2_PLACEMENT_3D ref_direction on conics ([8eced00](https://github.com/esaueng/brepkit/commit/8eced005e8fd2911f11e69847f3254383b390934))
-* **step:** honour the declared AXIS2_PLACEMENT_3D ref_direction on conics ([7cab66f](https://github.com/esaueng/brepkit/commit/7cab66fa76362f5d53e29f75a98e3adfd2c49fed))
-* **tessellate:** close sphere equatorial seam ([4979931](https://github.com/esaueng/brepkit/commit/49799317768b4cdf4f8b73d4ba7cf1d1f7a84ecd))
-* **tessellate:** close sphere equatorial seam ([b8c839e](https://github.com/esaueng/brepkit/commit/b8c839e5418d8c2f587f5e12aae22f667dce9c96))
-* **tessellate:** preserve cylinder inner wires ([3ba4f3b](https://github.com/esaueng/brepkit/commit/3ba4f3b5b3cd2a92723f0f1e6484d952b9d5e085))
-* two operations that returned wrong-but-plausible solids ([#39](https://github.com/esaueng/brepkit/issues/39)) ([e5db439](https://github.com/esaueng/brepkit/commit/e5db4397d7d4610fe0a5202288d461bab4267d2c))
-* **wasm:** route batch chamfer through the same engine chain as the binding ([0f6dbc6](https://github.com/esaueng/brepkit/commit/0f6dbc6c596f6a67f658a0df73bd48783172c55e))
+* **operations:** centralize the sphere-patch plane thresholds on kernel tolerance ([#1410](https://github.com/andymai/brepkit/issues/1410)) ([43e597f](https://github.com/andymai/brepkit/commit/43e597f74d98c894bb1bd23f1cf2ed972484c5dd))
 
-
-### Performance
-
-* **fillet:** clear the degeneracy guard on a cheap boundary area first ([f4c3202](https://github.com/esaueng/brepkit/commit/f4c32027b9aabdc8cc36ecb31ff86af67985de00))
-* **fillet:** stop tessellating every face to check for degeneracy ([#1248](https://github.com/esaueng/brepkit/issues/1248)) ([73a4c2c](https://github.com/esaueng/brepkit/commit/73a4c2cefa253bae9133c07b872412c9be9f33bf))
-* **operations:** exact sag bound for display sphere tessellation ([#1389](https://github.com/esaueng/brepkit/issues/1389)) ([7fa1f35](https://github.com/esaueng/brepkit/commit/7fa1f356c1d4fdc8745ba7b1566825f7afca946b))
-* **operations:** short-circuit disjoint Cut to a target copy ([#1252](https://github.com/esaueng/brepkit/issues/1252)) ([6047363](https://github.com/esaueng/brepkit/commit/6047363be90de59bed97512ad8b2a3c4626be16d))
-* **operations:** short-circuit disjoint Cut to a target copy ([#1252](https://github.com/esaueng/brepkit/issues/1252)) ([47ef2cb](https://github.com/esaueng/brepkit/commit/47ef2cbf6afb04f8274d7d4b6b3b6f1d77061625))
-
-## [2.129.0](https://github.com/esaueng/brepkit/compare/v2.128.5...v2.129.0) (2026-07-26)
-
-
-### Features
-
-* **algo:** faithful shape-evolution via GFA face provenance ([#962](https://github.com/esaueng/brepkit/issues/962)) ([267fedf](https://github.com/esaueng/brepkit/commit/267fedf486f0e2ac2df808e885b93f51223d7167)), closes [#863](https://github.com/esaueng/brepkit/issues/863)
-* **fillet:** round NURBS-blend-adjacent edges via the fillet binding ([#839](https://github.com/esaueng/brepkit/issues/839)) ([d4a46ea](https://github.com/esaueng/brepkit/commit/d4a46ea53a7b9a11e750d4a04fcc3f4ac4765a4b))
-* **fillet:** watertight fillet of edges adjacent to a NURBS blend face ([#837](https://github.com/esaueng/brepkit/issues/837)) ([2cde8f5](https://github.com/esaueng/brepkit/commit/2cde8f55d58c3318d9e527032bb0a1ef3727f73f))
-* **heal:** implement duplicate-face removal in the fix pipeline ([#849](https://github.com/esaueng/brepkit/issues/849)) ([fa06bb4](https://github.com/esaueng/brepkit/commit/fa06bb4dbc0b76ebb6ca42bc60628c562ccae610))
-* **loft:** preserve curved corners for two-profile lofts ([#797](https://github.com/esaueng/brepkit/issues/797)) ([29ea1b3](https://github.com/esaueng/brepkit/commit/29ea1b307963e5df98942733129b3cec2d8388ae))
-* **math:** add robust 2D polygon boolean (union/intersection/difference) ([#889](https://github.com/esaueng/brepkit/issues/889)) ([8e4f0d4](https://github.com/esaueng/brepkit/commit/8e4f0d475664c8e4d3ceb5f204d9189242bc1487))
-* **math:** solve parallel-axis cone × cylinder in closed form ([#1125](https://github.com/esaueng/brepkit/issues/1125)) ([8dd92c4](https://github.com/esaueng/brepkit/commit/8dd92c47453437f700bebd8bad7e852550719d9f))
-* N-way GFA fuse — 3.9x faster kumiko compound_cut ([#1202](https://github.com/esaueng/brepkit/issues/1202)) ([679f9de](https://github.com/esaueng/brepkit/commit/679f9de5bb58bf42cdafa872eb90e6065829471a))
-* **operations:** convex Minkowski sum of two solids ([#815](https://github.com/esaueng/brepkit/issues/815)) ([#828](https://github.com/esaueng/brepkit/issues/828)) ([488c3d9](https://github.com/esaueng/brepkit/commit/488c3d94b16bd3df2df7d2943920ddb1152ada50))
-* **operations:** edge projection with hidden-line removal ([#815](https://github.com/esaueng/brepkit/issues/815)) ([#830](https://github.com/esaueng/brepkit/issues/830)) ([7d6cfd5](https://github.com/esaueng/brepkit/commit/7d6cfd5b7f8fcc36757a40b261f99a7c517dc1f9))
-* **operations:** merge analytic revolve segments — apex cone, annulus caps, partial-turn torus ([#1062](https://github.com/esaueng/brepkit/issues/1062)) ([8b783b7](https://github.com/esaueng/brepkit/commit/8b783b78e5721a63a894e82c6ea0413b69b674ae))
-* **operations:** native push/pull and cylindrical-face resize ([#18](https://github.com/esaueng/brepkit/issues/18)) ([b660886](https://github.com/esaueng/brepkit/commit/b6608862c4c128ceedad2a98ab6120aabaa4a7fd))
-* **operations:** non-planar profiles in smooth, options, and multi-section sweeps ([#988](https://github.com/esaueng/brepkit/issues/988)) ([2f4cec5](https://github.com/esaueng/brepkit/commit/2f4cec5d9afce16e9d701c03d4963c82fe829e4d))
-* **operations:** recover analytic surfaces of revolution + exact volume ([#1012](https://github.com/esaueng/brepkit/issues/1012)) ([45c1375](https://github.com/esaueng/brepkit/commit/45c1375881609a08edd6cdf906066954b3c58797))
-* **operations:** support non-planar profiles in loft ([#974](https://github.com/esaueng/brepkit/issues/974)) ([2f1b11d](https://github.com/esaueng/brepkit/commit/2f1b11de32a0e17f100ab4a9ad62097508007523))
-* **operations:** support non-planar profiles in revolve ([#979](https://github.com/esaueng/brepkit/issues/979)) ([4c708ad](https://github.com/esaueng/brepkit/commit/4c708ad6671432f8ba8f2ed2777d0dbad24a7b3d))
-* **operations:** support non-planar profiles in sweep and pipe ([#976](https://github.com/esaueng/brepkit/issues/976)) ([67cdd5e](https://github.com/esaueng/brepkit/commit/67cdd5e9c4acb18289a09043c4281cc18118c7dc))
-* **render:** brepkit-render M1 — offscreen wgpu renderer ([#1013](https://github.com/esaueng/brepkit/issues/1013)) ([f7d3000](https://github.com/esaueng/brepkit/commit/f7d30008e660d233acbd0727eeaa9f12c3f96c99))
-* **render:** compute-shader quadric mesher for cylinders (M2) ([#1017](https://github.com/esaueng/brepkit/issues/1017)) ([cf1dc6e](https://github.com/esaueng/brepkit/commit/cf1dc6e0c6c845f8e43f1f5a28e44bb936f3f5a1))
-* **render:** interactive viewer — orbit, pan, zoom, click-to-pick (M1.5) ([#1016](https://github.com/esaueng/brepkit/issues/1016)) ([362d8a7](https://github.com/esaueng/brepkit/commit/362d8a71c2edffb8d39d10404b4fdbcf01e169c6))
-* **sweep:** native multi-section sweep with RMF frame transport ([#814](https://github.com/esaueng/brepkit/issues/814)) ([#825](https://github.com/esaueng/brepkit/issues/825)) ([ec76f16](https://github.com/esaueng/brepkit/commit/ec76f16a1594ce1b387ce3048490abb0f72b72db))
-* **topology:** add make_ellipse_arc trimmed-ellipse-arc constructor + wasm export ([#865](https://github.com/esaueng/brepkit/issues/865)) ([e1a7e71](https://github.com/esaueng/brepkit/commit/e1a7e7134d0e282da553e71b22613c5fa2f453d9))
-* **wasm:** add binary tessellateSolidGrouped (packed buffers, no JSON) ([#817](https://github.com/esaueng/brepkit/issues/817)) ([574aa9a](https://github.com/esaueng/brepkit/commit/574aa9a6fd587bf5d731d9c884a820d101abed4a))
-* **wasm:** add filletWithEvolution face-provenance tracking ([#815](https://github.com/esaueng/brepkit/issues/815)) ([#822](https://github.com/esaueng/brepkit/issues/822)) ([d4cac8c](https://github.com/esaueng/brepkit/commit/d4cac8c75e81baf6b368ab664e5be2757c0c7842))
-* **wasm:** add fuseAll binding (batched balanced fuse + disjoint-merge) ([#934](https://github.com/esaueng/brepkit/issues/934)) ([33c2cfc](https://github.com/esaueng/brepkit/commit/33c2cfc0982a4f00f169c238df70b7e06ca9ff7f))
-* **wasm:** add getSolidShells to enumerate a solid's shells ([#805](https://github.com/esaueng/brepkit/issues/805)) ([880771e](https://github.com/esaueng/brepkit/commit/880771e9bdeaa6ed16aae138037e8a2f06950901)), closes [#802](https://github.com/esaueng/brepkit/issues/802)
-* **wasm:** capture panic text for post-poison diagnosis ([#1059](https://github.com/esaueng/brepkit/issues/1059)) ([4fe072f](https://github.com/esaueng/brepkit/commit/4fe072fc086c3ebc2094b24c13e715884b2baf89))
-* **wasm:** configurable healing — per-fix config and custom pipelines ([#5](https://github.com/esaueng/brepkit/issues/5)) ([2659e0a](https://github.com/esaueng/brepkit/commit/2659e0ac677355b0bac4e7000b029f4af9fd6714))
-* **wasm:** default fillet engine order flips to v2-first ([#10](https://github.com/esaueng/brepkit/issues/10)) ([ca3a7d9](https://github.com/esaueng/brepkit/commit/ca3a7d9060e6053b108756de3552ca1af357e015))
-* **wasm:** expose mass properties, mesh quality, boolean options, and bounded imports ([#3](https://github.com/esaueng/brepkit/issues/3)) ([b1bc4ef](https://github.com/esaueng/brepkit/commit/b1bc4ef84eead6069938cf6b9d117b3358d3de1e))
-* **wasm:** typed GCS sketch bindings with the full 19-constraint surface ([#4](https://github.com/esaueng/brepkit/issues/4)) ([b98aae0](https://github.com/esaueng/brepkit/commit/b98aae02819eb88b5792aa9f36252f7801d5fe43))
+## [2.129.14](https://github.com/andymai/brepkit/compare/v2.129.13...v2.129.14) (2026-08-07)
 
 
 ### Bug Fixes
 
-* **algo,operations:** coincident-contact Intersect classifier + flatten normal fixes ([#941](https://github.com/esaueng/brepkit/issues/941)) ([7a202d6](https://github.com/esaueng/brepkit/commit/7a202d6fe7c2e7c543a873bd7775ee5416aa3cbd))
-* **algo:** accept reversed NURBS sub-spans and run lens interior search as a last resort ([#1099](https://github.com/esaueng/brepkit/issues/1099)) ([95b899a](https://github.com/esaueng/brepkit/commit/95b899ad2077e58e916a25cb627cb2b252887238))
-* **algo:** analytic gridfinity bin — multi-section loft, coaxial cone cut, shelled-lip fuse ([#871](https://github.com/esaueng/brepkit/issues/871)) ([1544e4c](https://github.com/esaueng/brepkit/commit/1544e4c6550c0af042a5fd29d16812bbc6eac82a))
-* **algo:** anchor closed-rim splits at the edge's own start angle ([#1123](https://github.com/esaueng/brepkit/issues/1123)) ([6dc0388](https://github.com/esaueng/brepkit/commit/6dc03885deb64240bb0ae2ead1c2146aa8c5228b))
-* **algo:** arc-aware planar arrangement for rounded U-notch wall cuts ([#903](https://github.com/esaueng/brepkit/issues/903)) ([94aa1b7](https://github.com/esaueng/brepkit/commit/94aa1b7dddcc4e02fd9feed65df2a67d210182ea))
-* **algo:** arc-true hole polygons for the region classifier seed search ([#1037](https://github.com/esaueng/brepkit/issues/1037)) ([43bda38](https://github.com/esaueng/brepkit/commit/43bda38c8876379ee2596cbba7457fa29f35f876))
-* **algo:** arc-true hole-promotion containment on plane faces ([#1156](https://github.com/esaueng/brepkit/issues/1156)) ([936c007](https://github.com/esaueng/brepkit/commit/936c0073ab8556f621dbd439c67a5f46a7e3b358))
-* **algo:** assemble perpendicular cyl∪cyl Fuse analytically ([#1008](https://github.com/esaueng/brepkit/issues/1008)) ([0dadfc9](https://github.com/esaueng/brepkit/commit/0dadfc9d982bf59243eb2495c94d8737a76fba13))
-* **algo:** assemble the label-tab attach fuse analytically ([#1194](https://github.com/esaueng/brepkit/issues/1194)) ([c775c0e](https://github.com/esaueng/brepkit/commit/c775c0e6bddf6a8d03127c6de0278dc0a117f4db))
-* **algo:** base EF containment margin on curved boundary edges only ([#919](https://github.com/esaueng/brepkit/issues/919)) ([8ae47cc](https://github.com/esaueng/brepkit/commit/8ae47cc007914e60fb8c47abfe62622788364ca8))
-* **algo:** bound sphere/torus faces by surface extent in boolean broad-phase ([#1003](https://github.com/esaueng/brepkit/issues/1003)) ([e034ed0](https://github.com/esaueng/brepkit/commit/e034ed0013a8c01c779647b9a7f9b690e243a7ca))
-* **algo:** classify thin coincident-band ring by absolute-nudge probe ([#1209](https://github.com/esaueng/brepkit/issues/1209)) ([0e09413](https://github.com/esaueng/brepkit/commit/0e09413d5e3f4c8e7c037fbee66bff32cb88ba90))
-* **algo:** clip curved-face sections to the outer region (deepened-notch stranded rim) ([#1102](https://github.com/esaueng/brepkit/issues/1102)) ([f0f8e0e](https://github.com/esaueng/brepkit/commit/f0f8e0e1911924effce9b9f73e060fccfdfc48b6))
-* **algo:** clip straight FF sections to the mutual AABB exactly ([#1224](https://github.com/esaueng/brepkit/issues/1224)) ([84e445b](https://github.com/esaueng/brepkit/commit/84e445b236c5f1e7868d89666b5de85546eb16e2))
-* **algo:** close dovetail corner-clip intersect chord/arc lens ([#1054](https://github.com/esaueng/brepkit/issues/1054)) ([bb9b1c9](https://github.com/esaueng/brepkit/commit/bb9b1c9248ea701c6d60895dac914810b294702c))
-* **algo:** close the dovetail tongue-relief cut family ([#1063](https://github.com/esaueng/brepkit/issues/1063)) ([a633c5f](https://github.com/esaueng/brepkit/commit/a633c5fc947315c7a4fe69b03672b22beff84412))
-* **algo:** close torus−box boolean analytically (plane×torus seam + toroidal band) ([#1010](https://github.com/esaueng/brepkit/issues/1010)) ([ead6f71](https://github.com/esaueng/brepkit/commit/ead6f717904265047b3af89b9871d8b5d9828444))
-* **algo:** coaxial cylinder/cone same-domain overlap (3×3 lip fuse + mismatched segmentation) ([#913](https://github.com/esaueng/brepkit/issues/913)) ([e1a0e56](https://github.com/esaueng/brepkit/commit/e1a0e56d7ddba07dc1262d17a8774001847c0070))
-* **algo:** coincident-coplanar classification for clipped-away corner wedges ([#948](https://github.com/esaueng/brepkit/issues/948)) ([1b16e32](https://github.com/esaueng/brepkit/commit/1b16e32a6ac63aabe6ea1644a38f46f30c78da92))
-* **algo:** correct interior-point displacement for multi-hole frame faces ([#891](https://github.com/esaueng/brepkit/issues/891)) ([22d64e0](https://github.com/esaueng/brepkit/commit/22d64e015986d8b48a49a626f24a279d0623f20e))
-* **algo:** correct sequential multi-tool cuts on thin-walled solids ([#779](https://github.com/esaueng/brepkit/issues/779)) ([45e8fb4](https://github.com/esaueng/brepkit/commit/45e8fb4c71e5f66d8867e83d63832792cc885a8e))
-* **algo:** cylinder-band arrangement rescue for partial-overlap pocket cuts ([#1112](https://github.com/esaueng/brepkit/issues/1112)) ([28569d6](https://github.com/esaueng/brepkit/commit/28569d668edb5587a038040b12acf4ae9a99a84d))
-* **algo:** decide planar hole nesting from the whole loop boundary ([#1039](https://github.com/esaueng/brepkit/issues/1039)) ([c709987](https://github.com/esaueng/brepkit/commit/c709987ab100e8c50d62ba5cf81b99e16f84f841))
-* **algo:** detect partial-overlap coincident faces in same-domain pass ([#895](https://github.com/esaueng/brepkit/issues/895)) ([e65de65](https://github.com/esaueng/brepkit/commit/e65de6527f9b29020039b603fb0c2149137d5596))
-* **algo:** deterministic interior-point classification + collinear-disjoint section dedup ([#901](https://github.com/esaueng/brepkit/issues/901)) ([1607637](https://github.com/esaueng/brepkit/commit/160763784037408a388b353bf91e9f204ee696da))
-* **algo:** deterministic iteration in GFA pipeline ([#774](https://github.com/esaueng/brepkit/issues/774)) ([4b84679](https://github.com/esaueng/brepkit/commit/4b84679aa1b80054b7c294b4429d7234de10a477))
-* **algo:** dovetail tangency caps, compound relief cuts, and the fit-offset groove-mouth sliver family ([#1078](https://github.com/esaueng/brepkit/issues/1078)) ([59cad4d](https://github.com/esaueng/brepkit/commit/59cad4d661df0439b1c99045fed17e16b29788e4))
-* **algo:** drop boundary-collinear line sections on plane faces ([#1174](https://github.com/esaueng/brepkit/issues/1174)) ([f39e843](https://github.com/esaueng/brepkit/commit/f39e8430f28b2659e4224619789277c85703e1d5))
-* **algo:** drop boundary-re-tracing sections and weave straight NURBS hole rims ([#1035](https://github.com/esaueng/brepkit/issues/1035)) ([0132c1e](https://github.com/esaueng/brepkit/commit/0132c1e8d6b25125077645559cca9e55876fdd77))
-* **algo:** drop cap circles emerging inside holes; gate salvage early ([#1121](https://github.com/esaueng/brepkit/issues/1121)) ([2599a0d](https://github.com/esaueng/brepkit/commit/2599a0d4e68fa86d2792f208d14a32659d16a171))
-* **algo:** drop doubled faces in solid assembly (baseplate dovetail groove cut) ([#938](https://github.com/esaueng/brepkit/issues/938)) ([5f1e89b](https://github.com/esaueng/brepkit/commit/5f1e89b6a370211d1a137601c4fb0d304426219a))
-* **algo:** drop hole-nested section edges; fix(operations): genus-aware boolean acceptance ([#768](https://github.com/esaueng/brepkit/issues/768)) ([3abebe1](https://github.com/esaueng/brepkit/commit/3abebe16f12644d768ffb50a68d5530c5caa7cc1))
-* **algo:** drop redundant hole-retrace + degenerate arc sections (non-square lip fuse) ([#911](https://github.com/esaueng/brepkit/issues/911)) ([0a2f25a](https://github.com/esaueng/brepkit/commit/0a2f25a60d60be90e0ab03269157258b50b8f0db))
-* **algo:** drop zero-span degenerate curve sections + arena-serialization tooling (3×3 lip fuse) ([#915](https://github.com/esaueng/brepkit/issues/915)) ([db470de](https://github.com/esaueng/brepkit/commit/db470de8280191557b10c7b563d9eb438cc3fd67))
-* **algo:** emit every in-face window of a closed section curve ([#1144](https://github.com/esaueng/brepkit/issues/1144)) ([b2f062e](https://github.com/esaueng/brepkit/commit/b2f062efb4b2c04df10cb6ca308743d89c3838ad))
-* **algo:** excise out-and-back spurs and slit faces before assembly ([#1187](https://github.com/esaueng/brepkit/issues/1187)) ([83ca006](https://github.com/esaueng/brepkit/commit/83ca006154e0d0b9f7ae1bf108dc6a30aae0f33e))
-* **algo:** filter section curves to mutual face footprints; fix(operations): loft cap winding ([#766](https://github.com/esaueng/brepkit/issues/766)) ([90d48be](https://github.com/esaueng/brepkit/commit/90d48bef877cef2397ba6a8077c13a4121d21aca))
-* **algo:** four section-machinery gaps behind the snap-slot hole-cut fallback ([#1085](https://github.com/esaueng/brepkit/issues/1085)) ([de23c25](https://github.com/esaueng/brepkit/commit/de23c2528d71191d3c714f772ccfb52af836c88e))
-* **algo:** gate EF-IN pave blocks on surface deviation vs chord ([#1168](https://github.com/esaueng/brepkit/issues/1168)) ([0535912](https://github.com/esaueng/brepkit/commit/0535912c844f3d11e2e6a6885eb0238d5c60f8d6))
-* **algo:** keep chord crossings at a closed rim's seam angle ([#1176](https://github.com/esaueng/brepkit/issues/1176)) ([b7abf6b](https://github.com/esaueng/brepkit/commit/b7abf6bbd72298e3e6ce434b66a798fa53b57033))
-* **algo:** keep coincident same-domain cap faces in fuse/intersect ([#790](https://github.com/esaueng/brepkit/issues/790)) ([89f218c](https://github.com/esaueng/brepkit/commit/89f218c65a4b5a9fccbef3a0ef23c4adccb66706))
-* **algo:** keep convex boundary arcs whole in plane arrangement (2×2 compartments+scoop fuse) ([#917](https://github.com/esaueng/brepkit/issues/917)) ([47259d9](https://github.com/esaueng/brepkit/commit/47259d90539afd5b6d0431dd4df8a2309b283d3f))
-* **algo:** keep cylinder slot-cut analytic (closed-circle section AABB) ([#997](https://github.com/esaueng/brepkit/issues/997)) ([c53af2f](https://github.com/esaueng/brepkit/commit/c53af2f637bf7d93c1c3039157294547c93cf41a))
-* **algo:** keep exact section endpoints on flush-face FF clip (stacking-lip fuse) ([#909](https://github.com/esaueng/brepkit/issues/909)) ([766af79](https://github.com/esaueng/brepkit/commit/766af79d9142ad2e21c6f16072b409d9e1f7618f))
-* **algo:** keep minuend wall for opposite-oriented coincident Cut pair ([#923](https://github.com/esaueng/brepkit/issues/923)) ([57fd0b5](https://github.com/esaueng/brepkit/commit/57fd0b5cc168966abeb35ed58501a8c6e9974b09))
-* **algo:** keep the completed socket-junction disc when its traced loop samples degenerate ([#1082](https://github.com/esaueng/brepkit/issues/1082)) ([c5fc0cd](https://github.com/esaueng/brepkit/commit/c5fc0cd2d897fa790f66c9298babe2a9cf437392))
-* **algo:** make plane-plane FF section clipping robust to collinear boundary edges ([#1069](https://github.com/esaueng/brepkit/issues/1069)) ([c9626ea](https://github.com/esaueng/brepkit/commit/c9626ea7ac66bcea8de12c06cb5b8c52eaa640c4))
-* **algo:** merge overlapping deepened wall openings in the internal-loops splitter ([#1104](https://github.com/esaueng/brepkit/issues/1104)) ([ac46c58](https://github.com/esaueng/brepkit/commit/ac46c583649d85f303d98e7dcfef67780cf1255d))
-* **algo:** never attach a hole to its own reversed-twin outline ([#1185](https://github.com/esaueng/brepkit/issues/1185)) ([9bf9d1f](https://github.com/esaueng/brepkit/commit/9bf9d1f30f3e4a71cc03c9331d9b5a79448ed8b2))
-* **algo:** never silently drop a non-trivial open growth shell ([#1146](https://github.com/esaueng/brepkit/issues/1146)) ([8326473](https://github.com/esaueng/brepkit/commit/83264739a97dbb5d98563aae9029374c278db732))
-* **algo:** normalize inner-wire winding at the face splitter entrance ([#1041](https://github.com/esaueng/brepkit/issues/1041)) ([0a77a63](https://github.com/esaueng/brepkit/commit/0a77a6346016a2b194d662c47b49b9354693cc06))
-* **algo:** order-independent coincident-face selection in fuse ([#907](https://github.com/esaueng/brepkit/issues/907)) ([c638c26](https://github.com/esaueng/brepkit/commit/c638c262b857d783fd22f7ba89de47fab8724d9e))
-* **algo:** orient partial-overlap cap wire by Newell normal ([#946](https://github.com/esaueng/brepkit/issues/946)) ([fffa034](https://github.com/esaueng/brepkit/commit/fffa03410de9f4931d239ebc379299924799c9ee))
-* **algo:** orient solids by surface normal so extrude-down operands fuse (baseplate dovetail hang) ([#875](https://github.com/esaueng/brepkit/issues/875)) ([8f1981d](https://github.com/esaueng/brepkit/commit/8f1981db9ab0082fa54c2d6f905041cde1fb92f0))
-* **algo:** orientation-safe interior points for plane sub-faces ([#1049](https://github.com/esaueng/brepkit/issues/1049)) ([90d0c6a](https://github.com/esaueng/brepkit/commit/90d0c6a8beac14e8b5a2e3c6c15e2b938bfa2c01))
-* **algo:** post-merge review follow-ups for rounded-rect booleans ([#783](https://github.com/esaueng/brepkit/issues/783)) ([e433a81](https://github.com/esaueng/brepkit/commit/e433a8150c58f3a923d77cc4021391f740628494))
-* **algo:** prefer deeper interior samples on plane faces ([#1189](https://github.com/esaueng/brepkit/issues/1189)) ([03c0a9a](https://github.com/esaueng/brepkit/commit/03c0a9aa9559b7714d82eade829cf39f825264c7))
-* **algo:** preserve untouched holes in the holed-cap arrangement split ([#950](https://github.com/esaueng/brepkit/issues/950)) ([b0b3144](https://github.com/esaueng/brepkit/commit/b0b314433b016d9d6fe436b485d29c1a926aec07))
-* **algo:** re-vote ray-cast classification when all cardinal rays graze degenerate structure ([#1088](https://github.com/esaueng/brepkit/issues/1088)) ([c89739e](https://github.com/esaueng/brepkit/commit/c89739e14630962951fd9e0b41f60398a1bd13f3))
-* **algo:** refine closed circle rims at mate-partition vertices in assembly ([#1166](https://github.com/esaueng/brepkit/issues/1166)) ([d222c85](https://github.com/esaueng/brepkit/commit/d222c85cf90632c20122910cdb3daf5e08f85980))
-* **algo:** require mutual containment for boundary-tolerant same-domain merge ([#772](https://github.com/esaueng/brepkit/issues/772)) ([31de678](https://github.com/esaueng/brepkit/commit/31de6785562201675cfaa52947939734b5270e8c))
-* **algo:** require real containment in dedup_collinear_sections (honeycomb cap watertight) ([#928](https://github.com/esaueng/brepkit/issues/928)) ([f772f86](https://github.com/esaueng/brepkit/commit/f772f86e4093ef5129a926c99625f3ec53074d3e))
-* **algo:** rescue corner-window cone-cylinder sections and accept multi-piece fuses ([#1136](https://github.com/esaueng/brepkit/issues/1136)) ([8d626c7](https://github.com/esaueng/brepkit/commit/8d626c74e46c118800ac826e7ce8cc4ed04a93bd))
-* **algo:** resolve d4 shelled-box + lip fuse (holed-face & section-arrangement splitting) ([#792](https://github.com/esaueng/brepkit/issues/792)) ([3535f0b](https://github.com/esaueng/brepkit/commit/3535f0bfdbfc9b899776b6ae90e553f4b73646ca))
-* **algo:** resolve disconnected section loops in the planar arrangement splitter ([#1043](https://github.com/esaueng/brepkit/issues/1043)) ([7522187](https://github.com/esaueng/brepkit/commit/75221875982746a3c2a7ccdf0181a08136d3682d))
-* **algo:** salvage closed-circle cap sections in the planar face splitter ([#1119](https://github.com/esaueng/brepkit/issues/1119)) ([79a82f0](https://github.com/esaueng/brepkit/commit/79a82f05041fa0d5f306cf9875badebd5e6ee791))
-* **algo:** sample a closed rim circle's full period in the line-clip polygon ([#1142](https://github.com/esaueng/brepkit/issues/1142)) ([f50ac30](https://github.com/esaueng/brepkit/commit/f50ac308888fad9c6ab9974a74bd9f90ff5013bd))
-* **algo:** sample concave face interiors via point-in-polygon (thin-shell fuse) ([#799](https://github.com/esaueng/brepkit/issues/799)) ([6bd1ff6](https://github.com/esaueng/brepkit/commit/6bd1ff6e1decc6b8125617a733440b17adef05ff))
-* **algo:** scale the EF endpoint-contact window by crossing angle ([#1033](https://github.com/esaueng/brepkit/issues/1033)) ([b6e21e5](https://github.com/esaueng/brepkit/commit/b6e21e5d37d7a2769cea35011d85ca0db7256e02))
-* **algo:** SD midpoint discriminator + sector rescue for under-split periodic strips ([#1178](https://github.com/esaueng/brepkit/issues/1178)) ([2c18ac7](https://github.com/esaueng/brepkit/commit/2c18ac79e7c93f8e11bcaa0a31c61b29b375575d))
-* **algo:** seam-edge flush pocket cut drops the entire slab top ([#1076](https://github.com/esaueng/brepkit/issues/1076)) ([4505072](https://github.com/esaueng/brepkit/commit/45050725d08925e23e0a35120296d4c548e4bedf))
-* **algo:** skip point-tangency sections instead of aborting the boolean ([#1172](https://github.com/esaueng/brepkit/issues/1172)) ([1105412](https://github.com/esaueng/brepkit/commit/11054124f54e3692ca1fd07e090e7fb52e405d41))
-* **algo:** split circle-boundary disc faces cut by chords ([#1109](https://github.com/esaueng/brepkit/issues/1109)) ([8574739](https://github.com/esaueng/brepkit/commit/85747395e443c089bb74882bba1d60fb529544b6))
-* **algo:** split co-endpoint lens arc in disc-chord split (funnel watertight) ([#1114](https://github.com/esaueng/brepkit/issues/1114)) ([f8c46fa](https://github.com/esaueng/brepkit/commit/f8c46fa47829ad9b8b67035f106be51f0834226d))
-* **algo:** split ellipse sections with the shorter-arc convention on both twins ([#1150](https://github.com/esaueng/brepkit/issues/1150)) ([a5e35d3](https://github.com/esaueng/brepkit/commit/a5e35d36b8252a9cc737963b6eccb19e8e96b62b))
-* **algo:** split grand-tour cylinder loops at pinch vertices ([#1140](https://github.com/esaueng/brepkit/issues/1140)) ([3221f79](https://github.com/esaueng/brepkit/commit/3221f7978347c2d375829dd619b49a521fbc4472))
-* **algo:** split holed planar cap whose cut bridges material between holes ([#921](https://github.com/esaueng/brepkit/issues/921)) ([09455d0](https://github.com/esaueng/brepkit/commit/09455d0b3c338e5ea3a9116aa8d6463301acca40))
-* **algo:** split marched-NURBS boundary edges at neighbor partition anchors ([#1094](https://github.com/esaueng/brepkit/issues/1094)) ([a991f79](https://github.com/esaueng/brepkit/commit/a991f79ea71e0f60dfcf2d23b4f202dc50448854))
-* **algo:** split shelled-wall notch side faces via planar arrangement ([#899](https://github.com/esaueng/brepkit/issues/899)) ([59c055e](https://github.com/esaueng/brepkit/commit/59c055e1234297029e951d0950612da9e15ae27e))
-* **algo:** synthesize cap for partial coplanar same-domain overlap (compartmented bin) ([#944](https://github.com/esaueng/brepkit/issues/944)) ([9328e9c](https://github.com/esaueng/brepkit/commit/9328e9cda7f3e4d2a46fb93a8935e2e9cf50e90b))
-* **algo:** toggle orientation of flipped cut tool faces, reject open hole shells ([#1030](https://github.com/esaueng/brepkit/issues/1030)) ([a20df55](https://github.com/esaueng/brepkit/commit/a20df5536da8a7dda1a49c9ecc892e8271480e73))
-* **algo:** total-order float comparison in collinear cut sort ([#776](https://github.com/esaueng/brepkit/issues/776)) ([21fd3cd](https://github.com/esaueng/brepkit/commit/21fd3cd9ee4b90e3b78e655def8866ece46cdedd))
-* **algo:** trace full-period cylinder partitions with the seam-glued DCEL ([#1152](https://github.com/esaueng/brepkit/issues/1152)) ([f253b52](https://github.com/esaueng/brepkit/commit/f253b52ad6cb5db7e3f94de1ee4651acd52c8fd3))
-* **algo:** treat near-collinear wire-builder junctions as continuations ([#879](https://github.com/esaueng/brepkit/issues/879)) ([87d30f4](https://github.com/esaueng/brepkit/commit/87d30f44ee6ed600e44e4fa8113ba2fc5a3ee683))
-* **algo:** trim closed-section windows against the margin-free face window ([#1148](https://github.com/esaueng/brepkit/issues/1148)) ([bd8cfb9](https://github.com/esaueng/brepkit/commit/bd8cfb965c1fe826e84989e8af00072bd49663bf))
-* **algo:** trim coincident closed-circle sections per face ([#767](https://github.com/esaueng/brepkit/issues/767)) ([213330b](https://github.com/esaueng/brepkit/commit/213330bfc789ec2541afcbf5356b417f249bbf49))
-* **algo:** trim coplanar sections to face boundaries + recognise flat NURBS (scoop fuse) ([#905](https://github.com/esaueng/brepkit/issues/905)) ([b46141f](https://github.com/esaueng/brepkit/commit/b46141f59b4b42792160c29f46c6ab46d2636527))
-* **algo:** trim plane-cone circle sections to exact boundary-crossing arcs ([#1106](https://github.com/esaueng/brepkit/issues/1106)) ([5bf9534](https://github.com/esaueng/brepkit/commit/5bf95348773bad782e3182b7d503ff1fd492787e))
-* **algo:** true line-arc crossings and slit-free region emission in the planar arrangement ([#1092](https://github.com/esaueng/brepkit/issues/1092)) ([5902a82](https://github.com/esaueng/brepkit/commit/5902a821c29ac7b72ad277bfa011bf21f4452619))
-* **algo:** valid GFA booleans for rounded-rect prisms at coplanar interfaces ([#778](https://github.com/esaueng/brepkit/issues/778)) ([c31888d](https://github.com/esaueng/brepkit/commit/c31888d1624eb07532e2a89f623045756ea3e2b4))
-* **algo:** weld near-coincident vertices in solid assembly ([#859](https://github.com/esaueng/brepkit/issues/859)) ([877ca43](https://github.com/esaueng/brepkit/commit/877ca433c1867d93e2468fc7914614a5cc0d6060))
-* **algo:** weld section endpoints onto line interiors; widen arrangement on-plane band ([#1090](https://github.com/esaueng/brepkit/issues/1090)) ([5801702](https://github.com/esaueng/brepkit/commit/5801702d9c2569e10c3163788a9049f0ac0b62c2))
-* **blend:** build circular-arc blend surface for any section count ([#835](https://github.com/esaueng/brepkit/issues/835)) ([ef06ec7](https://github.com/esaueng/brepkit/commit/ef06ec7811701b4b2abfafd7941905860d6df566))
-* **blend:** propagate trimmer edge splits into neighbor face wires ([#1060](https://github.com/esaueng/brepkit/issues/1060)) ([f44d487](https://github.com/esaueng/brepkit/commit/f44d487a9bf4615fdc34e62a60961dfca5fceac2))
-* **blend:** stop failed fillets corrupting the model, and close fillet ends ([#14](https://github.com/esaueng/brepkit/issues/14)) ([63294ee](https://github.com/esaueng/brepkit/commit/63294ee6dcfc5281a76dfc8fdb7a4f4f53bdddc4))
-* **boolean:** restrict analytic FF curves + merge coincident junction edges ([#795](https://github.com/esaueng/brepkit/issues/795)) ([b52fa56](https://github.com/esaueng/brepkit/commit/b52fa56140ab2c18f675e64cf2c43b82ade09102))
-* **boolean:** strip out-and-back wire spurs from fused faces ([#801](https://github.com/esaueng/brepkit/issues/801)) ([#811](https://github.com/esaueng/brepkit/issues/811)) ([841661c](https://github.com/esaueng/brepkit/commit/841661cd54f111610421926517caed34c53451c4))
-* **check,operations:** classify trimmed-torus bands correctly ([#1068](https://github.com/esaueng/brepkit/issues/1068)) ([6e21bdf](https://github.com/esaueng/brepkit/commit/6e21bdfab809f4d54288a5678aed398b1e2cfeac))
-* **check:** subtract face holes in point classification ([#13](https://github.com/esaueng/brepkit/issues/13)) ([10556c4](https://github.com/esaueng/brepkit/commit/10556c45a0dca4ad25267c8f0da3b821aa43bf57))
-* cone/torus curved-boolean bugs (volume integration + contained-cut) + parity corpus ([#803](https://github.com/esaueng/brepkit/issues/803)) ([8c903f2](https://github.com/esaueng/brepkit/commit/8c903f20e40ccba2669428edabc01160a3a1e463))
-* **deps:** upgrade quick-xml to 0.41 for RUSTSEC-2026-0194/0195 ([#1024](https://github.com/esaueng/brepkit/issues/1024)) ([262676d](https://github.com/esaueng/brepkit/commit/262676d5e280a8dbf0947bac8fb6d9f0fd6f0aba))
-* **fillet:** round a cylinder rim into an exact quarter-torus ([#967](https://github.com/esaueng/brepkit/issues/967)) ([#972](https://github.com/esaueng/brepkit/issues/972)) ([3d17fb8](https://github.com/esaueng/brepkit/commit/3d17fb838a4230c3aeeab2af15f3d52256d5ffdc))
-* **fillet:** skip edges bordering NURBS blend faces instead of emitting garbage ([#813](https://github.com/esaueng/brepkit/issues/813)) ([#821](https://github.com/esaueng/brepkit/issues/821)) ([bc13671](https://github.com/esaueng/brepkit/commit/bc13671ebf904e8bfb77530529a21f087c524f0d))
-* **fillet:** watertight rolling-ball fillet of two edges sharing a corner ([#842](https://github.com/esaueng/brepkit/issues/842)) ([2548611](https://github.com/esaueng/brepkit/commit/2548611180ada9c730a0f3657cfb703f0ea59d4c)), closes [#841](https://github.com/esaueng/brepkit/issues/841)
-* **geometry:** document the per-segment span invariant on arc conversion ([#1183](https://github.com/esaueng/brepkit/issues/1183)) ([cd8b757](https://github.com/esaueng/brepkit/commit/cd8b7576a2ad466693727abca7d9a6716e16e905))
-* **geometry:** recognize circular NURBS arcs as CIRCLE ([#816](https://github.com/esaueng/brepkit/issues/816)) ([#819](https://github.com/esaueng/brepkit/issues/819)) ([8571527](https://github.com/esaueng/brepkit/commit/8571527d338dc8e7478a048ab8c31dba7eb55eb5))
-* **heal:** revert a unify pass that would orphan edges ([#1131](https://github.com/esaueng/brepkit/issues/1131)) ([dd47ed2](https://github.com/esaueng/brepkit/commit/dd47ed29ffa2b520de99981de0223e35198a3226))
-* **heal:** stop unify_same_domain discarding closed-curve boundary loops ([#1129](https://github.com/esaueng/brepkit/issues/1129)) ([d9a0400](https://github.com/esaueng/brepkit/commit/d9a0400b8101152ce1fa8bc21f60f1691bcb6d0f))
-* **io:** reject invalid imported mesh data ([eb2c94c](https://github.com/esaueng/brepkit/commit/eb2c94cae8f114fd2154236e84c58da7ed9d6cdc))
-* **math,algo:** exact tangential intersections at socket-outline wall tangencies ([#1051](https://github.com/esaueng/brepkit/issues/1051)) ([190419a](https://github.com/esaueng/brepkit/commit/190419ae8d55a10bbc04c4146246549235ca27f7))
-* **math:** bezier-clip hull vertex check defeated straight-line clips ([#8](https://github.com/esaueng/brepkit/issues/8)) ([e8e073a](https://github.com/esaueng/brepkit/commit/e8e073ad410c8aab47011a2be6dc2dcec48fcb43))
-* **math:** bounded oblique plane-cone conic (was unbounded both-nappe sweep) ([#936](https://github.com/esaueng/brepkit/issues/936)) ([f1efd8e](https://github.com/esaueng/brepkit/commit/f1efd8e3d849ae78f989fc168c869e45dd110ee6))
-* **math:** pad bezier-clip AABB early-exit by intersection tolerance ([#7](https://github.com/esaueng/brepkit/issues/7)) ([ddb1d43](https://github.com/esaueng/brepkit/commit/ddb1d437a5c8bd1b3560a69e55af7480ae7dd66d))
-* **measure:** clamp volume tessellation deflection for accurate curved-face volume ([#959](https://github.com/esaueng/brepkit/issues/959)) ([a41d03b](https://github.com/esaueng/brepkit/commit/a41d03b22d90da6966f0c8fe8b72611080b87ea0))
-* **offset:** assemble torus offsets analytically (doubly-periodic seam wire) ([#999](https://github.com/esaueng/brepkit/issues/999)) ([6327ebe](https://github.com/esaueng/brepkit/commit/6327ebe977f9d7a12ef0b503422bca20a085b811))
-* **offset:** restrict torus-wire rebuild to full untrimmed torus faces ([#1001](https://github.com/esaueng/brepkit/issues/1001)) ([2a8d97d](https://github.com/esaueng/brepkit/commit/2a8d97dc1e2fae79c5960b135dc41657c9ec1d67))
-* **operations:** admit Intersect to the multi-region acceptance gate ([#1154](https://github.com/esaueng/brepkit/issues/1154)) ([5345412](https://github.com/esaueng/brepkit/commit/5345412600776fbaf8273c1e3f725688989aac21))
-* **operations:** apply the hole correction in the multi-region boolean gate ([#1127](https://github.com/esaueng/brepkit/issues/1127)) ([3f8d1c2](https://github.com/esaueng/brepkit/commit/3f8d1c2d7fee700181a678010e5de68c9cb067c1))
-* **operations:** assemble and render sphere−cyl Cut analytically ([#1005](https://github.com/esaueng/brepkit/issues/1005)) ([78887da](https://github.com/esaueng/brepkit/commit/78887da7756da191be667986daad745ec4a16372))
-* **operations:** build shell arc edges along wire traversal direction ([#781](https://github.com/esaueng/brepkit/issues/781)) ([f771eb9](https://github.com/esaueng/brepkit/commit/f771eb90c0039d2b56bae17785834f396660b406))
-* **operations:** close arc-runout corners in rolling-ball fillet ([#873](https://github.com/esaueng/brepkit/issues/873)) ([bea3e89](https://github.com/esaueng/brepkit/commit/bea3e89582213036382f6bf75529dc55cf7c1dae))
-* **operations:** close box∩sphere boolean analytically (seam split + collar render/volume) ([#1006](https://github.com/esaueng/brepkit/issues/1006)) ([6b4e781](https://github.com/esaueng/brepkit/commit/6b4e781988f377a3decc5b5c441f95a955bd13d7))
-* **operations:** correct sweep_smooth side-face rails and orientation ([#981](https://github.com/esaueng/brepkit/issues/981)) ([b59cb64](https://github.com/esaueng/brepkit/commit/b59cb640ed2f9c93b956a161eed7c99d6e901a50))
-* **operations:** curve-preserving loft for sketch arcs and downward stacks ([#1045](https://github.com/esaueng/brepkit/issues/1045)) ([c8d644b](https://github.com/esaueng/brepkit/commit/c8d644b3137bf1c821b510f4719008c2c5eb77ec))
-* **operations:** drop absorbed hole wires when unify_faces merges faces ([#11](https://github.com/esaueng/brepkit/issues/11)) ([863fe9c](https://github.com/esaueng/brepkit/commit/863fe9ce2ad621daaa9964b4862152c3684598c9))
-* **operations:** exact analytic volume for revolved circular and line profiles ([#968](https://github.com/esaueng/brepkit/issues/968)) ([#970](https://github.com/esaueng/brepkit/issues/970)) ([830a633](https://github.com/esaueng/brepkit/commit/830a633fc19dc9ead0b6230242018affa6b0f30f))
-* **operations:** exact analytic volume for swept circles and extruded circular holes ([#969](https://github.com/esaueng/brepkit/issues/969)) ([a0f2f10](https://github.com/esaueng/brepkit/commit/a0f2f10074949189b92df6aab8a12d055229a4e2)), closes [#965](https://github.com/esaueng/brepkit/issues/965) [#966](https://github.com/esaueng/brepkit/issues/966)
-* **operations:** extrude elliptical-arc edge over the trimmed arc, not the full ellipse ([#869](https://github.com/esaueng/brepkit/issues/869)) ([#930](https://github.com/esaueng/brepkit/issues/930)) ([70535b9](https://github.com/esaueng/brepkit/commit/70535b9795de4132d383bf85a3c2874f53d83c64))
-* **operations:** fold a multi-component fuse tool in piece by piece ([#1138](https://github.com/esaueng/brepkit/issues/1138)) ([f5ef4df](https://github.com/esaueng/brepkit/commit/f5ef4df7f3490bdfb993e3024c1220409c7282b6))
-* **operations:** guard fuse_cluster against empty input ([#1207](https://github.com/esaueng/brepkit/issues/1207)) ([4625701](https://github.com/esaueng/brepkit/commit/4625701129b132bbeb8f51c8526f12f2e0f2b009))
-* **operations:** hard-fail free boundary edges in the strict boolean gate ([#1192](https://github.com/esaueng/brepkit/issues/1192)) ([69fd392](https://github.com/esaueng/brepkit/commit/69fd392066f6d342ee4b5570ded2ac1ae9f4df0b))
-* **operations:** imprint grazing edge contacts in the mesh boolean co-refinement ([#1162](https://github.com/esaueng/brepkit/issues/1162)) ([8eafbe0](https://github.com/esaueng/brepkit/commit/8eafbe0966ef3ff3526cf15f8cdf4f4f198ea825))
-* **operations:** make mesh-boolean fallback output conforming and manifold ([#1061](https://github.com/esaueng/brepkit/issues/1061)) ([5011607](https://github.com/esaueng/brepkit/commit/5011607dfdb1b142005b532627d944287bbdd67b))
-* **operations:** preserve corner arcs on cylindrical fillet pass-through faces (gridfinity 26/26) ([#878](https://github.com/esaueng/brepkit/issues/878)) ([ec5f66f](https://github.com/esaueng/brepkit/commit/ec5f66fbf83dadf45f1165d28d24c24bd8f94a8d))
-* **operations:** real winding number, consolidate classify onto check ([#17](https://github.com/esaueng/brepkit/issues/17)) ([eec77c4](https://github.com/esaueng/brepkit/commit/eec77c4317f55ae70342bc4badc602923fb2fd72))
-* **operations:** recognize spline-encoded profile edges before extruding walls ([#1080](https://github.com/esaueng/brepkit/issues/1080)) ([d1a1c08](https://github.com/esaueng/brepkit/commit/d1a1c08a8583cbac4a229a31f8c05a0d63cebe44))
-* **operations:** reverse periodic-curve parameterization for reversed extrude edges ([#932](https://github.com/esaueng/brepkit/issues/932)) ([cf4935e](https://github.com/esaueng/brepkit/commit/cf4935ec40dd443e7b035d37786afb52e215ec1f))
-* **operations:** route trivial operand pairs around the evolution GFA path ([#1057](https://github.com/esaueng/brepkit/issues/1057)) ([d2a98fc](https://github.com/esaueng/brepkit/commit/d2a98fcd5f2b4b43b706b35681ca247433303382))
-* **operations:** sweep miter joins collapsed after sub-curve split ([#6](https://github.com/esaueng/brepkit/issues/6)) ([df532ee](https://github.com/esaueng/brepkit/commit/df532ee7739c4c56d19ecb4d4934ff9b5006c707))
-* **operations:** sweep profiles perpendicular to the path regardless of orientation ([#985](https://github.com/esaueng/brepkit/issues/985)) ([7c8c96b](https://github.com/esaueng/brepkit/commit/7c8c96b4f0c5a23c55ca4e9cc18273efd3fd9783))
-* **operations:** tessellate nested inner wires by even-odd nesting depth ([#1212](https://github.com/esaueng/brepkit/issues/1212)) ([8126072](https://github.com/esaueng/brepkit/commit/8126072ccd0ff5add6eeb409a0506ac6397fb375))
-* **operations:** watertight, parity-density tessellation for cylinder/cone bands ([#1029](https://github.com/esaueng/brepkit/issues/1029)) ([e209d0c](https://github.com/esaueng/brepkit/commit/e209d0cf3555b6cc4f0d18b13628156fc9670db9))
-* preserve cavity classification semantics ([d7ac223](https://github.com/esaueng/brepkit/commit/d7ac2232ee6f65b82754a6bb90c5513144b026c3))
-* refine bowed curve sampling ([5b0ca80](https://github.com/esaueng/brepkit/commit/5b0ca801449f7f334105f72322c8674b9a195984))
-* **review:** address skipped review on [#828](https://github.com/esaueng/brepkit/issues/828) + [#830](https://github.com/esaueng/brepkit/issues/830) ([#832](https://github.com/esaueng/brepkit/issues/832)) ([18fc3d6](https://github.com/esaueng/brepkit/commit/18fc3d6ae3b5873b69e784094300ab618fa21aa8))
-* **section:** collapse coincident section curves so sphere slices aren't degenerate ([#864](https://github.com/esaueng/brepkit/issues/864)) ([ec98f09](https://github.com/esaueng/brepkit/commit/ec98f09d5a82519cd6c44a99f56d45f9b2d1fe09))
-* support high-degree NURBS evaluation ([4d64472](https://github.com/esaueng/brepkit/commit/4d64472defe961eb9342c13471fc7b006055b1bd))
-* **sweep:** densify long spine spans so non-square sweeps don't overshoot ([#854](https://github.com/esaueng/brepkit/issues/854)) ([1330de8](https://github.com/esaueng/brepkit/commit/1330de84082f449d999d95a93092dc3ef84e4d0f))
-* **tessellate:** build drilled-hole cylinder/cone bands from shared rim vertices ([#696](https://github.com/esaueng/brepkit/issues/696)) ([#809](https://github.com/esaueng/brepkit/issues/809)) ([4a7337b](https://github.com/esaueng/brepkit/commit/4a7337b1ff6cb2a119d46b48ca538e3fd52fd47f))
-* **tessellate:** honor angularTolerance in meshEdges/meshEdgesAll ([#953](https://github.com/esaueng/brepkit/issues/953)) ([5962901](https://github.com/esaueng/brepkit/commit/5962901cdf90e107bc2af48c0b7988874c1ddb08))
-* **tessellate:** keep self-intersecting planar caps watertight via fan fallback ([#1117](https://github.com/esaueng/brepkit/issues/1117)) ([54aa016](https://github.com/esaueng/brepkit/commit/54aa016771e1a64c6a5b492d31c48ebb8ca258e7))
-* **tessellate:** route grouped solid tessellation through the watertight shared-edge pipeline ([#780](https://github.com/esaueng/brepkit/issues/780)) ([ba4f07b](https://github.com/esaueng/brepkit/commit/ba4f07bcc60d49ab59b126c724c60771507ab5ea))
-* **topology:** trim NURBS edge domains to validated forward endpoint sub-spans ([#1097](https://github.com/esaueng/brepkit/issues/1097)) ([c3575af](https://github.com/esaueng/brepkit/commit/c3575af0d02263d954db772a4095494a7ba25e1e))
-* **wasm:** validate feature and batch inputs ([2217bf5](https://github.com/esaueng/brepkit/commit/2217bf5dd0c7d413f73318d907319c89f0f44dc6))
+* **operations:** correct the box-sphere octant shortcut and sphere-patch classification ([#1408](https://github.com/andymai/brepkit/issues/1408)) ([3159636](https://github.com/andymai/brepkit/commit/31596366768a20043498fd985459a5dd82617c1d))
+
+## [2.129.13](https://github.com/andymai/brepkit/compare/v2.129.12...v2.129.13) (2026-08-07)
+
+
+### Bug Fixes
+
+* **operations:** reverse concave coaxial corner walls in curve-preserving lofts ([#1404](https://github.com/andymai/brepkit/issues/1404)) ([5a3e405](https://github.com/andymai/brepkit/commit/5a3e40533622e3c910b515e6f52da777cbdf68af))
+
+## [2.129.12](https://github.com/andymai/brepkit/compare/v2.129.11...v2.129.12) (2026-08-07)
+
+
+### Bug Fixes
+
+* **io:** re-ground the mixed-socket attribution on the directed half-edge oracle ([#1402](https://github.com/andymai/brepkit/issues/1402)) ([e7e1ff1](https://github.com/andymai/brepkit/commit/e7e1ff115dfbd6d96587c79f69b06c175beb07c0))
+
+## [2.129.11](https://github.com/andymai/brepkit/compare/v2.129.10...v2.129.11) (2026-08-07)
 
 
 ### Performance
 
-* **algo:** batch edge sampler for the same-domain polygon builders ([#1160](https://github.com/esaueng/brepkit/issues/1160)) ([b517d4f](https://github.com/esaueng/brepkit/commit/b517d4fca52269806eff552460c266f66130fa50))
-* **algo:** broad-phase culls + analytic line-circle in GFA pave-filler ([#881](https://github.com/esaueng/brepkit/issues/881)) ([d4813a6](https://github.com/esaueng/brepkit/commit/d4813a65d959b94bcd3f6c87f34e586ae6975539))
-* **algo:** hoist the NURBS section domain out of the split-finder eval loop ([#1158](https://github.com/esaueng/brepkit/issues/1158)) ([51d7d8f](https://github.com/esaueng/brepkit/commit/51d7d8f9965ebe213895b6a2352ed3135a0258f1))
-* **algo:** make Cut producing many holes near-linear ([#987](https://github.com/esaueng/brepkit/issues/987)) ([#990](https://github.com/esaueng/brepkit/issues/990)) ([f0bb20f](https://github.com/esaueng/brepkit/commit/f0bb20fe1a60ed151e3d12ddaa49d48f65e26f74))
-* **algo:** reject coplanar-but-disjoint SD pairs with an oriented box ([#1200](https://github.com/esaueng/brepkit/issues/1200)) ([6e28fce](https://github.com/esaueng/brepkit/commit/6e28fce6832276bbb1e842e2eaaa888860897bd8))
-* **algo:** spatial-hash the builder's O(N²) collinear-split + same-domain passes ([#926](https://github.com/esaueng/brepkit/issues/926)) ([5b48f0f](https://github.com/esaueng/brepkit/commit/5b48f0f48fb343e5952a6ded13ffcbbbdb584124))
-* **operations:** batch compound_cut when the tools form one cluster ([#1198](https://github.com/esaueng/brepkit/issues/1198)) ([a795086](https://github.com/esaueng/brepkit/commit/a79508646899b472a4e79091de0f8b0e96a7c717))
-* **operations:** batch pairwise-disjoint compound_cut tools into one cut ([#1164](https://github.com/esaueng/brepkit/issues/1164)) ([7c7a49f](https://github.com/esaueng/brepkit/commit/7c7a49ffb781b3361b939a3f2f9681d04d1bf1b9))
-* **operations:** cluster-batch overlapping compound_cut tools ([#1170](https://github.com/esaueng/brepkit/issues/1170)) ([c577faa](https://github.com/esaueng/brepkit/commit/c577faab5c02c5dacb4aab6257f426e5c9afee8b))
-* **operations:** fuse_all uses the N-way fuse for connected clusters ([#1205](https://github.com/esaueng/brepkit/issues/1205)) ([59c7dec](https://github.com/esaueng/brepkit/commit/59c7decbe929ace9d44e17765b3aa96755f802a2))
-* **operations:** keep disjoint flat-faced solids out of fuse_all's boolean groups ([#982](https://github.com/esaueng/brepkit/issues/982)) ([c60aa9a](https://github.com/esaueng/brepkit/commit/c60aa9accebff2329b4aea29b091921a2751628d))
-* **operations:** memoize boolean post-processing traversals + cut-fragmentation root-cause report ([#885](https://github.com/esaueng/brepkit/issues/885)) ([85d2b03](https://github.com/esaueng/brepkit/commit/85d2b03842d50c03e594a5ad9f818bb93973f07e))
-* **operations:** short-circuit disjoint Fuse to a cheap shell merge ([#893](https://github.com/esaueng/brepkit/issues/893)) ([66e52fd](https://github.com/esaueng/brepkit/commit/66e52fdac840bedd74584ab2f647f29c62c1f26e))
-* **tessellate:** skip curvature floor for constant-curvature circular faces ([#886](https://github.com/esaueng/brepkit/issues/886)) ([c3fa8a7](https://github.com/esaueng/brepkit/commit/c3fa8a73e0595996c4463f836e5cc34a9beda9e4))
+* **operations:** exact divergence-theorem volume for all-planar solids ([#1396](https://github.com/andymai/brepkit/issues/1396)) ([1933079](https://github.com/andymai/brepkit/commit/19330793a84219c662471f71a3466fb38e43d63a))
+
+## [2.129.10](https://github.com/andymai/brepkit/compare/v2.129.9...v2.129.10) (2026-08-07)
+
+
+### Bug Fixes
+
+* **algo:** classify plane split loops on arc-true via-frame polygons ([#1394](https://github.com/andymai/brepkit/issues/1394)) ([f530e58](https://github.com/andymai/brepkit/commit/f530e58f187f7c9720c37910b52c44a95ca2e4bc))
+
+## [2.129.9](https://github.com/andymai/brepkit/compare/v2.129.8...v2.129.9) (2026-08-06)
+
+
+### Bug Fixes
+
+* **math:** guard CDT constrained-crossing split against welded intersection vertices ([#1391](https://github.com/andymai/brepkit/issues/1391)) ([4c72b07](https://github.com/andymai/brepkit/commit/4c72b0742d10f0b78950598678df2c52cbc51359))
+
+
+### Performance
+
+* **operations:** exact sag bound for display sphere tessellation ([#1389](https://github.com/andymai/brepkit/issues/1389)) ([7fa1f35](https://github.com/andymai/brepkit/commit/7fa1f356c1d4fdc8745ba7b1566825f7afca946b))
+
+## [2.129.8](https://github.com/andymai/brepkit/compare/v2.129.7...v2.129.8) (2026-08-06)
+
+
+### Bug Fixes
+
+* **check:** planar fan triangulation uses signed areas ([#1385](https://github.com/andymai/brepkit/issues/1385)) ([76e5054](https://github.com/andymai/brepkit/commit/76e505450d70c549d23a78e008377ef63dde6a47))
+
+## [2.129.7](https://github.com/andymai/brepkit/compare/v2.129.6...v2.129.7) (2026-08-06)
+
+
+### Bug Fixes
+
+* **operations:** reversed-traversal boundary samplers no longer drop polygon corners ([#1383](https://github.com/andymai/brepkit/issues/1383)) ([7866b9e](https://github.com/andymai/brepkit/commit/7866b9e7a02a29e5fca659b6ccef5e0dc09e77d6))
+
+## [2.129.6](https://github.com/andymai/brepkit/compare/v2.129.5...v2.129.6) (2026-08-06)
+
+
+### Bug Fixes
+
+* **math:** extend plane-cone section chains to the v_max boundary ([#1379](https://github.com/andymai/brepkit/issues/1379)) ([c6dbc14](https://github.com/andymai/brepkit/commit/c6dbc14af736f9493acd81edd21798fad5cbaf47))
+
+## [2.129.5](https://github.com/andymai/brepkit/compare/v2.129.4...v2.129.5) (2026-08-06)
+
+
+### Bug Fixes
+
+* **operations:** close the orientation-emission campaign; check_orientation defaults on ([#1377](https://github.com/andymai/brepkit/issues/1377)) ([15fadd5](https://github.com/andymai/brepkit/commit/15fadd58d8812b4051e3282cc3678e6451960494))
+
+## [2.129.4](https://github.com/andymai/brepkit/compare/v2.129.3...v2.129.4) (2026-08-05)
+
+
+### Bug Fixes
+
+* **operations:** sweep and shared-cap wires reverse with their faces; strict orientation validation by default ([#1373](https://github.com/andymai/brepkit/issues/1373)) ([e5f1109](https://github.com/andymai/brepkit/commit/e5f1109edcf5879894d026160613fd693611c5d0))
+
+## [2.129.3](https://github.com/andymai/brepkit/compare/v2.129.2...v2.129.3) (2026-08-05)
+
+
+### Bug Fixes
+
+* **operations:** extrude side wires must match cap traversal senses ([#1371](https://github.com/andymai/brepkit/issues/1371)) ([fa78e5f](https://github.com/andymai/brepkit/commit/fa78e5f4cc64acd2b71d7b8f6b56d4d4cff37984))
+
+## [2.129.2](https://github.com/andymai/brepkit/compare/v2.129.1...v2.129.2) (2026-08-05)
+
+
+### Bug Fixes
+
+* **operations:** segmented revolve side wires must reverse with the face ([#1369](https://github.com/andymai/brepkit/issues/1369)) ([fe645a4](https://github.com/andymai/brepkit/commit/fe645a44bd278e9bc3934cb892b6ee66c7842cd0))
+
+## [2.129.1](https://github.com/andymai/brepkit/compare/v2.129.0...v2.129.1) (2026-08-05)
+
+
+### Bug Fixes
+
+* **operations:** analytic revolve rim senses must account for face reversal ([#1367](https://github.com/andymai/brepkit/issues/1367)) ([53c9063](https://github.com/andymai/brepkit/commit/53c90631d4d2544bf9a8dcc4de023c97ad18e766))
+
+## [2.129.0](https://github.com/andymai/brepkit/compare/v2.128.34...v2.129.0) (2026-08-05)
+
+
+### Features
+
+* **operations:** expose shell orientation consistency in solid validation ([#1365](https://github.com/andymai/brepkit/issues/1365)) ([fa06b86](https://github.com/andymai/brepkit/commit/fa06b860b55a4d28f24c8c25c2ce23600b869b6f))
+
+## [2.128.34](https://github.com/andymai/brepkit/compare/v2.128.33...v2.128.34) (2026-08-05)
+
+
+### Bug Fixes
+
+* **math:** CDT edge recovery must not claim success without the edge ([#1362](https://github.com/andymai/brepkit/issues/1362)) ([a878bad](https://github.com/andymai/brepkit/commit/a878bad644b2ce18b95247cb414ed2d9fd94ad5f))
+
+## [2.128.33](https://github.com/andymai/brepkit/compare/v2.128.32...v2.128.33) (2026-08-05)
+
+
+### Bug Fixes
+
+* **algo:** within-rank SD dedup must not drop a cross-shell coincident face ([#1360](https://github.com/andymai/brepkit/issues/1360)) ([5997727](https://github.com/andymai/brepkit/commit/599772784bc20583ba974282c7f2c807b12d1fbc))
+
+## [2.128.32](https://github.com/andymai/brepkit/compare/v2.128.31...v2.128.32) (2026-08-05)
+
+
+### Bug Fixes
+
+* **algo:** re-cast grazed cardinal rays when clean rays unanimously disagree ([#1357](https://github.com/andymai/brepkit/issues/1357)) ([2f10967](https://github.com/andymai/brepkit/commit/2f1096716e683ce949b74fe5f5066702ff3e0407))
+
+## [2.128.31](https://github.com/andymai/brepkit/compare/v2.128.30...v2.128.31) (2026-08-05)
+
+
+### Bug Fixes
+
+* **algo:** expand NURBS boundary images so coaxial revolve cuts split ([#1352](https://github.com/andymai/brepkit/issues/1352)) ([6e2a55d](https://github.com/andymai/brepkit/commit/6e2a55d316bb0e880c8755a7fd35f00e2cf1a915))
+
+## [2.128.30](https://github.com/andymai/brepkit/compare/v2.128.29...v2.128.30) (2026-08-05)
+
+
+### Bug Fixes
+
+* **algo:** clip sections to true NURBS boundary arcs, perf-safe ([#1343](https://github.com/andymai/brepkit/issues/1343)) ([c465e90](https://github.com/andymai/brepkit/commit/c465e90c3031587cb43af77435a1763f0b53f2ff))
+
+## [2.128.29](https://github.com/andymai/brepkit/compare/v2.128.28...v2.128.29) (2026-08-04)
+
+
+### Bug Fixes
+
+* **shell:** emit the chamfer strip a swallowed corner fillet collapses to ([#1324](https://github.com/andymai/brepkit/issues/1324)) ([b7f4cd3](https://github.com/andymai/brepkit/commit/b7f4cd3dfad683fe5f3756addc60da8fc108b80e))
+
+## [2.128.28](https://github.com/andymai/brepkit/compare/v2.128.27...v2.128.28) (2026-08-04)
+
+
+### Bug Fixes
+
+* **blend:** use the material wedge half-angle in the analytic plane fillet ([#1321](https://github.com/andymai/brepkit/issues/1321)) ([b516ed4](https://github.com/andymai/brepkit/commit/b516ed4381ba9cf010e946119bb5d0f3fd7b6bfe))
+
+## [2.128.27](https://github.com/andymai/brepkit/compare/v2.128.26...v2.128.27) (2026-08-04)
+
+
+### Bug Fixes
+
+* **blend:** fill concave edges on the correct side of the analytic fillet ([#1319](https://github.com/andymai/brepkit/issues/1319)) ([b0d6ed7](https://github.com/andymai/brepkit/commit/b0d6ed7e8cf11d4cfbb0735a3b651a90a458d0ce))
+
+## [2.128.26](https://github.com/andymai/brepkit/compare/v2.128.25...v2.128.26) (2026-08-04)
+
+
+### Bug Fixes
+
+* **blend:** material-oriented chamfer contacts on concave edges ([#1312](https://github.com/andymai/brepkit/issues/1312)) ([4996331](https://github.com/andymai/brepkit/commit/499633177f707feec95bc0b4fd8aba1409a1238e))
+
+## [2.128.25](https://github.com/andymai/brepkit/compare/v2.128.24...v2.128.25) (2026-08-04)
+
+
+### Bug Fixes
+
+* **blend:** notch end caps with the fillet end cross-section arcs ([#1309](https://github.com/andymai/brepkit/issues/1309)) ([453a7be](https://github.com/andymai/brepkit/commit/453a7be9cd63a2f1e238f9a6c598eb0cfe98eed1))
+
+## [2.128.24](https://github.com/andymai/brepkit/compare/v2.128.23...v2.128.24) (2026-08-04)
+
+
+### Bug Fixes
+
+* **blend:** thread chamfer trims into shared contact edges ([#1307](https://github.com/andymai/brepkit/issues/1307)) ([243db8f](https://github.com/andymai/brepkit/commit/243db8fa884945fc15ae27beee20b3414e1d3b2e))
+
+## [2.128.23](https://github.com/andymai/brepkit/compare/v2.128.22...v2.128.23) (2026-08-04)
+
+
+### Bug Fixes
+
+* **blend:** reuse trimmer contact edges in the v2 blend face ([#1305](https://github.com/andymai/brepkit/issues/1305)) ([cc34788](https://github.com/andymai/brepkit/commit/cc34788f0911cedf3d06ca1b8c528aedeaa0a75e))
+
+## [2.128.22](https://github.com/andymai/brepkit/compare/v2.128.21...v2.128.22) (2026-08-04)
+
+
+### Bug Fixes
+
+* **algo:** close the kumiko lattice band fuse ([#1302](https://github.com/andymai/brepkit/issues/1302)) ([719585c](https://github.com/andymai/brepkit/commit/719585c9264f20c3aa3262f5934a496c215ef0e0))
+
+## [2.128.21](https://github.com/andymai/brepkit/compare/v2.128.20...v2.128.21) (2026-08-04)
+
+
+### Bug Fixes
+
+* **algo:** analytic torus arm for the ray-cast classifier ([#1300](https://github.com/andymai/brepkit/issues/1300)) ([8c0c530](https://github.com/andymai/brepkit/commit/8c0c530a74b248fc1d1623601c20be584576b5af))
+
+## [2.128.20](https://github.com/andymai/brepkit/compare/v2.128.19...v2.128.20) (2026-08-04)
+
+
+### Bug Fixes
+
+* **algo:** unify cross-solver junction anchors in the kumiko lattice fuse ([#1284](https://github.com/andymai/brepkit/issues/1284)) ([0a7837e](https://github.com/andymai/brepkit/commit/0a7837ecf8b7ab73f046df5aa7fe3a38fa53679a))
+
+## [2.128.19](https://github.com/andymai/brepkit/compare/v2.128.18...v2.128.19) (2026-08-04)
+
+
+### Bug Fixes
+
+* **algo:** keep exact operand geometry through arrangement emission and welds ([#1277](https://github.com/andymai/brepkit/issues/1277)) ([dd152bd](https://github.com/andymai/brepkit/commit/dd152bd6f057cb18408dcab24e924b9ef840cb86))
+
+## [2.128.18](https://github.com/andymai/brepkit/compare/v2.128.17...v2.128.18) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** line splits return the foot; pin the weld-band contract ([#1272](https://github.com/andymai/brepkit/issues/1272)) ([56de1ee](https://github.com/andymai/brepkit/commit/56de1ee7e9bf3d716167d77e1e71300bd33f95b6))
+
+## [2.128.17](https://github.com/andymai/brepkit/compare/v2.128.16...v2.128.17) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** weld-scale boundary anchoring for line splits ([#1270](https://github.com/andymai/brepkit/issues/1270)) ([5fbb836](https://github.com/andymai/brepkit/commit/5fbb83612b5fc714fe9c3aa1399f20d95888a724))
+
+## [2.128.16](https://github.com/andymai/brepkit/compare/v2.128.15...v2.128.16) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** exact polygon clip for plane-plane lines in the FF prefilter ([#1267](https://github.com/andymai/brepkit/issues/1267)) ([c9847a4](https://github.com/andymai/brepkit/commit/c9847a44e968a0c0d751c4c4502502d490b0f871))
+
+## [2.128.15](https://github.com/andymai/brepkit/compare/v2.128.14...v2.128.15) (2026-08-03)
+
+
+### Bug Fixes
+
+* **operations:** per-face tessellation and classification of wavy-band faces ([#1265](https://github.com/andymai/brepkit/issues/1265)) ([458d0f7](https://github.com/andymai/brepkit/commit/458d0f72276743b78c7443bce5dbcd972be23fd6))
+
+## [2.128.14](https://github.com/andymai/brepkit/compare/v2.128.13...v2.128.14) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** emit ellipse section arcs in sub-π spans ([#1262](https://github.com/andymai/brepkit/issues/1262)) ([f427b46](https://github.com/andymai/brepkit/commit/f427b46a84afb97eba9181484024fe1a2aefd2bc))
+
+## [2.128.13](https://github.com/andymai/brepkit/compare/v2.128.12...v2.128.13) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** close the circle-outside cone∪box fuse (winding-chain band splitting) ([#1259](https://github.com/andymai/brepkit/issues/1259)) ([4ac422d](https://github.com/andymai/brepkit/commit/4ac422d81e44bbdeeeaca8a8e17bdf4bc32a689f))
+
+## [2.128.12](https://github.com/andymai/brepkit/compare/v2.128.11...v2.128.12) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** close the 2-tangency quadric-box fuse (parallel half-arc sections) ([#1257](https://github.com/andymai/brepkit/issues/1257)) ([b468fcc](https://github.com/andymai/brepkit/commit/b468fccdc7183549c5ea22d228531b27f85bc365))
+
+## [2.128.11](https://github.com/andymai/brepkit/compare/v2.128.10...v2.128.11) (2026-08-03)
+
+
+### Bug Fixes
+
+* **algo:** close the quadric-box inscribed-rim fuse (4-tangency cone/cylinder ∪ box) ([#1254](https://github.com/andymai/brepkit/issues/1254)) ([20f2d44](https://github.com/andymai/brepkit/commit/20f2d447ce432855bc772619fb48fe105fc07d1a))
+
+## [2.128.10](https://github.com/andymai/brepkit/compare/v2.128.9...v2.128.10) (2026-08-03)
+
+
+### Performance
+
+* **operations:** short-circuit disjoint Cut to a target copy ([#1252](https://github.com/andymai/brepkit/issues/1252)) ([47ef2cb](https://github.com/andymai/brepkit/commit/47ef2cbf6afb04f8274d7d4b6b3b6f1d77061625))
+
+## [2.128.9](https://github.com/andymai/brepkit/compare/v2.128.8...v2.128.9) (2026-08-02)
+
+
+### Performance
+
+* **fillet:** stop tessellating every face to check for degeneracy ([#1248](https://github.com/andymai/brepkit/issues/1248)) ([73a4c2c](https://github.com/andymai/brepkit/commit/73a4c2cefa253bae9133c07b872412c9be9f33bf))
+
+## [2.128.8](https://github.com/andymai/brepkit/compare/v2.128.7...v2.128.8) (2026-08-02)
+
+
+### Bug Fixes
+
+* **operations:** collapse a shell fillet the thickness swallows to a sharp corner ([#1243](https://github.com/andymai/brepkit/issues/1243)) ([dea642f](https://github.com/andymai/brepkit/commit/dea642fb745a6825864310919607c38905705e9c))
+
+## [2.128.7](https://github.com/andymai/brepkit/compare/v2.128.6...v2.128.7) (2026-07-30)
+
+
+### Bug Fixes
+
+* **operations:** accept multi-region booleans with rotated or ring pieces ([#1239](https://github.com/andymai/brepkit/issues/1239)) ([c35c99a](https://github.com/andymai/brepkit/commit/c35c99af840ef7d341fea37e217d1a6b768feb31))
+
+## [2.128.6](https://github.com/andymai/brepkit/compare/v2.128.5...v2.128.6) (2026-07-26)
+
+
+### Bug Fixes
+
+* **operations:** normalize segmented revolve orientation ([#1237](https://github.com/andymai/brepkit/issues/1237)) ([cd7bc32](https://github.com/andymai/brepkit/commit/cd7bc3260d9babf2b9e48150fb6b8f8bfabfc444))
 
 ## [2.128.5](https://github.com/andymai/brepkit/compare/v2.128.4...v2.128.5) (2026-07-25)
 

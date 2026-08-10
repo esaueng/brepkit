@@ -2782,8 +2782,10 @@ export class BrepKernel {
     /**
      * Sweep a face along a path defined by a chain of edges.
      *
-     * Collects points from the edges, fits an interpolating NURBS curve,
-     * then sweeps the profile along that curve.
+     * A closed planar chain of lines and tangent arcs with an all-line
+     * perpendicular profile is swept analytically (exact plane / cylinder /
+     * cone faces); anything else falls back to fitting an interpolating
+     * NURBS curve through sampled chain points and sweeping along that.
      *
      * Returns a solid handle (`u32`).
      *
