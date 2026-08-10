@@ -7,6 +7,17 @@
 
 use std::collections::{BTreeMap, HashMap};
 use std::hash::BuildHasher;
+use std::sync::LazyLock;
+
+/// `BK_SECEDGE=1`: the clipped 3D extent of every section handed to the
+/// splitter — the level at which a section that survived phase FF can still be
+/// clipped to the wrong window (#1510). Read once; these sit on hot paths.
+static TRACE_SECEDGE: LazyLock<bool> = LazyLock::new(|| std::env::var("BK_SECEDGE").is_ok());
+
+/// `BK_CLIP=1`: per-call chord vs true-arc crossings in
+/// `clip_line_to_face_boundary`, which is what separates a chord-short clip
+/// from a genuinely absent section.
+static TRACE_CLIP: LazyLock<bool> = LazyLock::new(|| std::env::var("BK_CLIP").is_ok());
 
 /// Quantized 3D position pair for CommonBlock edge matching.
 type CbEdgeKey = ((i64, i64, i64), (i64, i64, i64));
@@ -338,6 +349,19 @@ pub fn fill_images_faces<S: BuildHasher, S2: BuildHasher>(
             has_sections,
             sections.len()
         );
+        if *TRACE_SECEDGE {
+            for (i, s) in sections.iter().enumerate() {
+                log::debug!(
+                    "SECEDGE face={face_id:?} #{i} ({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3})",
+                    s.start.x(),
+                    s.start.y(),
+                    s.start.z(),
+                    s.end.x(),
+                    s.end.y(),
+                    s.end.z()
+                );
+            }
+        }
         if sections.is_empty() {
             let expanded =
                 rebuild_face_with_edge_images(topo, face_id, edge_images).unwrap_or(face_id);
@@ -438,6 +462,37 @@ pub fn fill_images_faces<S: BuildHasher, S2: BuildHasher>(
         );
 
         if std::env::var("BK_SPLITW").is_ok_and(|v| v == format!("{}", face_id.index())) {
+            if let Ok(face) = topo.face(face_id)
+                && let brepkit_topology::face::FaceSurface::Plane { normal, .. } = face.surface()
+            {
+                for (ri, r) in split_results.iter().enumerate() {
+                    if r.outer_wire.len() < 3 {
+                        continue;
+                    }
+                    let uvs: Vec<brepkit_math::vec::Point2> =
+                        r.outer_wire.iter().map(|e| e.start_uv).collect();
+                    let mut uv_area = 0.0;
+                    for k in 0..uvs.len() {
+                        let a = uvs[k];
+                        let b = uvs[(k + 1) % uvs.len()];
+                        uv_area += a.x() * b.y() - b.x() * a.y();
+                    }
+                    let pts: Vec<brepkit_math::vec::Point3> =
+                        r.outer_wire.iter().map(|e| e.start_3d).collect();
+                    let mut acc = brepkit_math::vec::Vec3::new(0.0, 0.0, 0.0);
+                    for k in 1..pts.len().saturating_sub(1) {
+                        let u = pts[k] - pts[0];
+                        let v = pts[k + 1] - pts[0];
+                        acc += u.cross(v);
+                    }
+                    log::debug!(
+                        "SPLITW piece[{ri}] rev={} uv_area={:.4} n_area={:.4}",
+                        r.reversed,
+                        uv_area * 0.5,
+                        acc.dot(*normal) * 0.5
+                    );
+                }
+            }
             for (si, sec) in sections.iter().enumerate() {
                 log::debug!(
                     "SPLITW sec[{si}] {} ({:.4},{:.4},{:.4})->({:.4},{:.4},{:.4})",
@@ -1440,36 +1495,46 @@ fn compute_winding_loop_cuts(topo: &Topology, arena: &GfaArena) -> Vec<Point3> {
                 };
                 #[allow(clippy::cast_precision_loss)]
                 let at = |k: usize| d0 + (d1 - d0) * (k as f64 / SAMPLES as f64);
-                // First consecutive pair straddling the meridian. A sample
-                // landing exactly ON it leaves its neighbours sharing a sign,
-                // so the crossing is missed and the loop opens only partly —
-                // the caller requires all three cuts and leaves it closed, so
-                // that case simply keeps the pre-existing route rather than
-                // half-opening. (Widening this to a nearest-sample search does
-                // find them, but it then routes bodies the tessellator cannot
-                // yet mesh watertight; see the note on the through-bore band.)
-                let Some(k) = (0..SAMPLES).find(|&k| {
+                // Preserve the established cut whenever consecutive samples
+                // strictly bracket the meridian without crossing wrap's
+                // branch cut at +/-pi.
+                let bracket = (0..SAMPLES).find(|&k| {
                     let (Some(a), Some(b)) = (f(at(k)), f(at(k + 1))) else {
                         return false;
                     };
-                    a != 0.0 && b != 0.0 && (a > 0.0) != (b > 0.0) && (a - b).abs() < PI
-                }) else {
-                    continue;
-                };
-                let (mut lo, mut hi) = (at(k), at(k + 1));
-                let Some(f_lo) = f(lo) else { continue };
-                for _ in 0..60 {
-                    let tm = f64::midpoint(lo, hi);
-                    let Some(fm) = f(tm) else { break };
-                    if (fm > 0.0) == (f_lo > 0.0) {
-                        lo = tm;
-                    } else {
-                        hi = tm;
+                    a.abs() > 0.0 && b.abs() > 0.0 && (a > 0.0) != (b > 0.0) && (a - b).abs() < PI
+                });
+                let crossing = if let Some(k) = bracket {
+                    let (mut lo, mut hi) = (at(k), at(k + 1));
+                    let Some(f_lo) = f(lo) else { continue };
+                    for _ in 0..60 {
+                        let tm = f64::midpoint(lo, hi);
+                        let Some(fm) = f(tm) else { break };
+                        if (fm > 0.0) == (f_lo > 0.0) {
+                            lo = tm;
+                        } else {
+                            hi = tm;
+                        }
                     }
-                }
-                found.push(ParametricCurve::evaluate(nurbs, f64::midpoint(lo, hi)));
+                    f64::midpoint(lo, hi)
+                } else {
+                    // A sample exactly on the meridian has same-sign
+                    // neighbours and therefore no strict bracket. Accept that
+                    // sample only after the established search fails. This is
+                    // a numerical-zero test at the splitter's existing 1e-10
+                    // seam precision, not a wider nearest-sample snap or a
+                    // modelling-tolerance change.
+                    let Some(t) = (0..=SAMPLES).find_map(|k| {
+                        let t = at(k);
+                        f(t).is_some_and(|offset| offset.abs() <= SEAM_DEGENERATE_TOL)
+                            .then_some(t)
+                    }) else {
+                        continue;
+                    };
+                    t
+                };
+                found.push(ParametricCurve::evaluate(nurbs, crossing));
             }
-            // Both cuts or neither: one alone leaves a still-closed loop.
             // All three or none: a partial set leaves an arc spanning half a
             // turn or more, and every winding sum in the splitter is taken
             // from arc endpoints, where `wrap_pi` cannot tell +pi from -pi.
@@ -3179,15 +3244,25 @@ fn clip_line_to_face_boundary(
     }
 
     crossings.sort_by(|a, b| a.partial_cmp(b).unwrap_or(std::cmp::Ordering::Equal));
-    if std::env::var("BK_CLIP").is_ok() {
+    if *TRACE_CLIP {
+        // Crossings are reported as 3D points as well as raw t: a chord-short
+        // clip is only recognisable once you can read the coordinate it stops
+        // at against the face's real boundary (#1510).
+        let at = |t: f64| {
+            let p = line_start + line_dir * t;
+            (t, p.x(), p.y(), p.z())
+        };
         log::debug!(
-            "CLIP face={face_id:?} line=({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3}) crossings={crossings:?} ext={crossings_ext:?}",
+            "CLIP face={face_id:?} holed={} line=({:.3},{:.3},{:.3})->({:.3},{:.3},{:.3}) crossings={:?} ext={:?}",
+            !face.inner_wires().is_empty(),
             line_start.x(),
             line_start.y(),
             line_start.z(),
             line_end.x(),
             line_end.y(),
-            line_end.z()
+            line_end.z(),
+            crossings.iter().map(|&t| at(t)).collect::<Vec<_>>(),
+            crossings_ext.iter().map(|&t| at(t)).collect::<Vec<_>>()
         );
     }
 
@@ -3292,11 +3367,22 @@ fn clip_line_to_face_boundary(
             })
             .collect()
     } else {
-        // Non-plane fallback: the historical outermost pair.
-        vec![(
-            crossings[0].clamp(0.0, 1.0),
-            crossings[crossings.len() - 1].clamp(0.0, 1.0),
-        )]
+        // Non-plane fallback: the historical outermost pair — but over the
+        // TRUE-arc crossings as well as the chord ones. A chord crossing sits
+        // a sagitta inside its arc, so on a face whose boundary corners are
+        // arcs the pair alone stops short of the real boundary and the section
+        // never reaches the face edge (#1510: 39.200 is where the outer corner
+        // chord meets y=40.550; the arc meets it at 40.7495, and a cut ending
+        // at the chord cannot separate the piece beyond it).
+        let outer = crossings
+            .iter()
+            .chain(crossings_ext.iter())
+            .map(|t| t.clamp(0.0, 1.0));
+        let lo = outer
+            .clone()
+            .fold(f64::INFINITY, |a: f64, b| if b < a { b } else { a });
+        let hi = outer.fold(f64::NEG_INFINITY, |a: f64, b| if b > a { b } else { a });
+        vec![(lo, hi)]
     };
 
     let t_tol = tol / line_len;

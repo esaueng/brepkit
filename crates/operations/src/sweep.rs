@@ -30,13 +30,12 @@ struct Frame {
 
 /// Compute rotation-minimizing frames along a NURBS path.
 ///
-/// Samples the path at evenly-spaced parameter values across its domain and
-/// propagates the initial up-vector using the double-reflection method to
-/// produce smooth, twist-free frames. For open paths, produces
-/// `num_segments + 1` frames (domain start through domain end). For closed
-/// paths, produces `num_segments` frames, omitting the last since it
-/// duplicates the first. The path's domain need not be [0, 1] — sub-curves
-/// from `curve_split` keep the parent parameterization.
+/// Samples the path at evenly-spaced parameters across its own domain
+/// `[u_min, u_max]` and propagates the initial up-vector using the
+/// double-reflection method to produce smooth, twist-free frames. For open
+/// paths, produces `num_segments + 1` frames (domain start through domain
+/// end). For closed paths, produces `num_segments` frames, omitting the
+/// domain end since it duplicates the start.
 fn compute_frames(
     path: &NurbsCurve,
     num_segments: usize,
@@ -49,6 +48,9 @@ fn compute_frames(
         num_segments + 1
     };
 
+    // Sample within the curve's own domain: split sub-curves keep their
+    // parent's sub-range, and a clamped NURBS evaluated outside its domain
+    // extrapolates the end spans linearly.
     let (u0, u1) = path.domain();
     let mut samples = Vec::with_capacity(frame_count);
     for k in 0..frame_count {
@@ -162,22 +164,59 @@ fn orthogonalize(v: Vec3, tangent: Vec3) -> Vec3 {
     })
 }
 
+/// How the profile is positioned relative to the path before sweeping.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(crate) enum ProfilePlacement {
+    /// Sweep the profile from where it lies: the first ring reproduces the
+    /// profile exactly, and later rings are its rotation-minimizing-frame
+    /// transports along the path (the reference-kernel pipe semantic).
+    AsPositioned,
+    /// Translate the profile so its centroid lands on the path start and its
+    /// plane is re-oriented perpendicular to the path. Used by operations
+    /// whose API positions the profile itself (e.g. helical sweep).
+    CentroidOnPath,
+}
+
+/// Minimum |cos| between the profile normal and the path start tangent for the
+/// profile to count as deliberately placed perpendicular to the path.
+///
+/// An edge-on or oblique profile has no meaningful as-positioned sweep (its
+/// plane contains the path direction and the result collapses), so those fall
+/// back to the auto-orienting centroid placement.
+const PROFILE_PERP_MIN_COS: f64 = 0.99;
+
+/// Resolve `AsPositioned` to `CentroidOnPath` when the profile is not
+/// perpendicular to the path start tangent (see [`PROFILE_PERP_MIN_COS`]).
+pub(crate) fn resolve_placement(
+    placement: ProfilePlacement,
+    input_normal: Vec3,
+    path_tangent_0: Vec3,
+) -> ProfilePlacement {
+    match placement {
+        ProfilePlacement::AsPositioned
+            if input_normal.dot(path_tangent_0).abs() < PROFILE_PERP_MIN_COS =>
+        {
+            ProfilePlacement::CentroidOnPath
+        }
+        other => other,
+    }
+}
+
 /// Transform a profile vertex from its original position to a frame location.
 ///
-/// The vertex's offset from the profile centroid is decomposed into the
-/// initial frame's coordinate system (right, up, tangent), then
-/// reconstructed in the target frame. Including the tangent component
-/// ensures correct geometry even when the profile plane is not
-/// perpendicular to the initial path tangent.
+/// The vertex's offset from `reference` is decomposed into the initial
+/// coordinate system (right, up, tangent), then reconstructed in the target
+/// frame. Including the tangent component ensures correct geometry even when
+/// the profile plane is not perpendicular to the initial path tangent.
 fn transform_point(
     point: Point3,
-    centroid: Point3,
+    reference: Point3,
     initial_right: Vec3,
     initial_up: Vec3,
     initial_tangent: Vec3,
     frame: &Frame,
 ) -> Point3 {
-    let offset = point - centroid;
+    let offset = point - reference;
     let local_r = initial_right.dot(offset);
     let local_u = initial_up.dot(offset);
     let local_t = initial_tangent.dot(offset);
@@ -195,13 +234,13 @@ struct SweptWireData {
 /// Sweep a wire's vertices through the given frames, creating ring vertices,
 /// ring edges, and path edges.
 ///
-/// `centroid`, `initial_right/up/tangent` define the local coordinate system
+/// `reference`, `initial_right/up/tangent` define the local coordinate system
 /// from which profile offsets are measured.
 #[allow(clippy::too_many_arguments)]
 fn sweep_wire_through_frames(
     topo: &mut Topology,
     wire_id: brepkit_topology::wire::WireId,
-    centroid: Point3,
+    reference: Point3,
     initial_right: Vec3,
     initial_up: Vec3,
     initial_tangent: Vec3,
@@ -237,7 +276,7 @@ fn sweep_wire_through_frames(
             .map(|&pos| {
                 let transformed = transform_point(
                     pos,
-                    centroid,
+                    reference,
                     initial_right,
                     initial_up,
                     initial_tangent,
@@ -484,6 +523,7 @@ fn try_straight_extrude(
     topo: &mut Topology,
     profile: FaceId,
     path: &NurbsCurve,
+    placement: ProfilePlacement,
 ) -> Result<Option<SolidId>, crate::OperationsError> {
     let tol = Tolerance::new();
 
@@ -522,39 +562,54 @@ fn try_straight_extrude(
         return Ok(None);
     }
 
-    // Position a copy of the profile so its centroid lands on the path start —
-    // matching the general sweep's frame[0] placement — then extrude.
-    let centroid = profile_outer_centroid(topo, profile)?;
+    // Match the general sweep's frame[0] placement, then extrude: as-positioned
+    // sweeps extrude the profile in place; centroid placement first translates
+    // the profile's centroid onto the path start.
     let moved = crate::copy::copy_face(topo, profile)?;
-    let shift = start - centroid;
-    crate::transform::transform_face(
-        topo,
-        moved,
-        &Mat4::translation(shift.x(), shift.y(), shift.z()),
-    )?;
+    if placement == ProfilePlacement::CentroidOnPath {
+        let centroid = profile_outer_centroid(topo, profile)?;
+        let shift = start - centroid;
+        crate::transform::transform_face(
+            topo,
+            moved,
+            &Mat4::translation(shift.x(), shift.y(), shift.z()),
+        )?;
+    }
 
     Ok(Some(crate::extrude::extrude(topo, moved, dir, length)?))
 }
 
 /// Sweep a face along a path curve to produce a solid.
 ///
-/// Creates a solid by moving a profile along a NURBS curve, with the profile
-/// oriented perpendicular to the path tangent at each sample point. Side faces
-/// are planar quads connecting consecutive profile rings. The profile surface
-/// may be planar or curved — only its boundary is used; the end caps are filled
-/// from that boundary (a planar ring gets a `Plane` cap, a non-planar 4-sided
-/// ring a bilinear patch).
+/// The profile is swept from where it lies: the first section reproduces the
+/// profile exactly, and later sections are its rotation-minimizing-frame
+/// transports along the path, so the profile's position relative to the path
+/// is preserved (the reference-kernel pipe semantic). Side faces are planar
+/// quads connecting consecutive profile rings. The profile surface may be
+/// planar or curved — only its boundary is used; the end caps are filled from
+/// that boundary (a planar ring gets a `Plane` cap, a non-planar 4-sided ring
+/// a bilinear patch). An edge-on or oblique profile (plane not perpendicular
+/// to the path) is instead re-oriented onto the path via centroid placement.
 ///
 /// # Errors
 ///
 /// Returns an error if the path has fewer than 2 control points, a degenerate
 /// tangent is encountered, or a section boundary is non-planar with more than
 /// four edges or with holes (unsupported cap).
-#[allow(clippy::too_many_lines)]
 pub fn sweep(
     topo: &mut Topology,
     profile: FaceId,
     path: &NurbsCurve,
+) -> Result<SolidId, crate::OperationsError> {
+    sweep_placed(topo, profile, path, ProfilePlacement::AsPositioned)
+}
+
+#[allow(clippy::too_many_lines)]
+pub(crate) fn sweep_placed(
+    topo: &mut Topology,
+    profile: FaceId,
+    path: &NurbsCurve,
+    placement: ProfilePlacement,
 ) -> Result<SolidId, crate::OperationsError> {
     let tol = Tolerance::new();
 
@@ -565,7 +620,7 @@ pub fn sweep(
     }
 
     // A straight perpendicular sweep is a prism — build it exactly via extrude.
-    if let Some(solid) = try_straight_extrude(topo, profile, path)? {
+    if let Some(solid) = try_straight_extrude(topo, profile, path, placement)? {
         return Ok(solid);
     }
 
@@ -642,8 +697,6 @@ pub fn sweep(
         input_normal = -input_normal;
     }
 
-    let centroid = crate::winding::polygon_centroid(&input_positions);
-
     let num_segments = (path.control_points().len() * 2).max(4);
 
     // Seed the first frame's up-vector from the profile normal, projected
@@ -652,12 +705,23 @@ pub fn sweep(
 
     let frames = compute_frames(path, num_segments, up_hint, is_closed)?;
 
-    // The first frame's basis vectors define the local coordinate system
-    // in which profile vertex offsets are expressed.
-    // Map the profile's 2D shape onto the path's perpendicular plane using the
-    // profile's own basis, so a profile whose plane is not perpendicular to the
-    // path is still swept perpendicular (rather than collapsing to a ribbon).
-    let (initial_right, initial_up, initial_tangent) = profile_basis(input_normal);
+    // The decomposition basis and reference point pick the placement semantic:
+    // frame-0's own basis and origin make ring 0 the identity map (profile
+    // swept as positioned); the profile's basis with its centroid re-centers
+    // and re-orients the profile onto the path.
+    let (reference, initial_right, initial_up, initial_tangent) =
+        match resolve_placement(placement, input_normal, path_tangent_0) {
+            ProfilePlacement::AsPositioned => (
+                frames[0].origin,
+                frames[0].right,
+                frames[0].up,
+                frames[0].tangent,
+            ),
+            ProfilePlacement::CentroidOnPath => {
+                let (r, u, t) = profile_basis(input_normal);
+                (crate::winding::polygon_centroid(&input_positions), r, u, t)
+            }
+        };
 
     // ring_verts[k][i] = vertex at path sample k, profile vertex i.
     // For closed paths, frames has num_segments entries; we append a copy
@@ -670,7 +734,7 @@ pub fn sweep(
             .map(|&pos| {
                 let transformed = transform_point(
                     pos,
-                    centroid,
+                    reference,
                     initial_right,
                     initial_up,
                     initial_tangent,
@@ -730,7 +794,7 @@ pub fn sweep(
         inner_swept.push(sweep_wire_through_frames(
             topo,
             iw_id,
-            centroid,
+            reference,
             initial_right,
             initial_up,
             initial_tangent,
@@ -927,16 +991,26 @@ pub fn sweep_smooth(
         input_normal = -input_normal;
     }
 
-    let centroid = crate::winding::polygon_centroid(&input_positions);
-
     let num_segments = (path.control_points().len() * 2).max(4);
     let up_hint = orthogonalize(input_normal, path_tangent_0);
     let frames = compute_frames(path, num_segments, up_hint, is_closed)?;
 
-    // Map the profile's 2D shape onto the path's perpendicular plane using the
-    // profile's own basis, so a profile whose plane is not perpendicular to the
-    // path is still swept perpendicular (rather than collapsing to a ribbon).
-    let (initial_right, initial_up, initial_tangent) = profile_basis(input_normal);
+    // As-positioned placement (see `sweep`): frame-0's basis and origin make
+    // ring 0 the identity map, so the profile is swept from where it lies.
+    // Edge-on/oblique profiles fall back to the auto-orienting placement.
+    let (reference, initial_right, initial_up, initial_tangent) =
+        match resolve_placement(ProfilePlacement::AsPositioned, input_normal, path_tangent_0) {
+            ProfilePlacement::AsPositioned => (
+                frames[0].origin,
+                frames[0].right,
+                frames[0].up,
+                frames[0].tangent,
+            ),
+            ProfilePlacement::CentroidOnPath => {
+                let (r, u, t) = profile_basis(input_normal);
+                (crate::winding::polygon_centroid(&input_positions), r, u, t)
+            }
+        };
 
     // Compute all ring positions (without allocating vertices yet).
     let num_rings = frames.len();
@@ -948,7 +1022,7 @@ pub fn sweep_smooth(
                 .map(|&pos| {
                     transform_point(
                         pos,
-                        centroid,
+                        reference,
                         initial_right,
                         initial_up,
                         initial_tangent,
@@ -994,7 +1068,7 @@ pub fn sweep_smooth(
         inner_swept_smooth.push(sweep_wire_through_frames(
             topo,
             iw_id,
-            centroid,
+            reference,
             initial_right,
             initial_up,
             initial_tangent,
@@ -1253,10 +1327,12 @@ pub fn sweep_with_options(
 
     // A straight perpendicular sweep is a prism — build it exactly via extrude.
     // Only when no scale law or guide spine applies, since either makes the
-    // result non-prismatic.
+    // result non-prismatic. As-positioned, matching the general path below
+    // (the fast path's gate already requires a perpendicular profile).
     if options.scale_law.is_none()
         && options.aux_spine.is_none()
-        && let Some(solid) = try_straight_extrude(topo, profile, path)?
+        && let Some(solid) =
+            try_straight_extrude(topo, profile, path, ProfilePlacement::AsPositioned)?
     {
         return Ok(solid);
     }
@@ -1466,10 +1542,23 @@ fn assemble_swept_solid(
     }
     let num_segments = frames.len() - 1;
 
-    // Map the profile's 2D shape onto the path's perpendicular plane using the
-    // profile's own basis, so a profile whose plane is not perpendicular to the
-    // path is still swept perpendicular (rather than collapsing to a ribbon).
-    let (initial_right, initial_up, initial_tangent) = profile_basis(input_normal);
+    // As-positioned placement makes frame 0 the identity for a profile that is
+    // already perpendicular to the path. Oblique profiles keep the historical
+    // centroid-on-path auto-orientation.
+    let path_tangent_0 = frames[0].tangent;
+    let (reference, initial_right, initial_up, initial_tangent) =
+        match resolve_placement(ProfilePlacement::AsPositioned, input_normal, path_tangent_0) {
+            ProfilePlacement::AsPositioned => (
+                frames[0].origin,
+                frames[0].right,
+                frames[0].up,
+                frames[0].tangent,
+            ),
+            ProfilePlacement::CentroidOnPath => {
+                let (r, u, t) = profile_basis(input_normal);
+                (centroid, r, u, t)
+            }
+        };
 
     let mut ring_verts: Vec<Vec<VertexId>> = Vec::with_capacity(num_segments + 1);
 
@@ -1479,7 +1568,7 @@ fn assemble_swept_solid(
             .map(|&pos| {
                 let mut transformed = transform_point(
                     pos,
-                    centroid,
+                    reference,
                     initial_right,
                     initial_up,
                     initial_tangent,
@@ -1529,7 +1618,7 @@ fn assemble_swept_solid(
         inner_swept.push(sweep_wire_through_frames(
             topo,
             iw_id,
-            centroid,
+            reference,
             initial_right,
             initial_up,
             initial_tangent,
@@ -1748,7 +1837,18 @@ fn sweep_miter(
         input_normal = -input_normal;
     }
 
-    let centroid = crate::winding::polygon_centroid(&input_positions);
+    // As-positioned placement (see `sweep`): a perpendicular profile's
+    // offsets are decomposed ONCE in the global frame-0 basis and measured
+    // from the path start, so the first ring reproduces the profile exactly
+    // and later sub-paths reconstruct the same coordinates in their own
+    // (up-transported, continuous) frames. Edge-on/oblique profiles keep the
+    // centroid placement with per-sub-path bases.
+    let placement = resolve_placement(ProfilePlacement::AsPositioned, input_normal, path_tangent_0);
+    let reference = match placement {
+        ProfilePlacement::AsPositioned => path.evaluate(domain_start),
+        ProfilePlacement::CentroidOnPath => crate::winding::polygon_centroid(&input_positions),
+    };
+    let mut global_basis: Option<(Vec3, Vec3, Vec3)> = None;
 
     // Split the path at each kink to get smooth sub-curves.
     let mut sub_paths: Vec<NurbsCurve> = Vec::with_capacity(kinks.len() + 1);
@@ -1773,36 +1873,31 @@ fn sweep_miter(
     // so we can connect them via miter faces.
     let mut prev_end_ring: Option<Vec<VertexId>> = None;
     let mut prev_end_ring_edges: Option<Vec<brepkit_topology::edge::EdgeId>> = None;
-    // The previous segment's end frame (tangent, up), used to transport the
-    // frame orientation through each kink so ring corner `i` on both sides of
-    // a miter is the image of the same profile corner.
-    let mut prev_end_frame: Option<(Vec3, Vec3)> = None;
+    let mut prev_end_on_bisector = false;
+    let mut prev_up: Option<(Vec3, Vec3)> = None; // (up, tangent) at the previous segment's end
 
     for (seg_idx, sub_path) in sub_paths.iter().enumerate() {
         let is_first = seg_idx == 0;
         let is_last = seg_idx == sub_paths.len() - 1;
 
         let sub_tangent_0 = sub_path.tangent(sub_path.domain().0)?;
-        // For the first segment, seed the frame up from the profile normal.
-        // For later segments, transport the previous end frame's up through
-        // the kink by the proper rotation taking the incoming tangent to the
-        // outgoing one (Rodrigues about their cross product); re-deriving up
-        // from the profile normal would rotate the cross-section relative to
-        // the previous segment and break the miter-ring corner
-        // correspondence.
-        let up_hint = match prev_end_frame {
+        // Chain the frame convention across sub-paths: transport the previous
+        // segment's end up-vector through the kink by the rotation that maps
+        // the old tangent onto the new one. A bare re-orthogonalization
+        // degenerates when the old up parallels the new tangent (an L-path
+        // whose first leg fell back to a world-axis up), spinning the section
+        // 90 degrees at the joint. The first sub-path seeds from the profile
+        // normal as before.
+        let up_hint = match prev_up {
             None => orthogonalize(input_normal, sub_tangent_0),
-            Some((prev_tangent, prev_up)) => {
-                let transported = match prev_tangent.cross(sub_tangent_0).normalize() {
+            Some((up_prev, t_prev)) => {
+                let cross = t_prev.cross(sub_tangent_0);
+                let transported = match cross.normalize() {
                     Ok(axis) => {
-                        let angle = prev_tangent.dot(sub_tangent_0).clamp(-1.0, 1.0).acos();
-                        let (sin_a, cos_a) = angle.sin_cos();
-                        prev_up * cos_a
-                            + axis.cross(prev_up) * sin_a
-                            + axis * (axis.dot(prev_up) * (1.0 - cos_a))
+                        let angle = t_prev.dot(sub_tangent_0).clamp(-1.0, 1.0).acos();
+                        crate::revolve::rotate_vec(up_prev, axis, angle)
                     }
-                    // Parallel tangents: no rotation at the kink.
-                    Err(_) => prev_up,
+                    Err(_) => up_prev, // parallel tangents — no rotation needed
                 };
                 orthogonalize(transported, sub_tangent_0)
             }
@@ -1853,79 +1948,238 @@ fn sweep_miter(
                 .collect(),
         };
 
-        // Decompose profile offsets in the profile's own basis (as the other
-        // sweep variants do), not the segment frame's basis: a segment whose
-        // tangent is not parallel to the profile normal would otherwise map
-        // the profile edge-on and collapse the ring to a flat ribbon.
-        let (initial_right, initial_up, initial_tangent) = profile_basis(input_normal);
-
-        // Create ring vertices for this segment.
-        let mut ring_verts: Vec<Vec<VertexId>> = Vec::with_capacity(num_segments + 1);
-        for frame in &sub_frames {
-            let ring: Vec<VertexId> = input_positions
-                .iter()
-                .map(|&pos| {
-                    let transformed = transform_point(
-                        pos,
-                        centroid,
-                        initial_right,
-                        initial_up,
-                        initial_tangent,
-                        frame,
-                    );
-                    topo.add_vertex(Vertex::new(transformed, tol.linear))
-                })
-                .collect();
-            ring_verts.push(ring);
+        if global_basis.is_none() {
+            global_basis = Some((sub_frames[0].right, sub_frames[0].up, sub_frames[0].tangent));
         }
+        if let Some(last) = sub_frames.last() {
+            prev_up = Some((last.up, last.tangent));
+        }
+        let (initial_right, initial_up, initial_tangent) = match (placement, global_basis) {
+            (ProfilePlacement::AsPositioned, Some((r, u, t))) => (r, u, t),
+            _ => (sub_frames[0].right, sub_frames[0].up, sub_frames[0].tangent),
+        };
 
-        // If the previous segment ended on a miter ring, this segment starts
-        // from that same ring: replace the freshly built start ring and reuse
-        // the miter ring's edges so both segments' side faces share the same
-        // edge entities.
-        let miter_ring_edges_for_reuse: Option<Vec<brepkit_topology::edge::EdgeId>> =
-            if let Some(prev_ring) = prev_end_ring.take() {
-                ring_verts[0] = prev_ring;
-                prev_end_ring_edges.take()
-            } else {
-                None
-            };
+        // Ring positions for this segment (vertices created after the miter
+        // adjustment below).
+        let mut ring_positions: Vec<Vec<Point3>> = sub_frames
+            .iter()
+            .map(|frame| {
+                input_positions
+                    .iter()
+                    .map(|&pos| {
+                        transform_point(
+                            pos,
+                            reference,
+                            initial_right,
+                            initial_up,
+                            initial_tangent,
+                            frame,
+                        )
+                    })
+                    .collect()
+            })
+            .collect();
 
-        // If another segment follows, trim this segment at the kink: project
-        // each end-ring vertex along this segment's end tangent onto the
-        // bisector plane. The next segment starts from the same projected
-        // ring, so the join is the true miter cross-section and needs no
-        // transition faces. (A transition band from an untrimmed end ring to
-        // the miter ring would fold into self-intersecting bowtie quads on
-        // the sides parallel to both tangents, since the miter plane crosses
-        // the end ring at the kink point.)
-        if !is_last {
+        // Exact miter: slide the exit ring onto the bisector plane along this
+        // segment's end tangent. For a profile perpendicular to the path,
+        // reflection through the bisector plane equals the tangent-to-tangent
+        // rotation, so the next segment's entry ring lands on the same points
+        // and both legs share one kink ring with no transition faces. Each
+        // vertex slides along its own prism edge line, so wall quads stay in
+        // their side planes. Falls back to the transition-quad bridge when
+        // the slide would cross the first interior ring (inverting a wall
+        // band) or the kink is near-degenerate.
+        let mut exit_on_bisector = false;
+        if !is_last && matches!(placement, ProfilePlacement::AsPositioned) {
             let kink_u = kinks[seg_idx];
             let eps = 1e-8;
-
-            // Tangents on either side of the kink; the bisector plane's
-            // normal is their average.
-            let t_before = path.tangent(kink_u - eps)?;
-            let t_after = path.tangent(kink_u + eps)?;
-            let bisector = (t_before + t_after).normalize().unwrap_or(t_before);
-            let kink_point = path.evaluate(kink_u);
-
-            let denom = bisector.dot(t_before);
-            for vid in &mut ring_verts[num_segments] {
-                let pos = topo.vertex(*vid)?.point();
-                // Line-plane intersection along the end tangent. If the
-                // tangent is parallel to the plane (a near-reversal), leave
-                // the vertex untrimmed rather than collapsing it.
-                if denom.abs() > tol.linear {
-                    let d = bisector.dot(kink_point - pos);
-                    let miter_pos = pos + t_before * (d / denom);
-                    *vid = topo.add_vertex(Vertex::new(miter_pos, tol.linear));
+            let t_b = path.tangent(kink_u - eps)?;
+            let t_a = path.tangent(kink_u + eps)?;
+            if let Ok(bisector) = (t_b + t_a).normalize() {
+                let kink_point = path.evaluate(kink_u);
+                let t_end = sub_frames[num_segments].tangent;
+                let denom = bisector.dot(t_end);
+                let spacing = (sub_frames[num_segments].origin
+                    - sub_frames[num_segments - 1].origin)
+                    .length();
+                if denom.abs() > 0.1 {
+                    let slid: Vec<Point3> = ring_positions[num_segments]
+                        .iter()
+                        .map(|&p| p + t_end * (bisector.dot(kink_point - p) / denom))
+                        .collect();
+                    let max_slide = ring_positions[num_segments]
+                        .iter()
+                        .zip(&slid)
+                        .map(|(&p, &q)| (q - p).length())
+                        .fold(0.0_f64, f64::max);
+                    if max_slide < spacing * 0.95 {
+                        ring_positions[num_segments] = slid;
+                        exit_on_bisector = true;
+                    }
                 }
             }
         }
 
-        // Create ring edges. If the start ring was carried over from the
-        // previous segment's miter, reuse its edges.
+        // A segment whose predecessor ended on the shared bisector ring
+        // reuses those vertices and edges as its own entry ring (the guard
+        // keeps the first interior ring strictly ahead of the shared ring).
+        let entry_shared = match (&prev_end_ring, prev_end_on_bisector) {
+            (Some(prev_ring), true) => {
+                let t_start = sub_frames[0].tangent;
+                let mut ahead = true;
+                for (i, &vid) in prev_ring.iter().enumerate() {
+                    let p_prev = topo.vertex(vid)?.point();
+                    if (ring_positions[1][i] - p_prev).dot(t_start) <= tol.linear {
+                        ahead = false;
+                        break;
+                    }
+                }
+                ahead
+            }
+            _ => false,
+        };
+
+        let mut ring_verts: Vec<Vec<VertexId>> = Vec::with_capacity(num_segments + 1);
+        for (ring_idx, positions) in ring_positions.iter().enumerate() {
+            if let (0, true, Some(prev_ring)) = (ring_idx, entry_shared, prev_end_ring.as_ref()) {
+                ring_verts.push(prev_ring.clone());
+                continue;
+            }
+            let ring: Vec<VertexId> = positions
+                .iter()
+                .map(|&p| topo.add_vertex(Vertex::new(p, tol.linear)))
+                .collect();
+            ring_verts.push(ring);
+        }
+
+        // If we have a previous segment's end ring, either share it directly
+        // (exact miter — the shared ring already lies on the bisector plane)
+        // or replace this segment's start ring with a bridge miter ring.
+        #[allow(clippy::useless_let_if_seq)]
+        let mut miter_ring_edges_for_reuse: Option<Vec<brepkit_topology::edge::EdgeId>> = None;
+        if entry_shared {
+            miter_ring_edges_for_reuse.clone_from(&prev_end_ring_edges);
+        } else if let Some(ref prev_ring) = prev_end_ring {
+            // The kink point is where the previous segment ended / this one starts.
+            let kink_idx = seg_idx - 1;
+            let kink_u = kinks[kink_idx];
+            let eps = 1e-8;
+
+            // Get tangents on either side of the kink.
+            let t_before = path.tangent(kink_u - eps)?;
+            let t_after = path.tangent(kink_u + eps)?;
+
+            // Bisector direction: average of the two tangent directions.
+            let bisector = (t_before + t_after).normalize().unwrap_or(t_before);
+
+            // Miter plane: passes through the kink point with normal = bisector.
+            let kink_point = path.evaluate(kink_u);
+
+            // Project the profile ring onto the miter plane.
+            // For each profile vertex, find where the line from the previous
+            // segment's end position to the current segment's start position
+            // intersects the bisector plane.
+            let miter_ring: Vec<VertexId> = (0..n)
+                .map(|i| {
+                    let prev_pos = topo
+                        .vertex(prev_ring[i])
+                        .map(brepkit_topology::vertex::Vertex::point)
+                        .unwrap_or(kink_point);
+                    let curr_pos = topo
+                        .vertex(ring_verts[0][i])
+                        .map(brepkit_topology::vertex::Vertex::point)
+                        .unwrap_or(kink_point);
+
+                    // Ray-plane intersection: find t where
+                    // prev_pos + t*(curr_pos - prev_pos) lies on the bisector plane.
+                    let ray_dir = curr_pos - prev_pos;
+                    let denom = bisector.dot(ray_dir);
+                    let miter_pos = if denom.abs() > tol.linear {
+                        let d = bisector.dot(Vec3::new(
+                            kink_point.x() - prev_pos.x(),
+                            kink_point.y() - prev_pos.y(),
+                            kink_point.z() - prev_pos.z(),
+                        ));
+                        let t_intersect = d / denom;
+                        prev_pos + ray_dir * t_intersect
+                    } else {
+                        // Ray parallel to plane — use midpoint.
+                        Point3::new(
+                            (prev_pos.x() + curr_pos.x()) * 0.5,
+                            (prev_pos.y() + curr_pos.y()) * 0.5,
+                            (prev_pos.z() + curr_pos.z()) * 0.5,
+                        )
+                    };
+                    topo.add_vertex(Vertex::new(miter_pos, tol.linear))
+                })
+                .collect();
+
+            let miter_ring_edges: Vec<brepkit_topology::edge::EdgeId> = (0..n)
+                .map(|i| {
+                    let next = (i + 1) % n;
+                    topo.add_edge(Edge::new(miter_ring[i], miter_ring[next], EdgeCurve::Line))
+                })
+                .collect();
+
+            // Build miter face connecting the previous segment's end to
+            // the miter ring. The miter face is on the bisector plane.
+            let prev_ring_edges = prev_end_ring_edges.as_ref().ok_or_else(|| {
+                crate::OperationsError::InvalidInput {
+                    reason: "internal error: missing previous ring edges".into(),
+                }
+            })?;
+
+            let prev_to_miter_path_edges: Vec<brepkit_topology::edge::EdgeId> = (0..n)
+                .map(|i| topo.add_edge(Edge::new(prev_ring[i], miter_ring[i], EdgeCurve::Line)))
+                .collect();
+
+            for i in 0..n {
+                let next_i = (i + 1) % n;
+
+                let p0 = topo.vertex(prev_ring[i])?.point();
+                let p1 = topo.vertex(prev_ring[next_i])?.point();
+                let p_next = topo.vertex(miter_ring[i])?.point();
+                let edge_dir = p1 - p0;
+                let path_dir = p_next - p0;
+                let side_normal = edge_dir
+                    .cross(path_dir)
+                    .normalize()
+                    .unwrap_or(Vec3::new(1.0, 0.0, 0.0));
+                let side_d = dot_normal_point(side_normal, p0);
+
+                let side_wire = Wire::new(
+                    vec![
+                        OrientedEdge::new(prev_ring_edges[i], true),
+                        OrientedEdge::new(prev_to_miter_path_edges[next_i], true),
+                        OrientedEdge::new(miter_ring_edges[i], false),
+                        OrientedEdge::new(prev_to_miter_path_edges[i], false),
+                    ],
+                    true,
+                )
+                .map_err(crate::OperationsError::Topology)?;
+
+                let side_wire_id = topo.add_wire(side_wire);
+                all_faces.push(topo.add_face(Face::new(
+                    side_wire_id,
+                    vec![],
+                    FaceSurface::Plane {
+                        normal: side_normal,
+                        d: side_d,
+                    },
+                )));
+            }
+
+            // Replace this segment's start ring with the miter ring so the
+            // next segment's side faces connect miter→ring[1]. No separate
+            // miter cap faces are needed — the transition quad faces already
+            // connect prev_end_ring→miter_ring.
+            ring_verts[0] = miter_ring;
+            miter_ring_edges_for_reuse = Some(miter_ring_edges);
+        }
+
+        // Create ring edges. If the start ring was replaced by a miter ring,
+        // reuse the miter_ring_edges so both the miter transition faces and
+        // this segment's side faces reference the same edge entities.
         let mut ring_edges: Vec<Vec<brepkit_topology::edge::EdgeId>> =
             Vec::with_capacity(num_segments + 1);
         for (ring_idx, ring) in ring_verts.iter().enumerate() {
@@ -1972,7 +2226,7 @@ fn sweep_miter(
             inner_swept.push(sweep_wire_through_frames(
                 topo,
                 iw_id,
-                centroid,
+                reference,
                 initial_right,
                 initial_up,
                 initial_tangent,
@@ -2071,13 +2325,10 @@ fn sweep_miter(
             )));
         }
 
-        // Save the end ring and frame for the next segment's miter connection.
+        // Save the end ring for the next segment's miter connection.
         prev_end_ring = Some(ring_verts[num_segments].clone());
         prev_end_ring_edges = Some(ring_edges[num_segments].clone());
-        prev_end_frame = Some((
-            sub_frames[num_segments].tangent,
-            sub_frames[num_segments].up,
-        ));
+        prev_end_on_bisector = exit_on_bisector;
     }
 
     let shell = Shell::new(all_faces).map_err(crate::OperationsError::Topology)?;
@@ -2642,6 +2893,129 @@ pub fn sweep_guided(
             ..Default::default()
         },
     )
+}
+
+mod spine;
+
+/// Sweep a face profile along a path defined by a chain of edges.
+///
+/// A closed planar G1 chain of lines and tangent circular arcs (a rounded
+/// rectangle) with an all-line perpendicular profile is swept analytically:
+/// one exact plane / cylinder / cone face per profile edge per spine segment
+/// (the `spine` submodule). Anything else falls back to sampling the chain, fitting an
+/// interpolating NURBS curve, and sweeping along that.
+///
+/// # Errors
+///
+/// Returns an error if the chain has no edges, too few distinct points to fit
+/// a path, or the underlying sweep fails.
+pub fn sweep_along_edges(
+    topo: &mut Topology,
+    profile: FaceId,
+    edges: &[brepkit_topology::edge::EdgeId],
+) -> Result<SolidId, crate::OperationsError> {
+    if edges.is_empty() {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: "sweep_along_edges requires at least one edge".into(),
+        });
+    }
+
+    if let Some(solid) = spine::try_analytic_spine_sweep(topo, profile, edges)? {
+        return Ok(solid);
+    }
+
+    let tol = Tolerance::new();
+
+    // Collect ordered points from the edge chain, sampling curved edges.
+    let mut points: Vec<Point3> = Vec::new();
+    for &eid in edges {
+        let edge_data = topo.edge(eid)?;
+        let start = topo.vertex(edge_data.start())?.point();
+        if points
+            .last()
+            .is_none_or(|p: &Point3| (*p - start).length() > tol.linear)
+        {
+            points.push(start);
+        }
+
+        match edge_data.curve() {
+            EdgeCurve::NurbsCurve(curve) => {
+                let (u0, u1) = curve.domain();
+                let n_samples = 4;
+                for i in 1..n_samples {
+                    #[allow(clippy::cast_precision_loss)]
+                    let frac = i as f64 / n_samples as f64;
+                    points.push(curve.evaluate(u0 + frac * (u1 - u0)));
+                }
+            }
+            EdgeCurve::Circle(circle) => {
+                let t_start = circle.project(start);
+                let end_pt = topo.vertex(edge_data.end())?.point();
+                let mut t_end = circle.project(end_pt);
+                if t_end <= t_start {
+                    t_end += std::f64::consts::TAU;
+                }
+                let n_samples = 8;
+                for i in 1..n_samples {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = t_start + (t_end - t_start) * (i as f64) / (n_samples as f64);
+                    points.push(circle.evaluate(t));
+                }
+            }
+            EdgeCurve::Ellipse(ellipse) => {
+                let t_start = ellipse.project(start);
+                let end_pt = topo.vertex(edge_data.end())?.point();
+                let mut t_end = ellipse.project(end_pt);
+                if t_end <= t_start {
+                    t_end += std::f64::consts::TAU;
+                }
+                let n_samples = 8;
+                for i in 1..n_samples {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = t_start + (t_end - t_start) * (i as f64) / (n_samples as f64);
+                    points.push(ellipse.evaluate(t));
+                }
+            }
+            EdgeCurve::Hyperbola(hyperbola) => {
+                let end_pt = topo.vertex(edge_data.end())?.point();
+                let (t_start, t_end) = (hyperbola.project(start), hyperbola.project(end_pt));
+                let n_samples = 8;
+                for i in 1..n_samples {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = t_start + (t_end - t_start) * (i as f64) / (n_samples as f64);
+                    points.push(hyperbola.evaluate(t));
+                }
+            }
+            EdgeCurve::Parabola(parabola) => {
+                let end_pt = topo.vertex(edge_data.end())?.point();
+                let (t_start, t_end) = (parabola.project(start), parabola.project(end_pt));
+                let n_samples = 8;
+                for i in 1..n_samples {
+                    #[allow(clippy::cast_precision_loss)]
+                    let t = t_start + (t_end - t_start) * (i as f64) / (n_samples as f64);
+                    points.push(parabola.evaluate(t));
+                }
+            }
+            EdgeCurve::Line => {}
+        }
+
+        let end = topo.vertex(edge_data.end())?.point();
+        points.push(end);
+    }
+
+    if points.len() < 2 {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: "sweep_along_edges: need at least 2 distinct points".into(),
+        });
+    }
+
+    // Densify long, sparsely-sampled spans so the global interpolating fit
+    // does not overshoot at adjacent high-curvature corners.
+    let points = densify_path_points(&points);
+    let degree = std::cmp::min(3, points.len() - 1);
+    let path_curve = brepkit_math::nurbs::fitting::interpolate(&points, degree)?;
+
+    sweep(topo, profile, &path_curve)
 }
 
 #[cfg(test)]
