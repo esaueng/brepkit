@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786336533112,
+  "lastUpdate": 1786337070294,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6371,6 +6371,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14154949,
             "range": "± 89556",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "749e427ac2324e6138c92407bebabff81bd32e2e",
+          "message": "Merge pull request #124 from esaueng/codex/preserve-v3.2.18-fork-contracts\n\ntest: preserve fork chamfer contract after v3.2.18 sync",
+          "timestamp": "2026-08-10T00:42:30-04:00",
+          "tree_id": "b5ee5ada035937a9f6e781cfe64553513eca351b",
+          "url": "https://github.com/esaueng/brepkit/commit/749e427ac2324e6138c92407bebabff81bd32e2e"
+        },
+        "date": 1786337069101,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 458816,
+            "range": "± 1413",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 508546,
+            "range": "± 1220",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6505,
+            "range": "± 45",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 438312,
+            "range": "± 617",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13923255,
+            "range": "± 30594",
             "unit": "ns/iter"
           }
         ]
