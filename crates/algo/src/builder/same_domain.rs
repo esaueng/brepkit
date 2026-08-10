@@ -136,6 +136,7 @@ struct SdGrouping {
     sd_groups: HashMap<usize, Vec<usize>>,
     pair_data: HashMap<(usize, usize), bool>,
     geometric_overlap_groups: HashSet<usize>,
+    edge_sets: Vec<Option<EdgeSet>>,
 }
 
 /// Detect and union all coincident (same-domain) sub-faces.
@@ -151,6 +152,7 @@ fn build_sd_grouping(
             sd_groups: HashMap::new(),
             pair_data: HashMap::new(),
             geometric_overlap_groups: HashSet::new(),
+            edge_sets: Vec::new(),
         };
     }
 
@@ -171,6 +173,33 @@ fn build_sd_grouping(
         .iter()
         .map(|sf| compute_directed_boundary_quantized(topo, arena, sf.face_id, scale))
         .collect();
+
+    // `BK_SD_SETS=1`: print every sub-face's quantized edge set (sorted), for
+    // run-to-run determinism diffs of the SD grouping input.
+    if std::env::var("BK_SD_SETS").is_ok() {
+        let mut rows: Vec<String> = sub_faces
+            .iter()
+            .zip(edge_sets.iter())
+            .map(|(sf, es)| {
+                let set = es.as_ref().map_or_else(
+                    || "-".to_string(),
+                    |es| {
+                        let mut items: Vec<String> = es.iter().map(|q| format!("{q:?}")).collect();
+                        items.sort();
+                        items.join(";")
+                    },
+                );
+                format!(
+                    "SDSET src={:?} rank={:?} set={set}",
+                    sf.source_face, sf.rank
+                )
+            })
+            .collect();
+        rows.sort();
+        for r in rows {
+            log::debug!("{r}");
+        }
+    }
 
     // Key = edge set, Value = list of sub-face indices with that set.
     let mut groups: HashMap<EdgeSet, Vec<usize>> = HashMap::new();
@@ -442,6 +471,7 @@ fn build_sd_grouping(
         sd_groups,
         pair_data,
         geometric_overlap_groups,
+        edge_sets,
     }
 }
 
@@ -481,6 +511,7 @@ pub fn detect_same_domain_with_shells<S: BuildHasher>(
         sd_groups,
         pair_data,
         geometric_overlap_groups,
+        edge_sets,
     } = build_sd_grouping(topo, arena, sub_faces, tol);
 
     let mut pairs = Vec::new();
@@ -496,7 +527,39 @@ pub fn detect_same_domain_with_shells<S: BuildHasher>(
     // dropping it as a duplicate orphans the void walls into an open hole
     // shell. Without shell information (`None`, the test-only path) every
     // pair keeps the historic dedup.
-    let is_residue = |i: usize, j: usize| -> bool {
+    // A complementary partition of one source face is structural, never
+    // duplicate residue. A second structural gate keeps containment-matched
+    // shim faces whose edges are load-bearing outside their same-domain group.
+    let mut edge_users: HashMap<brepkit_topology::edge::EdgeId, Vec<usize>> = HashMap::new();
+    for (idx, sf) in sub_faces.iter().enumerate() {
+        let Ok(face) = topo.face(sf.face_id) else {
+            continue;
+        };
+        for wid in std::iter::once(face.outer_wire()).chain(face.inner_wires().iter().copied()) {
+            let Ok(wire) = topo.wire(wid) else { continue };
+            for oe in wire.edges() {
+                edge_users.entry(oe.edge()).or_default().push(idx);
+            }
+        }
+    }
+    let entangled_outside_group = |i: usize, members: &HashSet<usize>| -> bool {
+        let Ok(face) = topo.face(sub_faces[i].face_id) else {
+            return false;
+        };
+        for wid in std::iter::once(face.outer_wire()).chain(face.inner_wires().iter().copied()) {
+            let Ok(wire) = topo.wire(wid) else { continue };
+            for oe in wire.edges() {
+                if edge_users
+                    .get(&oe.edge())
+                    .is_some_and(|users| users.iter().any(|u| !members.contains(u)))
+                {
+                    return true;
+                }
+            }
+        }
+        false
+    };
+    let is_residue = |i: usize, j: usize, members: &HashSet<usize>| -> bool {
         // Two pieces of ONE source face's partition TILE that face — they are
         // complementary regions, never copies of one another, so one is never
         // residue for the other however the grouping reached them. The pairwise
@@ -519,22 +582,28 @@ pub fn detect_same_domain_with_shells<S: BuildHasher>(
                 _ => false,
             }
         });
+        let coextensive = matches!(
+            (&edge_sets[i], &edge_sets[j]),
+            (Some(a), Some(b)) if a == b
+        );
+        let shim = !coextensive && entangled_outside_group(i, members);
         if std::env::var("BK_SD").is_ok() {
             log::debug!(
-                "SD residue-gate i={i} face={:?} src={:?} j={j} face={:?} src={:?} cross_shell={cross_shell}",
+                "SD residue-gate i={i} face={:?} src={:?} j={j} face={:?} src={:?} cross_shell={cross_shell} coextensive={coextensive} shim={shim}",
                 sub_faces[i].face_id,
                 sub_faces[i].source_face,
                 sub_faces[j].face_id,
                 sub_faces[j].source_face
             );
         }
-        !cross_shell
+        !cross_shell && !shim
     };
 
     for (root, members) in &sd_groups {
         if members.len() < 2 {
             continue;
         }
+        let member_set: HashSet<usize> = members.iter().copied().collect();
 
         let repr_a = members
             .iter()
@@ -600,7 +669,7 @@ pub fn detect_same_domain_with_shells<S: BuildHasher>(
                     } else {
                         idx_b
                     };
-                    if !is_residue(idx, rep) {
+                    if !is_residue(idx, rep, &member_set) {
                         continue;
                     }
                     within_rank_dups.push(WithinRankDuplicate {
@@ -615,7 +684,7 @@ pub fn detect_same_domain_with_shells<S: BuildHasher>(
             // classification (issue #696).
             (Some(rep), None) | (None, Some(rep)) => {
                 for &idx in members {
-                    if idx != rep && is_residue(idx, rep) {
+                    if idx != rep && is_residue(idx, rep, &member_set) {
                         within_rank_dups.push(WithinRankDuplicate {
                             representative: rep,
                             duplicate: idx,

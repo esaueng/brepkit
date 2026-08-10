@@ -1155,6 +1155,101 @@ fn assemble_mixed_planar_only() {
 }
 
 #[test]
+fn assemble_mixed_drops_sub_resolution_polygon() {
+    // A polygon whose vertices all quantize to one merged vertex loses every
+    // edge to the degenerate/duplicate skips; it must be dropped, not error
+    // the whole assembly with an empty wire (seen in the mesh-fallback fuse of
+    // a heavily faceted sweep operand).
+    let mut topo = Topology::new();
+    let unit_cube_faces = [
+        (
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 0.0, -1.0],
+            0.0,
+        ),
+        (
+            [0.0, 0.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [1.0, 1.0, 1.0],
+            [0.0, 1.0, 1.0],
+            [0.0, 0.0, 1.0],
+            1.0,
+        ),
+        (
+            [0.0, 0.0, 0.0],
+            [1.0, 0.0, 0.0],
+            [1.0, 0.0, 1.0],
+            [0.0, 0.0, 1.0],
+            [0.0, -1.0, 0.0],
+            0.0,
+        ),
+        (
+            [0.0, 1.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [0.0, 1.0, 1.0],
+            [0.0, 1.0, 0.0],
+            1.0,
+        ),
+        (
+            [0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0],
+            [0.0, 1.0, 1.0],
+            [0.0, 0.0, 1.0],
+            [-1.0, 0.0, 0.0],
+            0.0,
+        ),
+        (
+            [1.0, 0.0, 0.0],
+            [1.0, 1.0, 0.0],
+            [1.0, 1.0, 1.0],
+            [1.0, 0.0, 1.0],
+            [1.0, 0.0, 0.0],
+            1.0,
+        ),
+    ];
+    let mut specs: Vec<FaceSpec> = unit_cube_faces
+        .iter()
+        .map(|&(a, b, c, d, n, dist)| FaceSpec::Planar {
+            vertices: vec![
+                Point3::new(a[0], a[1], a[2]),
+                Point3::new(b[0], b[1], b[2]),
+                Point3::new(c[0], c[1], c[2]),
+                Point3::new(d[0], d[1], d[2]),
+            ],
+            normal: Vec3::new(n[0], n[1], n[2]),
+            d: dist,
+            inner_wires: vec![],
+        })
+        .collect();
+    // Sub-resolution sliver: all three vertices within 1e-9 on a unit-scale
+    // model (merge cell ~1.7e-7), so they collapse to one vertex id.
+    specs.push(FaceSpec::Planar {
+        vertices: vec![
+            Point3::new(0.5, 0.5, 1.0),
+            Point3::new(0.5 + 1e-9, 0.5, 1.0),
+            Point3::new(0.5, 0.5 + 1e-9, 1.0),
+        ],
+        normal: Vec3::new(0.0, 0.0, 1.0),
+        d: 1.0,
+        inner_wires: vec![],
+    });
+
+    let solid = assemble_solid_mixed(&mut topo, &specs, Tolerance::new())
+        .expect("sub-resolution polygon must be dropped, not error the assembly");
+    let s = topo.solid(solid).unwrap();
+    let sh = topo.shell(s.outer_shell()).unwrap();
+    assert_eq!(
+        sh.faces().len(),
+        6,
+        "the degenerate polygon must not appear as a face"
+    );
+}
+
+#[test]
 fn assemble_mixed_with_nurbs() {
     use brepkit_math::nurbs::surface::NurbsSurface;
 
@@ -7423,13 +7518,12 @@ fn lip_ring_loft_cut_is_orientation_consistent() {
 // ═══════════════════════════════════════════════════════════════════════
 
 #[test]
-#[ignore = "ready repro: intersect(corner box, center sphere) keeps the wrong sphere region — \
-            vol 1304.8 vs the exact octant 268.083, every probe point classifies Outside \
-            (including inside the true octant), and oriented volume (1148.8) disagrees with \
-            the magnitude (1304.8). Three coordinate planes through the sphere center = the \
-            chord-discretized-equator sphere-split family (roadmap TERMINAL-adjacent: the \
-            general UV-space sphere arrangement splitter is the named missing primitive)"]
 fn bench_equiv_intersect_box_corner_sphere_is_the_octant() {
+    // CLOSED 2026-08-07: the analytic octant shortcut built its three cut
+    // arcs on circles with the OUTWARD plane normals, storing the 270-degree
+    // complements (mid-points on the far side of the sphere) — the whole
+    // wrong-region volume. Inward normals make them the intended quarters.
+    // The GFA path was already correct; only the shortcut was wrong.
     let mut topo = Topology::new();
     let b = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
     let s = crate::primitives::make_sphere(&mut topo, 8.0, 32).unwrap();
@@ -7673,4 +7767,340 @@ fn fuse_cylinder_crossing_a_wall_at_its_rim_still_merges() {
         let got = format!("{:?}", classify_point(&topo, result, p, &opts).unwrap());
         assert_eq!(got, want, "classify {p:?}");
     }
+}
+
+#[test]
+fn mesh_fallback_counter_records_fallbacks() {
+    // Single test (not two) so the two counter reads cannot race each
+    // other under the parallel test runner. The monotonic assertions
+    // tolerate concurrent increments from unrelated tests; only the
+    // ordering within this test is load-bearing.
+    //
+    // Phase 1: a clean overlapping-box fuse stays analytic. Phase 2 uses the
+    // quarter-cone intersection whose closed result is intentionally produced
+    // by the mesh route. Edge-touching boxes are no longer a reliable trigger:
+    // the upstream disjoint/touching fast path now resolves them analytically.
+    let mut topo = Topology::new();
+    let a = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    let b = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    let m = brepkit_math::mat::Mat4::translation(1.0, 1.0, 1.0);
+    crate::transform::transform_solid(&mut topo, b, &m).unwrap();
+    let clean = boolean(&mut topo, BooleanOp::Fuse, a, b).unwrap();
+    assert!(crate::measure::solid_volume(&topo, clean, 0.1).unwrap() > 0.0);
+
+    let c = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    let d = crate::primitives::make_cone(&mut topo, 1.0, 0.0, 2.0).unwrap();
+    let before = super::mesh_fallback_count();
+    let result = boolean(&mut topo, BooleanOp::Intersect, c, d);
+    assert!(result.is_ok(), "quarter-cone intersection should succeed");
+    assert!(
+        super::mesh_fallback_count() > before,
+        "quarter-cone intersection should increment the mesh fallback counter"
+    );
+}
+
+/// A gridfinity-style baseplate pocket: a ruled loft of rounded-rect
+/// sections, full cell size at the top (walls land exactly on the cell
+/// boundary) tapering inward below. At pitch == cell size, adjacent pockets'
+/// wall planes are coplanar and each wall plane is tangent to the neighbor's
+/// corner cones — the #1488 grazing configuration.
+#[cfg(feature = "perf-counters")]
+fn make_plate_pocket(topo: &mut Topology, cx: f64, cy: f64) -> SolidId {
+    make_plate_pocket_profiled(topo, cx, cy, false)
+}
+
+/// `simplified` mirrors the tool's preview cutter (2 sections + through
+/// extension): walls slant from full cell size straight to the bottom inset,
+/// so adjacent pockets touch only along their shared top EDGE — the
+/// non-manifold-union configuration.
+fn make_plate_pocket_profiled(topo: &mut Topology, cx: f64, cy: f64, simplified: bool) -> SolidId {
+    let cell = 42.0;
+    let sections: &[(f64, f64)] = if simplified {
+        &[(1.0, 0.0), (-5.0, 2.95), (-6.0, 2.95)]
+    } else {
+        &[
+            (1.0, 0.0),
+            (0.0, 0.0),
+            (-0.25, 0.0),
+            (-2.4, 2.15),
+            (-4.2, 2.15),
+            (-5.0, 2.95),
+            (-6.0, 2.95),
+        ]
+    };
+    let profs: Vec<brepkit_topology::face::FaceId> = sections
+        .iter()
+        .map(|&(z, inset): &(f64, f64)| {
+            let w = cell - 2.0 * inset;
+            let r = (4.0_f64 - inset).max(0.1);
+            make_offset_rounded_rect_face(topo, cx, cy, w, r, z)
+        })
+        .collect();
+    crate::loft::loft(topo, &profs).unwrap()
+}
+
+fn make_offset_rounded_rect_face(
+    topo: &mut Topology,
+    cx: f64,
+    cy: f64,
+    w: f64,
+    r: f64,
+    z: f64,
+) -> brepkit_topology::face::FaceId {
+    use brepkit_math::curves::Circle3D;
+    let tol_val = 1e-7;
+    let c = w / 2.0 - r;
+    let corners = [
+        (cx + c, cy + c, 0.0_f64),
+        (cx - c, cy + c, 90.0),
+        (cx - c, cy - c, 180.0),
+        (cx + c, cy - c, 270.0),
+    ];
+    let pt = |kx: f64, ky: f64, deg: f64| {
+        let a = deg.to_radians();
+        Point3::new(kx + r * a.cos(), ky + r * a.sin(), z)
+    };
+    let mut vids = Vec::new();
+    for &(kx, ky, a0) in &corners {
+        vids.push(topo.add_vertex(Vertex::new(pt(kx, ky, a0), tol_val)));
+        vids.push(topo.add_vertex(Vertex::new(pt(kx, ky, a0 + 90.0), tol_val)));
+    }
+    let mut oes = Vec::new();
+    for (k, &(kx, ky, _)) in corners.iter().enumerate() {
+        let circle = Circle3D::new(Point3::new(kx, ky, z), Vec3::new(0.0, 0.0, 1.0), r).unwrap();
+        let arc = topo.add_edge(Edge::new(
+            vids[2 * k],
+            vids[2 * k + 1],
+            EdgeCurve::Circle(circle),
+        ));
+        oes.push(OrientedEdge::new(arc, true));
+        let line = topo.add_edge(Edge::new(
+            vids[2 * k + 1],
+            vids[(2 * k + 2) % 8],
+            EdgeCurve::Line,
+        ));
+        oes.push(OrientedEdge::new(line, true));
+    }
+    let wid = topo.add_wire(Wire::new(oes, true).unwrap());
+    topo.add_face(Face::new(
+        wid,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: z,
+        },
+    ))
+}
+
+/// #1488 phase 2 (the app-path 10x): the tool's PREVIEW pocket cutter is a
+/// 2-section loft whose pockets touch only along shared top edges. Their
+/// union is genuinely non-manifold, so `fuse_cluster`'s pairwise fuses all
+/// degraded to the mesh fallback and `compound_cut` batched against an
+/// all-planar blob (11 s and lost cones on the 4x4 plate). A fallback-
+/// tainted merge now bails to the exact sequential cuts.
+#[test]
+fn compound_cut_edge_tangent_tools_stays_analytic() {
+    // The global fallback counter is shared across parallel tests, so a
+    // concurrent test's genuine fallback can land inside this window. A
+    // REAL leak from the discarded probe fuse is deterministic (+1 on every
+    // run); race noise is not — retry up to 3 fresh runs and require one
+    // clean window. Deterministic single-pass under nextest.
+    let mut counter_clean = false;
+    for _ in 0..3 {
+        let mut topo = Topology::new();
+        let slab = crate::primitives::make_box(&mut topo, 84.0, 84.0, 5.0).unwrap();
+        let mut pockets = Vec::new();
+        for i in 0..2 {
+            for j in 0..2 {
+                let p = make_plate_pocket_profiled(
+                    &mut topo,
+                    21.0 + 42.0 * f64::from(i),
+                    21.0 + 42.0 * f64::from(j),
+                    true,
+                );
+                // The pocket loft opens downward from z=+1; the slab occupies
+                // z in [0,5], so shift the pockets to cut from the slab top.
+                crate::transform::transform_solid(
+                    &mut topo,
+                    p,
+                    &brepkit_math::mat::Mat4::translation(0.0, 0.0, 5.0),
+                )
+                .unwrap();
+                pockets.push(p);
+            }
+        }
+
+        let fallbacks_before = super::mesh_fallback_count();
+        let result =
+            super::compound_cut(&mut topo, slab, &pockets, super::BooleanOptions::default())
+                .unwrap();
+        let fallback_delta = super::mesh_fallback_count() - fallbacks_before;
+
+        let face_ids = brepkit_topology::explorer::solid_faces(&topo, result).unwrap();
+        let cones = face_ids
+            .iter()
+            .filter(|&&f| {
+                matches!(
+                    topo.face(f).unwrap().surface(),
+                    brepkit_topology::face::FaceSurface::Cone(_)
+                )
+            })
+            .count();
+        assert!(
+            cones >= 8,
+            "edge-tangent pocket cut lost its analytic cones (got {cones} of {} faces) — \
+             the batch used a mesh-fallback tool",
+            face_ids.len()
+        );
+        let adj = brepkit_topology::adjacency::AdjacencyIndex::build(&topo, result).unwrap();
+        assert_eq!(adj.boundary_edges().len(), 0, "result must be watertight");
+
+        if fallback_delta == 0 {
+            counter_clean = true;
+            break;
+        }
+    }
+    assert!(
+        counter_clean,
+        "fallback counter grew on every attempt: the discarded probe fuse \
+         leaks its increment (export pipelines would read phantom degradation)"
+    );
+}
+
+/// Complexity guard for the #1488 baseplate regression: a wall plane grazing
+/// a neighbor pocket's taper cone samples the section hyperbola across the
+/// UNBOUNDED cone; without `clip_chain_to_pair_boxes` the full ~512-point
+/// chain feeds the dense O(n³) interpolation per grazing pair (~60ms each,
+/// the whole plate fuse budget). Counting fit points keeps the guard
+/// deterministic. Bounds calibrated on the fixed path; reverting the clip
+/// sends the grazing count into the thousands.
+#[cfg(feature = "perf-counters")]
+#[test]
+fn tangent_graze_section_fit_is_clipped() {
+    // Two pockets at exact cell pitch: coplanar walls, tangent cones.
+    let mut topo = Topology::new();
+    let a = make_plate_pocket(&mut topo, 21.0, 21.0);
+    let b = make_plate_pocket(&mut topo, 63.0, 21.0);
+    brepkit_algo::perf::reset();
+    brepkit_algo::gfa::fuse_n(&mut topo, &[a, b]).unwrap();
+    let graze = brepkit_algo::perf::snapshot().section_fit_points;
+
+    // Same pockets genuinely overlapping: real plane×cone crossings must
+    // still fit their (clipped) sections, proving the counter is live.
+    let mut topo = Topology::new();
+    let a = make_plate_pocket(&mut topo, 21.0, 21.0);
+    let b = make_plate_pocket(&mut topo, 51.0, 21.0);
+    brepkit_algo::perf::reset();
+    brepkit_algo::gfa::fuse_n(&mut topo, &[a, b]).unwrap();
+    let overlap = brepkit_algo::perf::snapshot().section_fit_points;
+
+    eprintln!("section_fit_points: graze={graze} overlap={overlap}");
+    assert!(
+        overlap > 0,
+        "overlapping-pocket fuse should exercise the sampled section-fit path"
+    );
+    assert!(
+        graze < 600,
+        "grazing-pocket fuse fit {graze} section points — the chain clip regressed"
+    );
+}
+
+/// gh #1499: an annular wedge (partial revolve) about the Z axis.
+///
+/// Profile rectangle r0..r1 × z0..z1 in the y=0 plane, revolved by `angle`,
+/// then rotated so its angular span starts at `start_angle`.
+fn make_annular_wedge(
+    topo: &mut Topology,
+    r0: f64,
+    r1: f64,
+    z0: f64,
+    z1: f64,
+    angle: f64,
+    start_angle: f64,
+) -> SolidId {
+    use brepkit_topology::builder::make_polygon_wire;
+
+    let wire = make_polygon_wire(
+        topo,
+        &[
+            Point3::new(r0, 0.0, z0),
+            Point3::new(r1, 0.0, z0),
+            Point3::new(r1, 0.0, z1),
+            Point3::new(r0, 0.0, z1),
+        ],
+        1e-7,
+    )
+    .unwrap();
+    let face = topo.add_face(Face::new(
+        wire,
+        vec![],
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 1.0, 0.0),
+            d: 0.0,
+        },
+    ));
+    let solid = crate::revolve::revolve(
+        topo,
+        face,
+        Point3::new(0.0, 0.0, 0.0),
+        Vec3::new(0.0, 0.0, 1.0),
+        angle,
+    )
+    .unwrap();
+    if start_angle != 0.0 {
+        crate::transform::transform_solid(
+            topo,
+            solid,
+            &brepkit_math::mat::Mat4::rotation_z(start_angle),
+        )
+        .unwrap();
+    }
+    solid
+}
+
+#[test]
+fn cut_wedge_by_thin_radial_strut_is_not_empty() {
+    // gh #1499: the kumiko corner cutter. A wide annular wedge cut by a thin
+    // radial strut that pokes through it (wider radially and axially, but a
+    // fraction of the angular span — 3.4× smaller by volume). The strut can
+    // NOT contain the wedge, yet the trivial-containment shortcut declared
+    // "target fully contained in tool" and returned EmptyResult:
+    //  - neither operand builds an analytic classifier (two different-radius
+    //    cylinders), so containment fell to the AABB-only fallback;
+    //  - `solid_bounding_box` expands partial cylinder faces to the FULL
+    //    circle, so the thin strut's box ballooned to ±r1 and strictly
+    //    contained the wedge's box in all three dims;
+    //  - the `center_outside` witness was disabled because the wedge's AABB
+    //    center sits in its own annular hole.
+    use crate::measure::solid_volume;
+
+    let mut topo = Topology::new();
+    // Faithful to the failing tool call: base vol ≈ 175.7, tool vol ≈ 52.1,
+    // tool AABB ⊋ base AABB by just over 10% in every dim.
+    let base = make_annular_wedge(&mut topo, 2.85, 4.75, 2.7, 13.8, 2.2, 0.0);
+    let tool = make_annular_wedge(&mut topo, 2.8, 5.25, 2.1, 14.4, 0.44, 0.88);
+
+    let base_vol = solid_volume(&topo, base, 0.01).unwrap();
+    let tool_vol = solid_volume(&topo, tool, 0.01).unwrap();
+    assert!(
+        base_vol > tool_vol * 3.0,
+        "precondition: tool ({tool_vol}) must be much smaller than base ({base_vol})"
+    );
+
+    let result = boolean(&mut topo, BooleanOp::Cut, base, tool)
+        .expect("cut must not be trivially empty: the tool cannot contain the base");
+    let cut_vol = solid_volume(&topo, result, 0.01).unwrap();
+
+    // Volume invariant: vol(A−B) + vol(A∩B) = vol(A).
+    let overlap = boolean(&mut topo, BooleanOp::Intersect, base, tool)
+        .expect("operands overlap, intersect must not be empty");
+    let overlap_vol = solid_volume(&topo, overlap, 0.01).unwrap();
+    assert!(
+        overlap_vol > 1.0,
+        "the strut pokes through the wedge, overlap must be substantial, got {overlap_vol}"
+    );
+    assert!(
+        (cut_vol + overlap_vol - base_vol).abs() / base_vol < 0.01,
+        "vol(A−B) + vol(A∩B) = vol(A) violated: {cut_vol} + {overlap_vol} ≠ {base_vol}"
+    );
 }

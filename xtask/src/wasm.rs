@@ -186,7 +186,14 @@ pub fn merge_packages() -> Result<()> {
 }
 
 fn copy_package_metadata(root: &Path, pkg: &Path) -> Result<()> {
-    for name in ["LICENSE-MIT", "LICENSE-APACHE"] {
+    for legacy in ["LICENSE-MIT", "LICENSE-APACHE"] {
+        let path = pkg.join(legacy);
+        if path.exists() {
+            fs::remove_file(&path)
+                .with_context(|| format!("removing stale {legacy} from npm package"))?;
+        }
+    }
+    for name in ["LICENSE", "COMMERCIAL-LICENSE.md"] {
         fs::copy(root.join(name), pkg.join(name))
             .with_context(|| format!("copying {name} into npm package"))?;
     }
@@ -267,7 +274,18 @@ fn patch_package_json(pkg_json: &mut serde_json::Value) -> Result<()> {
         .as_array_mut()
         .context("package.json files is not an array")?;
 
-    for entry in ["brepkit_wasm_node.cjs", "LICENSE-MIT", "LICENSE-APACHE"] {
+    files.retain(|entry| {
+        !matches!(
+            entry.as_str(),
+            Some("LICENSE-MIT" | "LICENSE-APACHE")
+        )
+    });
+
+    for entry in [
+        "brepkit_wasm_node.cjs",
+        "LICENSE",
+        "COMMERCIAL-LICENSE.md",
+    ] {
         let entry = serde_json::json!(entry);
         if !files.contains(&entry) {
             files.push(entry);
@@ -295,8 +313,8 @@ fn validate_at(pkg: &Path) -> Result<()> {
         "brepkit_wasm_node.cjs",
         "brepkit_wasm.d.ts",
         "package.json",
-        "LICENSE-MIT",
-        "LICENSE-APACHE",
+        "LICENSE",
+        "COMMERCIAL-LICENSE.md",
     ];
     for file in &required_files {
         let path = pkg.join(file);
@@ -421,7 +439,11 @@ fn validate_package_json(pkg_json: &serde_json::Value, errors: &mut Vec<String>)
     }
 
     if let Some(files) = pkg_json.get("files").and_then(|v| v.as_array()) {
-        for required in ["brepkit_wasm_node.cjs", "LICENSE-MIT", "LICENSE-APACHE"] {
+        for required in [
+            "brepkit_wasm_node.cjs",
+            "LICENSE",
+            "COMMERCIAL-LICENSE.md",
+        ] {
             if !files.iter().any(|v| v.as_str() == Some(required)) {
                 errors.push(format!("files array missing '{required}'"));
             } else {
@@ -535,8 +557,10 @@ mod tests {
 
         let files = pkg["files"].as_array().unwrap();
         assert!(files.contains(&json!("brepkit_wasm_node.cjs")));
-        assert!(files.contains(&json!("LICENSE-MIT")));
-        assert!(files.contains(&json!("LICENSE-APACHE")));
+        assert!(files.contains(&json!("LICENSE")));
+        assert!(files.contains(&json!("COMMERCIAL-LICENSE.md")));
+        assert!(!files.contains(&json!("LICENSE-MIT")));
+        assert!(!files.contains(&json!("LICENSE-APACHE")));
         // Original files preserved
         assert!(files.contains(&json!("brepkit_wasm_bg.wasm")));
     }
