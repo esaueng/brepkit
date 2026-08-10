@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786335240763,
+  "lastUpdate": 1786336533112,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6317,6 +6317,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14512974,
             "range": "± 99011",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1a051db18960a442ecbc339a7aa4deb863b7d77d",
+          "message": "Merge pull request #123 from esaueng/codex/repair-brepkit-3-0-1\n\nfix: repair BrepKit 3.0.1 geometry regressions",
+          "timestamp": "2026-08-10T00:33:34-04:00",
+          "tree_id": "bb3177b122f6a96361b098d9df1784fa7efbdd60",
+          "url": "https://github.com/esaueng/brepkit/commit/1a051db18960a442ecbc339a7aa4deb863b7d77d"
+        },
+        "date": 1786336531993,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 488217,
+            "range": "± 1124",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 516415,
+            "range": "± 2254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6934,
+            "range": "± 10",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 448720,
+            "range": "± 1967",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14154949,
+            "range": "± 89556",
             "unit": "ns/iter"
           }
         ]
