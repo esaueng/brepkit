@@ -44,6 +44,29 @@ use brepkit_topology::edge::EdgeCurve;
 use brepkit_topology::face::{FaceId, FaceSurface};
 use brepkit_topology::solid::SolidId;
 
+static MESH_FALLBACK_COUNT: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// Number of boolean operations that have used the mesh (co-refinement)
+/// fallback since process start.
+///
+/// The fallback loses analytic surface types and does not guarantee a
+/// watertight result, so callers that require exact geometry (export
+/// pipelines in particular) can snapshot this counter around an operation
+/// chain and refuse the output when it grew.
+pub fn mesh_fallback_count() -> u64 {
+    MESH_FALLBACK_COUNT.load(std::sync::atomic::Ordering::Relaxed)
+}
+
+thread_local! {
+    /// Whether the innermost `boolean_inner` call routed through the mesh
+    /// fallback. Set at the fallback site, consumed by the callers that
+    /// decide whether the result is DELIVERED (counted) or DISCARDED (a
+    /// batching probe in `fuse_cluster`) — the public counter only records
+    /// fallbacks whose output actually reaches a caller, keeping its
+    /// monotonic snapshot-and-diff contract exact (#1445).
+    static LAST_USED_MESH_FALLBACK: std::cell::Cell<bool> = const { std::cell::Cell::new(false) };
+}
+
 /// Perform a boolean operation on two solids.
 ///
 /// Uses the GFA pipeline as the primary engine, with mesh boolean
@@ -53,13 +76,27 @@ use brepkit_topology::solid::SolidId;
 ///
 /// Returns an error if either solid is invalid or the operation produces
 /// an empty or non-manifold result.
-#[allow(clippy::too_many_lines)]
 pub fn boolean(
     topo: &mut Topology,
     op: BooleanOp,
     a: SolidId,
     b: SolidId,
 ) -> Result<SolidId, crate::OperationsError> {
+    let result = boolean_inner(topo, op, a, b);
+    if LAST_USED_MESH_FALLBACK.with(std::cell::Cell::take) {
+        MESH_FALLBACK_COUNT.fetch_add(1, std::sync::atomic::Ordering::Relaxed);
+    }
+    result
+}
+
+#[allow(clippy::too_many_lines)]
+fn boolean_inner(
+    topo: &mut Topology,
+    op: BooleanOp,
+    a: SolidId,
+    b: SolidId,
+) -> Result<SolidId, crate::OperationsError> {
+    LAST_USED_MESH_FALLBACK.with(|f| f.set(false));
     let tol = brepkit_math::tolerance::Tolerance::new();
 
     // Detect A⊂B or B⊂A (including A=B) and handle directly. A positive
@@ -894,6 +931,7 @@ pub fn boolean(
         target: "brepkit_approx",
         "boolean {op:?}: GFA unusable — using mesh (co-refinement) fallback; analytic surface types will be lost"
     );
+    LAST_USED_MESH_FALLBACK.with(|f| f.set(true));
     let opts = BooleanOptions::default();
     let raw = match mesh_boolean_fallback(topo, op, a, b, opts.deflection, tol, &opts) {
         Ok(raw) => raw,
@@ -986,11 +1024,29 @@ pub fn compound_cut(
         && let Some(clusters) = cluster_tools_by_aabb(topo, tools)
         && !clusters.is_empty()
     {
+        // Tools that merely TOUCH (a plate's edge-tangent preview pockets)
+        // cluster together by AABB, and their union is genuinely non-manifold,
+        // so every pairwise fuse below "succeeds" through the mesh fallback —
+        // the batch then proceeds with a degraded all-planar tool and the cut
+        // grinds against it (11 s and lost cones on a 4x4 baseplate, #1488).
+        // A fallback-tainted merge is a FAILED merge for batching purposes:
+        // the sequential per-tool cuts are exact and never see the tangency.
+        // Taint propagates as Err from `fuse_cluster` and from the cross-
+        // cluster merge fuses below, so a discarded merge never touches the
+        // public fallback counter.
         let merged = clusters.iter().try_fold(None::<SolidId>, |acc, cluster| {
             let fused = fuse_cluster(topo, cluster)?;
             match acc {
                 None => Ok(Some(fused)),
-                Some(prev) => boolean(topo, BooleanOp::Fuse, prev, fused).map(Some),
+                Some(prev) => {
+                    let m = boolean_inner(topo, BooleanOp::Fuse, prev, fused)?;
+                    if LAST_USED_MESH_FALLBACK.with(std::cell::Cell::take) {
+                        return Err(crate::OperationsError::InvalidInput {
+                            reason: "cluster merge degraded to mesh fallback".to_string(),
+                        });
+                    }
+                    Ok(Some(m))
+                }
             }
         });
         if let Ok(Some(tool)) = merged
@@ -1043,8 +1099,19 @@ pub(crate) fn fuse_cluster(
     {
         return Ok(fused);
     }
-    rest.iter()
-        .try_fold(first, |a, &t| boolean(topo, BooleanOp::Fuse, a, t))
+    // A pairwise fuse that degrades to the mesh fallback poisons the whole
+    // batch; bail at the first one instead of paying the fallback for every
+    // remaining pair. `boolean_inner` + the taint flag keeps the discarded
+    // probe out of the public fallback counter entirely.
+    rest.iter().try_fold(first, |a, &t| {
+        let fused = boolean_inner(topo, BooleanOp::Fuse, a, t)?;
+        if LAST_USED_MESH_FALLBACK.with(std::cell::Cell::take) {
+            return Err(crate::OperationsError::InvalidInput {
+                reason: "cluster fuse degraded to mesh fallback".to_string(),
+            });
+        }
+        Ok(fused)
+    })
 }
 
 /// Group tools into AABB-overlap clusters (union-find over tolerance-
@@ -1793,8 +1860,14 @@ fn build_box_sphere_octant(
                 });
             }
             let u_ref = Vec3::new(dx / len, dy / len, dz / len);
+            // The circle's CCW direction must take start -> end the SHORT
+            // way (the quarter arc bounding the octant). About the cutting
+            // plane's OUTWARD normal that span is the 270-degree
+            // complement (the wrong-region 1304.8 volume); the INWARD
+            // normal makes it the intended quarter.
+            let inward = Vec3::new(-n.x(), -n.y(), -n.z());
             let circle =
-                Circle3D::new_with_ref(circle_center, n, circle_r, u_ref).map_err(|e| {
+                Circle3D::new_with_ref(circle_center, inward, circle_r, u_ref).map_err(|e| {
                     crate::OperationsError::InvalidInput {
                         reason: format!("box-sphere octant: circle construction failed: {e}"),
                     }
@@ -1873,11 +1946,13 @@ fn build_box_sphere_octant(
     // Wind so the sphere's outward normal matches the resulting volume
     // (outside the octant). With arcs going X→Y→Z→X around the patch,
     // the right-hand rule gives an outward normal pointing AWAY from O.
+    // Each arc is traversed forward by its quarter-disc, so the patch must
+    // traverse all three reversed for consistent edge senses: X → Z → Y → X.
     let sph_wire = Wire::new(
         vec![
-            OrientedEdge::new(arc_xy, true), // X → Y
-            OrientedEdge::new(arc_yz, true), // Y → Z
-            OrientedEdge::new(arc_zx, true), // Z → X
+            OrientedEdge::new(arc_zx, false), // X → Z
+            OrientedEdge::new(arc_yz, false), // Z → Y
+            OrientedEdge::new(arc_xy, false), // Y → X
         ],
         true,
     )

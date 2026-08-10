@@ -39,7 +39,7 @@ const DEGENERATE_PROFILE_AREA_REL_TOL: f64 = 1e-9;
 /// Uses Rodrigues' rotation formula:
 ///   P' = P·cos θ + (k × P)·sin θ + k·(k · P)·(1 − cos θ)
 /// where P is the vector from origin to point, k is the unit axis.
-fn rotate_point(point: Point3, origin: Point3, axis: Vec3, angle: f64) -> Point3 {
+pub(crate) fn rotate_point(point: Point3, origin: Point3, axis: Vec3, angle: f64) -> Point3 {
     let v = point - origin;
     let cos_a = angle.cos();
     let sin_a = angle.sin();
@@ -50,7 +50,7 @@ fn rotate_point(point: Point3, origin: Point3, axis: Vec3, angle: f64) -> Point3
 }
 
 /// Rotate a direction vector around an axis by angle θ (no translation).
-fn rotate_vec(dir: Vec3, axis: Vec3, angle: f64) -> Vec3 {
+pub(crate) fn rotate_vec(dir: Vec3, axis: Vec3, angle: f64) -> Vec3 {
     let cos_a = angle.cos();
     let sin_a = angle.sin();
     let k_dot_v = axis.dot(dir);
@@ -96,7 +96,7 @@ fn arc_mid_control_point(
 /// Create a degree-2 rational NURBS curve representing a circular arc.
 ///
 /// Control points: `[start, mid, end]` with weights `[1, cos(θ/2), 1]`.
-fn make_arc_curve(
+pub(crate) fn make_arc_curve(
     start: Point3,
     end: Point3,
     origin: Point3,
@@ -173,7 +173,7 @@ fn radial_axial(p: Point3, axis_origin: Point3, axis: Vec3) -> (f64, f64) {
 /// case also falls back to NURBS here — recognising it as a `Sphere` band is a
 /// follow-up.)
 #[allow(clippy::too_many_arguments)]
-fn revolution_band_surface(
+pub(crate) fn revolution_band_surface(
     profile_curve: &EdgeCurve,
     p0_start: Point3,
     p0_end: Point3,
