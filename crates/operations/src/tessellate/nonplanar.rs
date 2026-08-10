@@ -1724,6 +1724,13 @@ fn stitch_rings(
 /// Projects shared edge points into (u,v) parameter space, generates interior
 /// sample points, then runs Constrained Delaunay Triangulation. Boundary
 /// vertices use their pre-existing global IDs (watertight by construction).
+/// `BK_CDT_TRACE` (any value): log CDT boundary sourcing and UV mapping.
+/// Resolved ONCE per process — the checks sit in per-edge loops.
+fn cdt_trace() -> bool {
+    static TRACE: std::sync::OnceLock<bool> = std::sync::OnceLock::new();
+    *TRACE.get_or_init(|| std::env::var("BK_CDT_TRACE").is_ok())
+}
+
 #[allow(clippy::too_many_lines, clippy::too_many_arguments)]
 pub(super) fn tessellate_nonplanar_cdt(
     topo: &Topology,
@@ -1750,6 +1757,14 @@ pub(super) fn tessellate_nonplanar_cdt(
         let edge_idx = edge_id_local.index();
         let is_fwd = oe.is_forward();
         if let Some(global_ids) = edge_global_indices.get(&edge_idx) {
+            if cdt_trace() {
+                log::debug!(
+                    "cdt {face_id:?} edge e{edge_idx} SHARED n={} gids {}..{}",
+                    global_ids.len(),
+                    global_ids.first().copied().unwrap_or(0),
+                    global_ids.last().copied().unwrap_or(0)
+                );
+            }
             let ordered: Vec<u32> = if is_fwd {
                 global_ids.clone()
             } else {
@@ -1769,6 +1784,9 @@ pub(super) fn tessellate_nonplanar_cdt(
                 boundary_3d.push((merged.positions[gid as usize], gid, edge_id_local, is_fwd));
             }
         } else {
+            if cdt_trace() {
+                log::debug!("cdt {face_id:?} edge e{edge_idx} RESAMPLED");
+            }
             // Edge not in shared pool -- insert directly.
             let edge_data = topo.edge(oe.edge())?;
             let points = sample_edge(topo, edge_data, deflection, angular_tol, circle_floor)?;
@@ -1837,8 +1855,38 @@ pub(super) fn tessellate_nonplanar_cdt(
                 | FaceSurface::Torus(_)
         );
         if is_periodic && !boundary_uv.is_empty() {
-            for i in 1..boundary_uv.len() {
-                let prev_u = boundary_uv[i - 1].0;
+            // A point on the surface's degenerate locus has no meaningful u
+            // (a horn torus pinches onto its axis at tube angle v = pi; the
+            // projection returns an arbitrary ring angle there). Left as
+            // projected, such a point can steer the consecutive unwrap the
+            // LONG way around the period, leaving the loop unclosed by a
+            // full turn — the UV polygon then self-overlaps and
+            // remove_exterior eats the triangles along the boundary strip.
+            // Give a degenerate point its predecessor's u so the unwrap
+            // steps over it neutrally.
+            let degenerate_u = |v: f64| -> bool {
+                if let FaceSurface::Torus(t) = face_data.surface() {
+                    (t.major_radius() + t.minor_radius() * v.cos()).abs() < t.minor_radius() * 1e-6
+                } else {
+                    false
+                }
+            };
+            // The boundary is cyclic, so the anchor itself can sit on the
+            // degenerate locus (the wire may start at the pinch); unwrap
+            // from the first NON-degenerate point instead so an arbitrary
+            // anchor u never steers the walk.
+            let n = boundary_uv.len();
+            let start = (0..n)
+                .find(|&i| !degenerate_u(boundary_uv[i].1))
+                .unwrap_or(0);
+            for k in 1..n {
+                let i = (start + k) % n;
+                let prev = (start + k + n - 1) % n;
+                let prev_u = boundary_uv[prev].0;
+                if degenerate_u(boundary_uv[i].1) {
+                    boundary_uv[i].0 = prev_u;
+                    continue;
+                }
                 let mut u = boundary_uv[i].0;
                 let diff = u - prev_u;
                 let shifts = (diff / std::f64::consts::TAU + 0.5).floor();
@@ -2018,6 +2066,16 @@ pub(super) fn tessellate_nonplanar_cdt(
     let boundary_cdt_ids = cdt
         .insert_points_hilbert(&boundary_pts)
         .map_err(crate::OperationsError::Math)?;
+    if cdt_trace() {
+        for (i, &cid) in boundary_cdt_ids.iter().enumerate() {
+            log::debug!(
+                "cdt {face_id:?} bpt[{i}] gid={} cdtid={cid} uv=({:.5},{:.5})",
+                boundary_3d[i].1,
+                boundary_uv[i].0,
+                boundary_uv[i].1
+            );
+        }
+    }
     let max_cdt_idx = boundary_cdt_ids.iter().copied().max().unwrap_or(2);
     if cdt_to_global.len() <= max_cdt_idx {
         cdt_to_global.resize(max_cdt_idx + 1, None);
@@ -2034,8 +2092,16 @@ pub(super) fn tessellate_nonplanar_cdt(
     }
 
     if du > 1e-15 && dv > 1e-15 {
-        let (n_u, n_v) =
-            interior_grid_resolution(face_data.surface(), du, dv, deflection, angular_tol);
+        let (n_u, n_v) = interior_grid_resolution(
+            face_data.surface(),
+            du,
+            dv,
+            deflection,
+            angular_tol,
+            circle_floor
+                || !face_data.inner_wires().is_empty()
+                || angular_tol >= brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+        );
 
         let boundary_uv_ref = &boundary_uv;
         let interior_pts: Vec<Point2> = (1..n_u)
@@ -2066,6 +2132,13 @@ pub(super) fn tessellate_nonplanar_cdt(
     let cdt_verts = cdt.vertices();
     let triangles = cdt.triangles();
 
+    // Constraint recovery can mint Steiner vertices (crossing splits,
+    // bisection backstop) whose ids the insert calls above never returned;
+    // cover them so the lift below assigns them global ids.
+    if cdt_to_global.len() < cdt_verts.len() {
+        cdt_to_global.resize(cdt_verts.len(), None);
+    }
+
     let mut final_global_ids: Vec<u32> = vec![0; cdt_to_global.len()];
 
     for i in 0..cdt_to_global.len() {
@@ -2088,13 +2161,46 @@ pub(super) fn tessellate_nonplanar_cdt(
         }
     }
 
+    // The CDT's UV winding is internally consistent but can be inverted as
+    // a whole against the surface: a pinched parameterization (a horn torus
+    // corner patch, where the base arc's UV image degenerates) triangulates
+    // cleanly yet winds against the outward normal. Decide ONE flip for the
+    // whole face by an area-weighted vote of geometric-vs-surface normal
+    // agreement, keeping internal consistency (per-triangle flips near the
+    // pinch scatter, where the sampled normal is unreliable). Default
+    // (non-reversed) orientation is emitted; the caller applies the
+    // `is_reversed` flip afterward.
+    let mut vote = 0.0;
+    for &(i0, i1, i2) in &triangles {
+        if i0 < 3 || i1 < 3 || i2 < 3 {
+            continue;
+        }
+        let (p0, p1, p2) = (
+            merged.positions[final_global_ids[i0] as usize],
+            merged.positions[final_global_ids[i1] as usize],
+            merged.positions[final_global_ids[i2] as usize],
+        );
+        let geo = (p1 - p0).cross(p2 - p0);
+        let (uv0, uv1, uv2) = (cdt_verts[i0], cdt_verts[i1], cdt_verts[i2]);
+        let uc = (uv0.x() + uv1.x() + uv2.x()) / 3.0;
+        let vc = (uv0.y() + uv1.y() + uv2.y()) / 3.0;
+        let outward = face_data.surface().normal(uc, vc);
+        vote += geo.dot(outward);
+    }
+    let flip_all = vote < 0.0;
     for (i0, i1, i2) in triangles {
         if i0 < 3 || i1 < 3 || i2 < 3 {
             continue; // Skip super-triangle vertices
         }
-        merged.indices.push(final_global_ids[i0]);
-        merged.indices.push(final_global_ids[i1]);
-        merged.indices.push(final_global_ids[i2]);
+        if flip_all {
+            merged.indices.push(final_global_ids[i0]);
+            merged.indices.push(final_global_ids[i2]);
+            merged.indices.push(final_global_ids[i1]);
+        } else {
+            merged.indices.push(final_global_ids[i0]);
+            merged.indices.push(final_global_ids[i1]);
+            merged.indices.push(final_global_ids[i2]);
+        }
     }
 
     Ok(())
@@ -2196,11 +2302,16 @@ fn interior_grid_resolution(
     dv: f64,
     deflection: f64,
     angular_tol: f64,
+    preserve_developable_rows: bool,
 ) -> (usize, usize) {
     // This is the non-standard-boundary CDT fallback (boolean-result faces).
     // Watertightness comes from the explicit boundary samples, not from these
-    // interior grid counts, and one radius drives both directions; keep the
-    // curvature floor on for all surfaces here as the conservative default.
+    // interior grid counts, and one radius drives both directions. Doubly
+    // curved surfaces keep the curvature floor unconditionally (the nominal
+    // radius understates the tightest curvature). Developable faces with inner
+    // wires retain two interior rows: dropping them can make a holed
+    // cylindrical CDT overlap itself, turning shared rim segments into
+    // four-use edges.
     match surface {
         FaceSurface::Sphere(sphere) => {
             let r = sphere.radius();
@@ -2232,7 +2343,13 @@ fn interior_grid_resolution(
             // along the straight rulings (a length, not an angle): zero chord
             // sag, so feeding it to the chord formula would treat millimeters
             // as radians and emit hundreds of interior rows on a tall wall.
-            // Two rows suffice for CDT quality on a developable band.
+            // Holed developable faces need two interior rows to partition
+            // inner wires without overlap. Simple display/export bands can
+            // omit them because their boundary samples already carry the u
+            // density and the surface is exact along the rulings.
+            if !preserve_developable_rows {
+                return (2, 1);
+            }
             let r = estimate_surface_radius(surface);
             let n_u = segments_for_chord_deviation_a(r, du, deflection, angular_tol, true).max(2);
             (n_u, 2)
