@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786333367685,
+  "lastUpdate": 1786334105529,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6209,6 +6209,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13338825,
             "range": "± 12310",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7a7be6e4569fe614e8692d3670ed9f2c8ac9d96b",
+          "message": "Merge pull request #120 from esaueng/codex/fix-cross-drill-meridian-residue\n\nfix(algo): preserve meridian winding samples",
+          "timestamp": "2026-08-09T23:53:08-04:00",
+          "tree_id": "f4f859e2bc768923e20ade84466e86ba92125d92",
+          "url": "https://github.com/esaueng/brepkit/commit/7a7be6e4569fe614e8692d3670ed9f2c8ac9d96b"
+        },
+        "date": 1786334104387,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 465578,
+            "range": "± 2375",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 509373,
+            "range": "± 2302",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6735,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 415631,
+            "range": "± 7652",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14018758,
+            "range": "± 168535",
             "unit": "ns/iter"
           }
         ]
