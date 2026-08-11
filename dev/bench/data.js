@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786337070294,
+  "lastUpdate": 1786422683628,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6425,6 +6425,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13923255,
             "range": "± 30594",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a4d4516e312f620a2e0e9181f70e48c695d6d006",
+          "message": "Merge pull request #125 from esaueng/codex/sync-upstream-2026-08-10\n\nchore: sync upstream through v3.2.22",
+          "timestamp": "2026-08-11T00:29:21-04:00",
+          "tree_id": "75edd903532382b3a8895e0ac8991f0f1983675c",
+          "url": "https://github.com/esaueng/brepkit/commit/a4d4516e312f620a2e0e9181f70e48c695d6d006"
+        },
+        "date": 1786422682384,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 478087,
+            "range": "± 6188",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 520246,
+            "range": "± 2757",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6896,
+            "range": "± 46",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 448803,
+            "range": "± 10603",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14209321,
+            "range": "± 250500",
             "unit": "ns/iter"
           }
         ]
