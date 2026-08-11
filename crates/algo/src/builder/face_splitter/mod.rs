@@ -3477,10 +3477,10 @@ fn split_cylinder_band_by_arrangement(
     // covers the sector the notch actually removes, so its midpoint says which
     // side of the generator pair the removed rectangle is on — the one fact the
     // generators alone cannot supply once the seam falls inside the removal.
+    // Do not also materialize every ring arc as a horizontal: `push_ring` below
+    // already reconstructs those spans, and adding both paths double-splits the
+    // almost-tangent boss-wall cases pinned by `regress_boss_crossing_a_wall`.
     let mut ring_mids: Vec<(f64, f64)> = Vec::new();
-    // Preserve the full arc spans too: upstream uses them to split band regions
-    // that extend beyond the generator-bounded notch sector.
-    let mut sec_rings: Vec<(f64, f64, f64)> = Vec::new(); // (v, u_lo, u_hi)
     for (i, e) in all_edges.iter().enumerate() {
         match &e.curve_3d {
             EdgeCurve::Line => {
@@ -3541,26 +3541,6 @@ fn split_cylinder_band_by_arrangement(
                     let (um, _) = proj(mid);
                     let m = snap_u((um - u_s).rem_euclid(TAU));
                     ring_mids.push((v0p, m));
-
-                    // A ring section over a sector the generators do NOT bound
-                    // is a real cut too: a partner plane that ends inside the
-                    // band cuts the arcs where it still exists, not only the
-                    // sector the tool removed. Reconstructing from the
-                    // generator pairs alone leaves those arcs uncut, and
-                    // everything above them stays welded to the material below
-                    // (the lid magnet-post band, #1517).
-                    let a = snap_u((u0 - u_s).rem_euclid(TAU));
-                    let b = snap_u((u1 - u_s).rem_euclid(TAU));
-                    // Endpoints alone leave the arc's side ambiguous; the
-                    // midpoint picks it. An arc running the far way round the
-                    // seam is emitted as its two strip pieces.
-                    let (lo, hi) = if a <= b { (a, b) } else { (b, a) };
-                    if m > lo && m < hi {
-                        sec_rings.push((v0p, lo, hi));
-                    } else {
-                        sec_rings.push((v0p, 0.0, lo));
-                        sec_rings.push((v0p, hi, TAU));
-                    }
                 }
             }
             // Hyperbola and parabola are unreachable:
@@ -3675,14 +3655,6 @@ fn split_cylinder_band_by_arrangement(
         }
         if v_lo > v_bottom + tol {
             push_ring(&mut horizontals, v_lo, ua, ub);
-        }
-    }
-
-    // The ring sections themselves, over whatever sectors they actually cover.
-    // Rings at the rims are already the band frame.
-    for &(v, u_lo, u_hi) in &sec_rings {
-        if v > v_bottom + tol && v < v_top - tol && u_hi - u_lo > cov {
-            horizontals.push((v, u_lo, u_hi));
         }
     }
 
