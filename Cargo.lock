@@ -252,7 +252,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-algo"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-check",
  "brepkit-math",
@@ -264,7 +264,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-blend"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-math",
  "brepkit-topology",
@@ -274,7 +274,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-check"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-geometry",
  "brepkit-math",
@@ -286,7 +286,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-geometry"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-math",
  "proptest",
@@ -295,7 +295,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-heal"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "bitflags 2.13.1",
  "brepkit-geometry",
@@ -308,7 +308,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-io"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-algo",
  "brepkit-math",
@@ -325,7 +325,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-math"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "log",
  "proptest",
@@ -336,7 +336,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-offset"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-check",
  "brepkit-geometry",
@@ -349,7 +349,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-operations"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-algo",
  "brepkit-blend",
@@ -370,7 +370,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-render"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-math",
  "brepkit-operations",
@@ -386,7 +386,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-sketch"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "proptest",
  "thiserror 2.0.19",
@@ -394,7 +394,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-topology"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-math",
  "proptest",
@@ -404,7 +404,7 @@ dependencies = [
 
 [[package]]
 name = "brepkit-wasm"
-version = "3.2.18"
+version = "3.2.22"
 dependencies = [
  "brepkit-algo",
  "brepkit-check",

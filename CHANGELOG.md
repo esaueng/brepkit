@@ -1,5 +1,33 @@
 # Changelog
 
+## [3.2.22](https://github.com/andymai/brepkit/compare/v3.2.21...v3.2.22) (2026-08-10)
+
+
+### Bug Fixes
+
+* **algo:** cross a band's rim arcs when trimming a faceted-ramp section ([#1534](https://github.com/andymai/brepkit/issues/1534)) ([4970aa9](https://github.com/andymai/brepkit/commit/4970aa9fbfcc76b8f2990443d483c2cb6a6dde70))
+
+## [3.2.21](https://github.com/andymai/brepkit/compare/v3.2.20...v3.2.21) (2026-08-10)
+
+
+### Bug Fixes
+
+* **algo:** cut a cylinder band at the ring sections, not only at the notch ([#1530](https://github.com/andymai/brepkit/issues/1530)) ([76eb71f](https://github.com/andymai/brepkit/commit/76eb71f75bd77592b876463b596ab052e5e3bac3))
+
+## [3.2.20](https://github.com/andymai/brepkit/compare/v3.2.19...v3.2.20) (2026-08-10)
+
+
+### Bug Fixes
+
+* **check:** count a ray hit in a face hole as no crossing ([#1526](https://github.com/andymai/brepkit/issues/1526)) ([fce8068](https://github.com/andymai/brepkit/commit/fce80681d6c525ef817e24e85bce5fe0925c3611))
+
+## [3.2.19](https://github.com/andymai/brepkit/compare/v3.2.18...v3.2.19) (2026-08-10)
+
+
+### Bug Fixes
+
+* **math:** bound CDT constraint recovery so a runaway cannot abort the kernel ([#1520](https://github.com/andymai/brepkit/issues/1520)) ([87407b9](https://github.com/andymai/brepkit/commit/87407b90f4da5643efde37dba588ba7a3edabb73))
+
 ## [3.2.18](https://github.com/andymai/brepkit/compare/v3.2.17...v3.2.18) (2026-08-09)
 
 
