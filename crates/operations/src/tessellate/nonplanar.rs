@@ -1974,6 +1974,19 @@ pub(super) fn tessellate_nonplanar_cdt(
             }
 
             for run in &seam_runs {
+                // The periodic walk may already have placed a genuine seam
+                // inside the non-seam boundary's unwrapped u interval.  Keep
+                // that valid CDT boundary instead of snapping it back to an
+                // endpoint; re-pin only the degenerate out-of-range case this
+                // fallback was introduced to repair.
+                let already_unwrapped = run.indices.iter().all(|&i| {
+                    let u = boundary_uv[i].0;
+                    u >= u_min_bnd - 1e-6 && u <= u_max_bnd + 1e-6
+                });
+                if already_unwrapped {
+                    continue;
+                }
+
                 let u_assign = if run.is_forward { u_max_bnd } else { u_min_bnd };
                 let n_pts = run.indices.len();
 
