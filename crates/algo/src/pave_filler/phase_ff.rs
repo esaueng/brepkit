@@ -1318,6 +1318,11 @@ fn restrict_curves_to_faces(
     };
 
     const N: usize = 24;
+    // `BK_RESTRICT=1`: the in-both window each section is trimmed to. Reports
+    // whether a curve reached this clip at all, which is what separates "the
+    // window was computed wrong" from "a special-case path emitted the section
+    // and skipped the clip entirely".
+    let trace_restrict = std::env::var("BK_RESTRICT").is_ok();
     let mut out = Vec::with_capacity(raw_curves.len());
     for raw in raw_curves {
         // Lines are clipped downstream by `clip_line_to_face`; only the
@@ -1394,6 +1399,13 @@ fn restrict_curves_to_faces(
         // back via the curve's periodic parameterization).
         let closed = (raw.p_start - raw.p_end).length() < 1e-7;
         let (b0, b1) = longest_inboth_run(&inb, closed);
+        if trace_restrict {
+            log::debug!(
+                "RESTRICT fa={fa:?} fb={fb:?} kind={} closed={closed} b0={b0} b1={b1} N={N} inb={}",
+                raw.curve.type_tag(),
+                inb.iter().filter(|v| **v).count()
+            );
+        }
         // An in-both run spanning fewer than two segments (b1-b0 < 2, i.e. at
         // most two consecutive in-both samples) is a tangency/grazing point —
         // such a curve never splits either face, so drop it.
@@ -2435,18 +2447,35 @@ fn trim_ellipse_to_boundary_crossings(
             let Ok(edge) = topo.edge(oe.edge()) else {
                 continue;
             };
-            if !matches!(edge.curve(), EdgeCurve::Line) {
-                continue;
-            }
             let Ok(sv) = topo.vertex(edge.start()) else {
                 continue;
             };
             let Ok(ev) = topo.vertex(edge.end()) else {
                 continue;
             };
-            if let Some(p) = line_segment_plane_crossing(sv.point(), ev.point(), *plane_n, *plane_d)
-            {
-                push_crossing(p, &mut crossings);
+            match edge.curve() {
+                EdgeCurve::Line => {
+                    if let Some(p) =
+                        line_segment_plane_crossing(sv.point(), ev.point(), *plane_n, *plane_d)
+                    {
+                        push_crossing(p, &mut crossings);
+                    }
+                }
+                // The band's RIM is where the face ends, exactly as its seam
+                // is. Without a crossing here the arc is never split at the
+                // rim, and one over-long arc reaching past it can still have
+                // its midpoint inside the extent's boundary margin — so the
+                // whole thing is kept and the two faces end up bounding the
+                // same region along different curves (#1517 root a: a corner
+                // cylinder ending at z=13.300 kept a section to z=13.912).
+                EdgeCurve::Circle(c) => {
+                    for p in
+                        circle_arc_plane_crossings(c, sv.point(), ev.point(), *plane_n, *plane_d)
+                    {
+                        push_crossing(p, &mut crossings);
+                    }
+                }
+                _ => {}
             }
         }
     }
@@ -2531,6 +2560,71 @@ fn trim_ellipse_to_boundary_crossings(
     }
 
     if arcs.is_empty() { None } else { Some(arcs) }
+}
+
+/// Crossings of a circular boundary ARC with the plane `normal·p = d`.
+///
+/// `normal·evaluate(t)` is a sinusoid in the circle's own parameter, so three
+/// evaluations pin it exactly and the crossings are a closed-form
+/// `a cos t + b sin t = c` solve. Points outside the arc actually spanned by
+/// `[sp, ep]` are discarded; a closed edge (coincident endpoints) spans all of
+/// it. The caller re-validates every point against the section curve, so a
+/// spurious root cannot survive.
+fn circle_arc_plane_crossings(
+    circle: &brepkit_math::curves::Circle3D,
+    sp: Point3,
+    ep: Point3,
+    normal: Vec3,
+    d: f64,
+) -> Vec<Point3> {
+    use std::f64::consts::{FRAC_PI_2, PI, TAU};
+
+    let f = |t: f64| -> f64 {
+        let p = circle.evaluate(t);
+        normal
+            .x()
+            .mul_add(p.x(), normal.y().mul_add(p.y(), normal.z() * p.z()))
+            - d
+    };
+    let (f0, fq, fp) = (f(0.0), f(FRAC_PI_2), f(PI));
+    let c = 0.5 * (f0 + fp);
+    let (a, b) = (0.5 * (f0 - fp), fq - c);
+    let amp = a.hypot(b);
+    if amp <= 1e-12 {
+        return Vec::new(); // circle parallel to the plane (or lying in it)
+    }
+    // A tangency lands exactly on |ratio| = 1, where rounding can put it a
+    // hair outside and drop a real (doubled) crossing. Admit the epsilon band
+    // and clamp before `acos`; the duplicate root the tangent case yields is
+    // collapsed by the caller's dedup.
+    let ratio = -c / amp;
+    if ratio.abs() > 1.0 + 1e-9 {
+        return Vec::new();
+    }
+    let (phase, delta) = (b.atan2(a), ratio.clamp(-1.0, 1.0).acos());
+
+    // Arc membership follows the kernel's one convention for an open circular
+    // edge (`EdgeCurve::domain_with_endpoints`): the CCW span from the start
+    // vertex to the end vertex, which is routinely a MAJOR arc. Reading it as
+    // the shorter way round instead is wrong in both directions — it drops
+    // real crossings on the arc AND invents them on the complement, and an
+    // invented crossing splits a section where no face boundary exists.
+    let closed = (sp - ep).length() < 1e-9;
+    let ts = circle.project(sp);
+    let span = {
+        let fwd = (circle.project(ep) - ts).rem_euclid(TAU);
+        if fwd < 1e-12 { TAU } else { fwd }
+    };
+
+    let mut out = Vec::new();
+    for root in [phase + delta, phase - delta] {
+        let t = root.rem_euclid(TAU);
+        if !closed && (t - ts).rem_euclid(TAU) > span + 1e-9 {
+            continue;
+        }
+        out.push(circle.evaluate(t));
+    }
+    out
 }
 
 /// Crossing of a line SEGMENT `[sp, ep]` with the plane `normal·p = d`.
@@ -5368,6 +5462,57 @@ mod tests {
             ])
         };
         (mk(a), mk(b))
+    }
+
+    fn unit_circle_xy() -> brepkit_math::curves::Circle3D {
+        // `new` picks u_axis from a derived frame; pin it to +X so the test can
+        // name parameters and points interchangeably.
+        brepkit_math::curves::Circle3D::new_with_ref(
+            Point3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            1.0,
+            Vec3::new(1.0, 0.0, 0.0),
+        )
+        .unwrap()
+    }
+
+    #[test]
+    fn major_rim_arc_crosses_its_own_span_not_the_complement() {
+        // A rim arc is an ordinary major arc whenever the band keeps more than
+        // half its circumference. Reading it as the shorter way round fails in
+        // both directions at once, so one plane pins both: y = -0.5 meets the
+        // unit circle at 210° and 330°, and a CCW edge from 0° to 270° spans
+        // the first and not the second.
+        let circle = unit_circle_xy();
+        let hits = circle_arc_plane_crossings(
+            &circle,
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, -1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            -0.5,
+        );
+        assert_eq!(hits.len(), 1, "got {hits:?}");
+        let expected = circle.evaluate(std::f64::consts::PI * 7.0 / 6.0);
+        assert!(
+            (hits[0] - expected).length() < 1e-9,
+            "crossing landed on the complement: {:?}",
+            hits[0]
+        );
+    }
+
+    #[test]
+    fn minor_rim_arc_still_discards_the_crossing_beyond_it() {
+        // The guard the span check exists for: the same plane, but an edge
+        // that really does stop short of either root.
+        let circle = unit_circle_xy();
+        let hits = circle_arc_plane_crossings(
+            &circle,
+            Point3::new(1.0, 0.0, 0.0),
+            Point3::new(0.0, 1.0, 0.0),
+            Vec3::new(0.0, 1.0, 0.0),
+            -0.5,
+        );
+        assert!(hits.is_empty(), "got {hits:?}");
     }
 
     #[test]

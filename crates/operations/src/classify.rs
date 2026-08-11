@@ -239,6 +239,31 @@ mod tests {
         assert_eq!(result, PointClassification::Outside);
     }
 
+    /// A point floating in an open pocket is outside the solid.
+    ///
+    /// The pocket makes the top face a ring with an inner wire, and the ray
+    /// leaves through the middle of that hole. Counting the hole as a crossing
+    /// flips the parity and reports the empty pocket as solid material.
+    #[test]
+    fn point_in_open_pocket_is_outside() {
+        let mut topo = Topology::new();
+        let plate = make_box(&mut topo, 100.0, 100.0, 10.0).unwrap();
+        let tool = make_box(&mut topo, 60.0, 60.0, 4.0).unwrap();
+        crate::transform::transform_solid(
+            &mut topo,
+            tool,
+            &brepkit_math::mat::Mat4::translation(20.0, 20.0, 6.0),
+        )
+        .unwrap();
+        let pocketed =
+            crate::boolean::boolean(&mut topo, crate::boolean::BooleanOp::Cut, plate, tool)
+                .unwrap();
+
+        let result =
+            classify_point(&topo, pocketed, Point3::new(50.0, 50.0, 8.0), 0.1, 1e-6).unwrap();
+        assert_eq!(result, PointClassification::Outside);
+    }
+
     #[test]
     fn point_on_boundary_box() {
         let mut topo = Topology::new();

@@ -3477,6 +3477,9 @@ fn split_cylinder_band_by_arrangement(
     // covers the sector the notch actually removes, so its midpoint says which
     // side of the generator pair the removed rectangle is on — the one fact the
     // generators alone cannot supply once the seam falls inside the removal.
+    // Do not also materialize every ring arc as a horizontal: `push_ring` below
+    // already reconstructs those spans, and adding both paths double-splits the
+    // almost-tangent boss-wall cases pinned by `regress_boss_crossing_a_wall`.
     let mut ring_mids: Vec<(f64, f64)> = Vec::new();
     for (i, e) in all_edges.iter().enumerate() {
         match &e.curve_3d {
@@ -3530,11 +3533,14 @@ fn split_cylinder_band_by_arrangement(
                 );
                 if i >= n_boundary_edges {
                     let (t0, t1) = e.curve_3d.domain_with_endpoints(e.start_3d, e.end_3d);
-                    let mid =
-                        e.curve_3d
-                            .evaluate_with_endpoints(0.5 * (t0 + t1), e.start_3d, e.end_3d);
+                    let mid = e.curve_3d.evaluate_with_endpoints(
+                        0.5_f64.mul_add(t1 - t0, t0),
+                        e.start_3d,
+                        e.end_3d,
+                    );
                     let (um, _) = proj(mid);
-                    ring_mids.push((v0p, snap_u((um - u_s).rem_euclid(TAU))));
+                    let m = snap_u((um - u_s).rem_euclid(TAU));
+                    ring_mids.push((v0p, m));
                 }
             }
             // Hyperbola and parabola are unreachable:
@@ -3582,6 +3588,7 @@ fn split_cylinder_band_by_arrangement(
         return None;
     }
 
+    let cov = 1e-6;
     let mut verticals: Vec<(f64, f64, f64)> = Vec::new(); // (u_shift, v_lo, v_hi)
     let mut horizontals: Vec<(f64, f64, f64)> = Vec::new(); // (v, u_lo, u_hi)
 
@@ -3655,7 +3662,6 @@ fn split_cylinder_band_by_arrangement(
     // span brackets (and whose u-range covers the generator), and each horizontal
     // at every vertical generator's u interior to its span (whose v-range reaches
     // the ring). Emit undirected sub-segments; dedup collapses duplicates.
-    let cov = 1e-6;
     let mut sub: Vec<((i64, i64), (i64, i64))> = Vec::new();
 
     for &(u, v0, v1) in &verticals {
@@ -4644,8 +4650,9 @@ fn split_face_2d_impl(
     let is_plane = matches!(surface, FaceSurface::Plane { .. });
     if trace_split {
         log::debug!(
-            "STRACE face={face_id:?} plane={is_plane} sections={}",
-            sections.len()
+            "STRACE face={face_id:?} plane={is_plane} sections={} info={}",
+            sections.len(),
+            info.map_or_else(|| "none".to_string(), |i| format!("{:?}", i.periodicity()))
         );
         let mut rows: Vec<String> = sections
             .iter()

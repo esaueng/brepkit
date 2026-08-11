@@ -26,8 +26,8 @@ The `#[ignore]` inventory is the load-bearing artifact. Before quoting any
 rg -n -A2 '#\[ignore' crates/    # filter the doc-comment false hits by hand
 ```
 
-**Inventory status (2026-08-09): CLEAN.** Every remaining `#[ignore]` is an explicit
-diagnostic or a slow-test marker — zero deferred-defect pins. Known stale-but-harmless:
+**Inventory status (2026-08-10): ZERO deferred-defect pins.**
+Every remaining `#[ignore]` is an explicit diagnostic or a slow-test marker. Known stale-but-harmless:
 the `profile_intersect.rs` box-sphere probes (box-sphere shipped analytic in #1006),
 `staircase_fuse_with_cylinders` (~2 min perf run), the two `#696` dovetail entries and
 `diverge_first_cut` (print-only).
@@ -124,6 +124,9 @@ that does not exist yet; without it, stop.
 
 | Item | Status / next step |
 |---|---|
+| **Tool geometric parity (#1517)** | MEASURED 2026-08-10 on released 3.2.22, stock pins, same-day same-catalog control. Generator suite 272 files / 2693 tests: **3.2.18 154 failed, 3.2.22 144 failed**; excluding stale per-kernel snapshots that is **153 -> 130 real**. The issue's old "137 failed / 2550 passed" DOES NOT REPRODUCE (3.2.18 measures 154 today) — the catalog grew, so only a same-day control is trustworthy. Head-to-head matrix: perf **0.63x** aggregate, faster on 24/26, **all 26 closed with 0 non-manifold** vs the reference's 5. Remaining 144 by class: 34 open-shell, **19 compound-capability (#1537 — 17 of them are the tool's stale `brepjs` pin at 18.124.2, fixed in brepjs 18.124.7; only the 2 compound-base `fuse` calls are a live gap, and it is brepjs-side)**, 15 timeout, 14 stale snapshot, 12 non-manifold, 2 reentrancy. Harness `kernelParityMatrix.test.ts` + `scripts/compare-kernel-parity.ts` |
+| **#1538 regressions from the band-split fixes** | Open-shell half CLOSED by #1540 (see Closed). Still open: 2 timeouts + 1 triangle-count invariant. The open-shell to mesh-fallback cascade is a plausible route to the timeouts but is NOT measured; #1530's ring-section horizontals are the other suspect (3.2.21 was already slow). Next step is a tool-side re-measure on a kernel carrying #1540, NOT another native dig |
+| **#1536 slotted no-lip loses its cavity** | LOCALIZED 2026-08-10 to the BODY OPERAND, not the fuse and not the measurement. `cavity_probe` on `slotted_nolip_body.bin`: outer shell +111351 (99.8% of its bbox), inner shell **-5263 against a 98783 bbox — 5.3% fill**. The cavity is present and correctly signed, it just encloses nothing; a correct one is ~-92000, exactly the 135237-vs-43129 gap. So GFA and every volume oracle are exonerated (per-shell sum, `oriented_solid_volume` and the fixture's own recorded numbers all agree). Next step is capturing one stage EARLIER than `crates/io/tests/data/slotted_nolip_body.bin` — the shell/cut chain that builds the body |
 | **Mesh-boolean fallback emits OPEN meshes that are CONSUMED** | A product call, not just a fix: rejecting means the op fails outright. Mitigation shipped: `boolean::mesh_fallback_count()` + wasm `meshFallbackCount()` let pipelines snapshot-and-refuse |
 | **Export angular default (5°) vs the reference's coarser effective default** | Tolerance-parity product choice, not mesher waste: 5° forces 18 segments/quarter-arc on r=0.6 slot corners, ~1.7x triangles vs reference at fine deflection. Revisit only as a product decision |
 | **Kumiko corner-window roots (4, documented)** | Unshipped; the parked branch `fix/kumiko-corner-window-cut` is GONE from the remote with its fixtures. Re-attempting means re-capturing fixtures first |
@@ -135,6 +138,58 @@ that does not exist yet; without it, stop.
 
 One line each; the fixture/PR carries the story. Newest first.
 
+- **Rim-arc crossings took the short way round (CLOSED 2026-08-10, #1540, the #1538 open shells)** —
+  `circle_arc_plane_crossings` (added by #1534) decided which part of a circle a
+  boundary edge covers by taking the SHORTER way between its vertices. The kernel has
+  one definition and it is not that: `EdgeCurve::domain_with_endpoints` reads an open
+  circle edge as the CCW span start->end, a MAJOR arc whenever a band keeps more than
+  half its circumference. On a major arc the two readings are complements, so the
+  predicate swaps its accept and reject sets — it drops the crossings on the edge and
+  returns ones where the edge never goes. The invented crossing is the damaging half:
+  it splits a section where no face boundary passes, and the existing midpoint test then
+  drops a piece that should have been kept. Regressions
+  `phase_ff::tests::{major,minor}_rim_arc_*`. Durable lesson in Recurring traps.
+- **Compartments+scoop graze fuse (CLOSED 2026-08-10, #1517 root a)** —
+  a thin planar tread meeting a corner cylinder takes a dedicated path,
+  `trim_ellipse_to_boundary_crossings`, because the in-both arc is a sub-millimetre
+  sliver the generic sampled filters drop. It crossed only `EdgeCurve::Line` boundary
+  edges, so it split the section at the tread's boundary lines and the analytic face's
+  SEAM lines but never at its RIM arcs. Nothing split the section where the band ends,
+  and the single over-long arc kept its midpoint inside the extent's boundary margin, so
+  the whole thing survived: tread and cylinder then bounded the same region along curves
+  0.687mm apart and the shell came back open (34 free edges, ~45 non-watertight exports).
+  Crossing the rim arcs too splits it at the rim and the existing midpoint test drops the
+  rest — no keep/drop logic changed. 178 faces, 12 cone / 24 cyl, 0 free. Fixture
+  `crates/io/tests/compartscoop_fuse_inmem.rs`, pin un-ignored. REFUTED on the way: the
+  "orientation-dominant / 145 same-sense pairs" framing (predated the #1525 classifier
+  fix), same-domain (the coincident scoop walls are real but not the cause), and
+  `clip_line_to_face_boundary`. Also refuted: adding a conic band clip in the FF
+  mutual-overlap trim — it closes the gap but the edges stay free, because the section
+  never reached that clip at all. `BK_RESTRICT=1` is what showed the bypass.
+- **Lid magnet-post corner fuse (CLOSED 2026-08-10, #1517 root b)** —
+  `split_cylinder_band_by_arrangement` reconstructed the cut from the vertical wall
+  generators alone, pairing them from the seam into removed rectangles, and used the ring
+  sections only to confirm the cut was rectilinear. That models a box notch, where the
+  removed sector is the only place a horizontal cut exists. A partner plane that ENDS
+  inside the band cuts the arcs where it still exists — the sectors the notch KEEPS — so
+  nothing capped them, and everything above stayed welded to the material below. The fix
+  feeds the ring sections in as horizontals, taking their u-range from the exact 3D
+  projection with the arc midpoint picking the side. The lid fuse went from 47 faces with
+  6 free edges (rejected, then a 305-face mesh blob compounding across ~24 later fuses,
+  the crash and the 14 timeouts) to 49 faces, 0 free, exact. Fixture
+  `crates/io/tests/lidpost_fuse_inmem.rs`, pin un-ignored. Instruments that cracked it:
+  `BK_SECEDGE` (exonerated FF — both faces get the same correct sections),
+  `BK_SUBFACE_BOX` + `BK_SUBFACE_WIRE` (the kept piece spanned the whole band height),
+  `BK_SPLIT_TRACE`.
+- **Point classifier counted holes as crossings (CLOSED 2026-08-10)** —
+  `classify_point` (both the `check` and `operations` copies) tested a ray hit against the
+  face's OUTER wire only, so a ray leaving through the mouth of a pocket counted the ring
+  face around it. A plain through-hole is parity-invisible (+2), which is why it survived;
+  it bites on a blind pocket or a hole filled by a coplanar neighbour face. An open pocket
+  read as solid material, and the wrong reading is deflection-independent, so no probe
+  setting exposes it. Regression `operations::classify::tests::point_in_open_pocket_is_outside`.
+  This is what made `POINT_IN` lie on the #1517 lid; treat pre-2026-08-10 POINT_IN readings
+  on any pocketed or holed solid as suspect.
 - **Label-bracket fuse open shell / mesh fallback (CLOSED 2026-08-09, #1510)** —
   `clip_line_to_face_boundary` kept chord crossings in `crossings` and true-arc ones in
   `crossings_ext`; the hole-free branch used both, the HOLED-face fallback only the former, so a
@@ -303,6 +358,20 @@ One line each; the fixture/PR carries the story. Newest first.
 
 ## Recurring traps (the distilled, expensive lessons)
 
+- **A circular edge has ONE canonical span and it is not the short one.**
+  `EdgeCurve::domain_with_endpoints` is the CCW range from start vertex to end vertex,
+  routinely a major arc. Any new "which part of the circle does this edge cover" test
+  must call it or reproduce it exactly (#1540). Taking the short way does not merely
+  lose crossings, it invents them on the complement.
+- **A whole-solid volume cannot tell a MISSING cavity from a COLLAPSED one** — both read
+  high by the same amount. Print per-shell signed volume against each shell's own bbox
+  (`cargo run --release --example cavity_probe -p brepkit-io`) before blaming either the
+  boolean or the measurement (#1536).
+- **Measurement and tessellation walk different face sets.** Tessellation uses
+  `explorer::solid_faces` (outer + inner shells) so the MESH is complete, while several
+  volume/area/CoM paths walked `outer_shell()` alone — closed, manifold and correctly
+  bounded, with the cavity silently absent from the number. Fixed for volume, area and
+  centre of mass; when adding a solid-scoped measurement, use `solid_faces`.
 - **Marched/fitted section geometry is good to ~1e-6; every exact-tol (1e-7) gate it
   meets needs a weld-scale (100·tol) band.** Four separate gaps in one family were this.
 - **A sampled proxy gated at an exactness tolerance** is the single most common defect
@@ -322,6 +391,10 @@ One line each; the fixture/PR carries the story. Newest first.
   cylinder-slot, a1corner. Each caught a different wrong discriminant.
 - **A trigger keyed to a post-hoc failure signature cannot demote a working case** — the
   cheap way past those calibrations.
+- **When a point-classification oracle disagrees with the face list, distrust the oracle
+  first.** Read the operand with `dump_solid` and check its volume; both are independent of
+  the classifier. A whole roadmap entry once recorded an "unexplained asymmetry" that was
+  purely a classifier defect, and it steered two passes at the wrong question.
 - **`solid_volume` is a MAGNITUDE**; only `oriented_solid_volume` sees an inverted or
   doubled shell. It is also translation-VARIANT on a malformed boundary, which needs no
   second oracle.
@@ -353,7 +426,25 @@ One line each; the fixture/PR carries the story. Newest first.
 ## Tool-side measurement recipes and traps
 
 - **Scenario numbers rot.** Always run the control on the SAME DAY and SAME catalog; a
-  stale baseline has twice nearly produced a false conclusion.
+  stale baseline has twice nearly produced a false conclusion. Confirmed again 2026-08-10:
+  the issue's "137 failed on 3.2.18" re-measured as **154** on the same kernel, because the
+  catalog had grown. Quote a delta between two runs you did yourself, never against a
+  recorded number.
+- **The reference kernel's volume is NOT an oracle where its own mesh is non-manifold.**
+  Three of four volume "failures" in the head-to-head matrix were against reference meshes
+  carrying 970-1809 non-manifold edges (Euler 1230-2375) reading HIGHER than brepkit's clean
+  ones — the double-cover over-count. Check `nonManifoldEdges` on BOTH sides before believing
+  a volume delta.
+- **A per-kernel `.brepkit.snap` triangle count is not a defect signal.** Any correct change
+  to how a face splits moves it. 11 of 16 apparent regressions in the 3.2.22 run were stale
+  baselines; separate them out before counting, or refresh them first.
+- **Measurement worktree recipe** (2026-08-10, worked end to end): `git worktree add
+  .worktrees/<name> origin/main --detach` inside the TOOL repo, `pnpm install`, edit the
+  `brepkit-wasm` pin in its `package.json`, `pnpm install --no-frozen-lockfile`. Verify with
+  `require.resolve('brepkit-wasm', {paths:[require.resolve('brepjs')]})` plus a sha256 of the
+  `.wasm` — resolution THROUGH brepjs is the part that catches a nested copy. Drive
+  `./node_modules/.bin/vitest` directly. `--reporter=basic` is not a vitest 4 reporter and
+  fails as a missing custom module. A full generator run is ~45 min at `--maxWorkers=4`.
 - **Current baseline (2026-08-07, released 2.129.13 era, stock pins): the ENTIRE tool
   generator suite is GREEN — 272 files, 2720 passed, 0 failures.** Compare against a
   fresh same-day run, not old counts (the catalog grows continuously).
@@ -398,8 +489,12 @@ One line each; the fixture/PR carries the story. Newest first.
   received-10x-above is a defect.
 - **Durable native probes/instruments** (env-gated, grep for them before writing new
   ones): `BK_FF_DUMP` / `BK_FF_TRACE` / `BK_RAWC` (phase_ff), `BK_SD_SETS`
-  (same_domain), `BK_OPEN_SHELL` / `BK_SHELLS` (builder_solid shell grouping),
-  `BK_SUBFACE_SRC` / `BK_SUBFACE_BOX` (builder — note BOX tests face VERTICES only),
+  (same_domain), `BK_RESTRICT` (phase_ff — the in-both window each section is trimmed to, and
+  crucially whether a section reached that clip at all: a special-case emitter that bypasses
+  it looks exactly like a window computed wrong), `BK_OPEN_SHELL` / `BK_SHELLS` (builder_solid shell grouping),
+  `BK_SUBFACE_SRC` / `BK_SUBFACE_BOX` (builder — note BOX tests face VERTICES only) and
+  `BK_SUBFACE_WIRE` (adds each sub-face's wire with per-edge curve MIDPOINTS, the only way
+  to tell a short arc from the long one sharing its endpoints on a periodic wall),
   `POINT_IN` / `FREE_EDGES` / `TESS_BND` modes in `replay_pair`, `dump_solid` (per-wire
   edge ids), `audit_bin.rs` (HALFEDGE directed oracle — the authoritative winding
   oracle), `orient_scan.rs` / `fuse_orient.rs`, fillet instruments (`BK_FORCE_V2`,
