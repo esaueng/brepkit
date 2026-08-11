@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786427772536,
+  "lastUpdate": 1786489832834,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6587,6 +6587,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13272987,
             "range": "± 11961",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fcad687fe929560e63436396e9a4959afc9d45c5",
+          "message": "Merge pull request #128 from esaueng/codex/fix-blend-v2-baselines\n\nfix(operations): close concave blend baselines",
+          "timestamp": "2026-08-11T19:08:24-04:00",
+          "tree_id": "5a7c9416450c5bb932bd6522d251d3f6b6599322",
+          "url": "https://github.com/esaueng/brepkit/commit/fcad687fe929560e63436396e9a4959afc9d45c5"
+        },
+        "date": 1786489831596,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 524584,
+            "range": "± 9647",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 586264,
+            "range": "± 10315",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7313,
+            "range": "± 136",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 456586,
+            "range": "± 6261",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15578852,
+            "range": "± 167675",
             "unit": "ns/iter"
           }
         ]
