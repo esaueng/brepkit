@@ -8,11 +8,11 @@ use brepkit_topology::Topology;
 use brepkit_topology::vertex::VertexId;
 
 /// One endpoint-connected curved-edge cycle that winds a periodic parameter.
-pub(crate) struct RimCycle {
+pub struct RimCycle {
     /// Raw topology indices of the edges in traversal order.
-    pub(crate) edge_indices: Vec<usize>,
+    pub edge_indices: Vec<usize>,
     /// Whether the cycle contains a by-construction closed edge.
-    pub(crate) has_closed_edge: bool,
+    pub has_closed_edge: bool,
 }
 
 /// Collect curved-edge cycles whose projected parameter winds one full turn.
@@ -21,7 +21,7 @@ pub(crate) struct RimCycle {
 /// The recognizer walks each connected run by endpoint identity, rejects open
 /// runs or an unexpected cycle count, and then requires every non-closed cycle
 /// to accumulate a wrapped winding of approximately `2*pi`.
-pub(crate) fn collect_full_turn_rim_cycles(
+pub fn collect_full_turn_rim_cycles(
     topo: &Topology,
     curved: &[(usize, VertexId, VertexId)],
     project_u: &dyn Fn(Point3) -> f64,

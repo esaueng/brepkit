@@ -262,11 +262,10 @@ fn non_winding_circle_pair_is_not_skinned_as_a_full_rim() {
         ],
     );
 
-    match tessellate_solid_with_tolerance(&topo, solid, 0.03, 8.0_f64.to_radians()) {
-        Ok(mesh) => assert!(
+    if let Ok(mesh) = tessellate_solid_with_tolerance(&topo, solid, 0.03, 8.0_f64.to_radians()) {
+        assert!(
             boundary_edge_count(&mesh) > 0,
             "a non-winding arc pair must not be skinned into a closed torus band"
-        ),
-        Err(_) => {}
+        );
     }
 }
