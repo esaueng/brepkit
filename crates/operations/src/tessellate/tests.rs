@@ -2739,8 +2739,12 @@ fn split_circle_rims_bound_the_torus_snap_range() {
 
     let whole = crate::primitives::make_torus(&mut topo, major, minor, 32).unwrap();
     let whole_face = brepkit_topology::explorer::solid_faces(&topo, whole).unwrap()[0];
+    assert!(matches!(
+        topo.face(whole_face).unwrap().surface(),
+        FaceSurface::Torus(_)
+    ));
     let FaceSurface::Torus(whole_surface) = topo.face(whole_face).unwrap().surface() else {
-        panic!("torus primitive face");
+        return;
     };
     assert_eq!(
         super::nurbs::compute_torus_v_range(&topo, topo.face(whole_face).unwrap(), whole_surface),
