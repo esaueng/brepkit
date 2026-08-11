@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786491148149,
+  "lastUpdate": 1786491475719,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6695,6 +6695,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16254999,
             "range": "± 219503",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f9c0ae30fabfcb9a27cb1707132763835cdcc8dd",
+          "message": "Merge pull request #131 from esaueng/codex/review-fix-pr-130\n\nfix(heal): apply reshape actions across cavity shells",
+          "timestamp": "2026-08-11T19:35:43-04:00",
+          "tree_id": "a0985e1cd4926cb66d69fb009db2c4f4d7a7b9f6",
+          "url": "https://github.com/esaueng/brepkit/commit/f9c0ae30fabfcb9a27cb1707132763835cdcc8dd"
+        },
+        "date": 1786491474553,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 499609,
+            "range": "± 11660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 610872,
+            "range": "± 15716",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7251,
+            "range": "± 81",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 491304,
+            "range": "± 19364",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15594159,
+            "range": "± 140857",
             "unit": "ns/iter"
           }
         ]
