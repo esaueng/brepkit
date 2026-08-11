@@ -9,6 +9,7 @@ use brepkit_topology::face::{FaceId, FaceSurface};
 use std::f64::consts::TAU;
 
 use super::edge_sampling::{sample_edge, segments_for_chord_deviation_a};
+use super::rim_chain::collect_full_turn_rim_cycles;
 use super::{MERGE_GRID, TriangleMesh, point_merge_key};
 
 /// Maps a 3D point to its `(u, v)` surface parameters.
@@ -339,74 +340,10 @@ pub(super) fn tessellate_revolution_band_shared(
             }
         }
     }
-    // Walk cycles by shared vertices (vertex→edge adjacency built once).
-    let mut by_vertex: std::collections::HashMap<brepkit_topology::vertex::VertexId, Vec<usize>> =
-        std::collections::HashMap::new();
-    for (j, &(_, sv, ev)) in curved.iter().enumerate() {
-        by_vertex.entry(sv).or_default().push(j);
-        by_vertex.entry(ev).or_default().push(j);
-    }
-    let mut used = vec![false; curved.len()];
-    let mut cycles: Vec<Vec<usize>> = Vec::new();
-    for start in 0..curved.len() {
-        if used[start] {
-            continue;
-        }
-        let (_, origin, mut at) = curved[start];
-        used[start] = true;
-        let mut cycle = vec![start];
-        let mut closed = curved[start].1 == curved[start].2 || at == origin;
-        while !closed {
-            let Some(&next) = by_vertex
-                .get(&at)
-                .and_then(|c| c.iter().find(|&&j| !used[j]))
-            else {
-                break;
-            };
-            used[next] = true;
-            at = if curved[next].1 == at {
-                curved[next].2
-            } else {
-                curved[next].1
-            };
-            cycle.push(next);
-            closed = at == origin;
-        }
-        if !closed {
-            return Ok(false); // open curved run — not a rim structure
-        }
-        cycles.push(cycle);
-    }
-    if cycles.len() != 2 {
+    let project_u = |point| project(point).0;
+    let Some(cycles) = collect_full_turn_rim_cycles(topo, &curved, &project_u, 2)? else {
         return Ok(false);
-    }
-    // Net winding per cycle from surface-projected endpoint deltas; a closed
-    // single edge (start == end vertex) winds a full turn by construction.
-    let wrap_pi = |d: f64| -> f64 { (d + TAU / 2.0).rem_euclid(TAU) - TAU / 2.0 };
-    for cycle in &cycles {
-        let mut winding = 0.0_f64;
-        let mut whole_turn = false;
-        let mut at: Option<brepkit_topology::vertex::VertexId> = None;
-        for &ci in cycle {
-            let (_, sv, ev) = curved[ci];
-            if sv == ev {
-                whole_turn = true;
-                continue;
-            }
-            let (from, to) = match at {
-                None => (sv, ev),
-                Some(v) if v == sv => (sv, ev),
-                Some(_) => (ev, sv),
-            };
-            let (u0, _) = project(topo.vertex(from)?.point());
-            let (u1, _) = project(topo.vertex(to)?.point());
-            winding += wrap_pi(u1 - u0);
-            at = Some(to);
-        }
-        if !whole_turn && (winding.abs() - TAU).abs() > 1e-6 {
-            return Ok(false);
-        }
-    }
+    };
 
     // Pull each rim's shared global vertex IDs. Chained pieces share their
     // joint vertices through the pool, so id-dedup merges the chain into one
@@ -414,8 +351,8 @@ pub(super) fn tessellate_revolution_band_shared(
     let mut rims: Vec<Vec<u32>> = Vec::with_capacity(2);
     for cycle in &cycles {
         let mut ids: Vec<u32> = Vec::new();
-        for &ci in cycle {
-            let Some(edge_ids) = edge_global_indices.get(&curved[ci].0) else {
+        for &edge_index in &cycle.edge_indices {
+            let Some(edge_ids) = edge_global_indices.get(&edge_index) else {
                 return Ok(false);
             };
             ids.extend_from_slice(edge_ids);
