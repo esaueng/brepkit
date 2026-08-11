@@ -731,7 +731,9 @@ mod tests {
         let final_wire = topo.face(face).unwrap().outer_wire();
         let final_edges = topo.wire(final_wire).unwrap().edges();
         assert_eq!(final_edges.len(), 2);
-        assert_eq!(final_edges[0], OrientedEdge::new(second, false));
-        assert_eq!(final_edges[1], OrientedEdge::new(first, false));
+        assert_eq!(final_edges[0].edge(), second);
+        assert!(!final_edges[0].is_forward());
+        assert_eq!(final_edges[1].edge(), first);
+        assert!(!final_edges[1].is_forward());
     }
 }
