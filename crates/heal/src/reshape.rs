@@ -476,9 +476,12 @@ impl ReShape {
                 let mut any_changed = false;
 
                 for oe in &old_edges {
-                    let replacements = self.resolved_edges(oe.edge());
+                    let mut replacements = self.resolved_edges(oe.edge());
                     if replacements.len() != 1 || replacements[0] != oe.edge() {
                         any_changed = true;
+                    }
+                    if !oe.is_forward() {
+                        replacements.reverse();
                     }
                     for replacement in replacements {
                         new_edges.push(OrientedEdge::new(replacement, oe.is_forward()));
@@ -704,5 +707,32 @@ mod tests {
         let final_edge = topo.wire(final_wire).unwrap().edges()[0].edge();
         assert_eq!(final_edge, replacement_edge);
         assert_eq!(topo.edge(final_edge).unwrap().start(), new_start);
+    }
+
+    #[test]
+    fn apply_reverses_split_edge_order_for_reversed_wire_use() {
+        let mut topo = Topology::new();
+        let start = Point3::new(0.0, 0.0, 0.0);
+        let middle = Point3::new(1.0, 0.0, 0.0);
+        let end = Point3::new(2.0, 0.0, 0.0);
+        let original = add_edge(&mut topo, start, end);
+        let first = add_edge(&mut topo, start, middle);
+        let second = add_edge(&mut topo, middle, end);
+        let wire = topo.add_wire(
+            Wire::new(vec![OrientedEdge::new(original, false)], false).unwrap(),
+        );
+        let face = add_face(&mut topo, wire);
+        let shell = add_shell(&mut topo, vec![face]);
+        let solid = add_solid(&mut topo, shell, vec![]);
+
+        let mut reshape = ReShape::new();
+        reshape.split_edge(original, vec![first, second]);
+        reshape.apply(&mut topo, solid).unwrap();
+
+        let final_wire = topo.face(face).unwrap().outer_wire();
+        let final_edges = topo.wire(final_wire).unwrap().edges();
+        assert_eq!(final_edges.len(), 2);
+        assert_eq!(final_edges[0], OrientedEdge::new(second, false));
+        assert_eq!(final_edges[1], OrientedEdge::new(first, false));
     }
 }
