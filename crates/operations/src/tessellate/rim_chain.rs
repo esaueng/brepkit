@@ -32,6 +32,9 @@ pub fn collect_full_turn_rim_cycles(
         by_vertex.entry(start).or_default().push(position);
         by_vertex.entry(end).or_default().push(position);
     }
+    if by_vertex.values().any(|positions| positions.len() != 2) {
+        return Ok(None);
+    }
 
     let mut used = vec![false; curved.len()];
     let mut cycles = Vec::new();
@@ -68,7 +71,7 @@ pub fn collect_full_turn_rim_cycles(
         let mut traversal_vertex: Option<VertexId> = None;
         let mut has_closed_edge = false;
         for &position in &positions {
-            let (_, start, end) = curved[position];
+            let (edge_index, start, end) = curved[position];
             if start == end {
                 has_closed_edge = true;
                 continue;
@@ -76,11 +79,26 @@ pub fn collect_full_turn_rim_cycles(
             let (from, to) = match traversal_vertex {
                 None => (start, end),
                 Some(vertex) if vertex == start => (start, end),
-                Some(_) => (end, start),
+                Some(vertex) if vertex == end => (end, start),
+                Some(_) => return Ok(None),
             };
+            let Some(edge_id) = topo.edge_id_from_index(edge_index) else {
+                return Ok(None);
+            };
+            let edge = topo.edge(edge_id)?;
+            if edge.start() != start || edge.end() != end {
+                return Ok(None);
+            }
+            let stored_start = topo.vertex(start)?.point();
+            let stored_end = topo.vertex(end)?.point();
+            let (t0, t1) = edge.curve().domain_with_endpoints(stored_start, stored_end);
+            let midpoint =
+                edge.curve()
+                    .evaluate_with_endpoints((t0 + t1) * 0.5, stored_start, stored_end);
             let u0 = project_u(topo.vertex(from)?.point());
             let u1 = project_u(topo.vertex(to)?.point());
-            winding += wrap_pi(u1 - u0);
+            let u_mid = project_u(midpoint);
+            winding += wrap_pi(u_mid - u0) + wrap_pi(u1 - u_mid);
             traversal_vertex = Some(to);
         }
         if !has_closed_edge && (winding.abs() - TAU).abs() > 1e-6 {
@@ -104,4 +122,66 @@ pub fn collect_full_turn_rim_cycles(
 
 fn wrap_pi(delta: f64) -> f64 {
     (delta + TAU / 2.0).rem_euclid(TAU) - TAU / 2.0
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use brepkit_math::curves::Circle3D;
+    use brepkit_math::vec::Vec3;
+    use brepkit_topology::Topology;
+    use brepkit_topology::edge::{Edge, EdgeCurve};
+    use brepkit_topology::vertex::Vertex;
+
+    use super::*;
+
+    #[test]
+    fn major_and_minor_arc_pair_is_a_full_turn() {
+        let circle =
+            Circle3D::new(Point3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 2.0).unwrap();
+        let mut topo = Topology::new();
+        let start = topo.add_vertex(Vertex::new(circle.evaluate(0.0), 1e-7));
+        let split = topo.add_vertex(Vertex::new(
+            circle.evaluate(1.5 * std::f64::consts::PI),
+            1e-7,
+        ));
+        let major = topo.add_edge(Edge::new(start, split, EdgeCurve::Circle(circle.clone())));
+        let minor = topo.add_edge(Edge::new(split, start, EdgeCurve::Circle(circle.clone())));
+        let curved = [(major.index(), start, split), (minor.index(), split, start)];
+
+        let cycles =
+            collect_full_turn_rim_cycles(&topo, &curved, &|point| circle.project(point), 1)
+                .unwrap();
+
+        assert!(cycles.is_some());
+    }
+
+    #[test]
+    fn branched_arc_graph_is_not_a_rim_cycle() {
+        let circle =
+            Circle3D::new(Point3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 2.0).unwrap();
+        let mut topo = Topology::new();
+        let a = topo.add_vertex(Vertex::new(circle.evaluate(0.0), 1e-7));
+        let b = topo.add_vertex(Vertex::new(circle.evaluate(std::f64::consts::PI), 1e-7));
+        let c = topo.add_vertex(Vertex::new(
+            circle.evaluate(std::f64::consts::FRAC_PI_2),
+            1e-7,
+        ));
+        let ab = topo.add_edge(Edge::new(a, b, EdgeCurve::Circle(circle.clone())));
+        let ba = topo.add_edge(Edge::new(b, a, EdgeCurve::Circle(circle.clone())));
+        let ac = topo.add_edge(Edge::new(a, c, EdgeCurve::Circle(circle.clone())));
+        let ca = topo.add_edge(Edge::new(c, a, EdgeCurve::Circle(circle.clone())));
+        let curved = [
+            (ab.index(), a, b),
+            (ba.index(), b, a),
+            (ac.index(), a, c),
+            (ca.index(), c, a),
+        ];
+
+        let cycles =
+            collect_full_turn_rim_cycles(&topo, &curved, &|point| circle.project(point), 2)
+                .unwrap();
+
+        assert!(cycles.is_none());
+    }
 }
