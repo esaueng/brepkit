@@ -75,32 +75,77 @@ pub(super) fn compute_torus_v_range(
     use brepkit_topology::edge::EdgeCurve;
     use std::f64::consts::{PI, TAU};
 
-    // Collect one constant-v level per circular boundary group. Split rim arcs
-    // all contribute the same level and collapse into one wrapped cluster.
-    let mut circle_vs: Vec<f64> = Vec::new();
-    if let Ok(wire) = topo.wire(face_data.outer_wire()) {
-        for oe in wire.edges() {
-            if let Ok(edge) = topo.edge(oe.edge())
-                && matches!(edge.curve(), EdgeCurve::Circle(_))
-                && let (Ok(start), Ok(end)) = (topo.vertex(edge.start()), topo.vertex(edge.end()))
-            {
-                let start_v = torus.project_point(start.point()).1.rem_euclid(TAU);
-                let end_v = torus.project_point(end.point()).1.rem_euclid(TAU);
-                let wrapped_delta = (end_v - start_v + PI).rem_euclid(TAU) - PI;
-                if wrapped_delta.abs() <= 1e-6
-                    && !circle_vs
-                        .iter()
-                        .any(|&level| ((start_v - level + PI).rem_euclid(TAU) - PI).abs() <= 1e-6)
-                {
-                    circle_vs.push(start_v);
-                }
-            }
+    let full_range = (0.0, TAU);
+    let Ok(wire) = topo.wire(face_data.outer_wire()) else {
+        return full_range;
+    };
+    let mut use_counts: DetHashMap<usize, usize> = DetHashMap::default();
+    for oe in wire.edges() {
+        *use_counts.entry(oe.edge().index()).or_default() += 1;
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut curved = Vec::new();
+    for oe in wire.edges() {
+        if !seen.insert(oe.edge().index()) || use_counts.get(&oe.edge().index()) != Some(&1) {
+            continue;
+        }
+        let Ok(edge) = topo.edge(oe.edge()) else {
+            return full_range;
+        };
+        if matches!(edge.curve(), EdgeCurve::Circle(_)) {
+            curved.push((oe.edge().index(), edge.start(), edge.end()));
         }
     }
+    let project_u = |point| torus.project_point(point).0;
+    let Ok(Some(cycles)) = collect_full_turn_rim_cycles(topo, &curved, &project_u, 2) else {
+        return full_range;
+    };
 
-    if circle_vs.len() != 2 {
-        return (0.0, TAU);
+    // Each accepted cycle must also remain at one constant tube angle between
+    // its vertices. Sampling the curve quarters prevents partial or tilted
+    // circles whose endpoints happen to share a v value from narrowing the
+    // torus snap range.
+    let mut circle_vs = Vec::with_capacity(2);
+    for cycle in cycles {
+        let mut samples = Vec::new();
+        for edge_index in cycle.edge_indices {
+            let Some(edge_id) = topo.edge_id_from_index(edge_index) else {
+                return full_range;
+            };
+            let Ok(edge) = topo.edge(edge_id) else {
+                return full_range;
+            };
+            let (Ok(start), Ok(end)) = (topo.vertex(edge.start()), topo.vertex(edge.end())) else {
+                return full_range;
+            };
+            let (t0, t1) = edge
+                .curve()
+                .domain_with_endpoints(start.point(), end.point());
+            for fraction in [0.0, 0.25, 0.5, 0.75] {
+                let point = edge.curve().evaluate_with_endpoints(
+                    t0 + (t1 - t0) * fraction,
+                    start.point(),
+                    end.point(),
+                );
+                samples.push(torus.project_point(point).1.rem_euclid(TAU));
+            }
+        }
+        let (sin_sum, cos_sum) = samples.iter().fold((0.0_f64, 0.0_f64), |acc, &v| {
+            (acc.0 + v.sin(), acc.1 + v.cos())
+        });
+        if sin_sum.hypot(cos_sum) <= 1e-12 {
+            return full_range;
+        }
+        let level = sin_sum.atan2(cos_sum).rem_euclid(TAU);
+        if samples
+            .iter()
+            .any(|&v| ((v - level + PI).rem_euclid(TAU) - PI).abs() > 1e-6)
+        {
+            return full_range;
+        }
+        circle_vs.push(level);
     }
+
     let (va, vb) = (circle_vs[0], circle_vs[1]);
 
     // Two candidate arcs between the circles; the band is the shorter one.

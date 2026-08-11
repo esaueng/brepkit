@@ -2753,6 +2753,64 @@ fn split_circle_rims_bound_the_torus_snap_range() {
 }
 
 #[test]
+fn non_winding_circle_groups_do_not_bound_the_torus_snap_range() {
+    use brepkit_math::curves::Circle3D;
+    use brepkit_math::surfaces::ToroidalSurface;
+    use std::f64::consts::{FRAC_PI_2, TAU};
+
+    fn non_winding_pair(
+        topo: &mut Topology,
+        major: f64,
+        minor: f64,
+        v: f64,
+    ) -> (brepkit_topology::vertex::VertexId, Vec<OrientedEdge>) {
+        let center = Point3::new(0.0, 0.0, minor * v.sin());
+        let circle =
+            Circle3D::new(center, Vec3::new(0.0, 0.0, 1.0), major + minor * v.cos()).unwrap();
+        let start = topo.add_vertex(Vertex::new(circle.evaluate(0.0), 1e-7));
+        let end = topo.add_vertex(Vertex::new(circle.evaluate(FRAC_PI_2), 1e-7));
+        let first = topo.add_edge(Edge::new(start, end, EdgeCurve::Circle(circle.clone())));
+        let second = topo.add_edge(Edge::new(start, end, EdgeCurve::Circle(circle)));
+        (
+            start,
+            vec![
+                OrientedEdge::new(first, true),
+                OrientedEdge::new(second, false),
+            ],
+        )
+    }
+
+    let (major, minor, v0, v1) = (6.0_f64, 2.0_f64, 0.4_f64, 1.2_f64);
+    let torus = ToroidalSurface::new(Point3::new(0.0, 0.0, 0.0), major, minor).unwrap();
+    let mut topo = Topology::new();
+    let (lo_anchor, lo_arcs) = non_winding_pair(&mut topo, major, minor, v0);
+    let (hi_anchor, hi_arcs) = non_winding_pair(&mut topo, major, minor, v1);
+    let seam = topo.add_edge(Edge::new(lo_anchor, hi_anchor, EdgeCurve::Line));
+    let wire = topo.add_wire(
+        Wire::new(
+            lo_arcs
+                .into_iter()
+                .chain(std::iter::once(OrientedEdge::new(seam, true)))
+                .chain(hi_arcs)
+                .chain(std::iter::once(OrientedEdge::new(seam, false)))
+                .collect(),
+            true,
+        )
+        .unwrap(),
+    );
+    let face = topo.add_face(Face::new(
+        wire,
+        Vec::new(),
+        FaceSurface::Torus(torus.clone()),
+    ));
+
+    assert_eq!(
+        super::nurbs::compute_torus_v_range(&topo, topo.face(face).unwrap(), &torus),
+        (0.0, TAU)
+    );
+}
+
+#[test]
 fn split_rim_anchor_is_independent_of_neighbor_wire_orientation() {
     use brepkit_math::curves::Circle3D;
     use brepkit_math::surfaces::CylindricalSurface;
