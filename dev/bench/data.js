@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786489832834,
+  "lastUpdate": 1786491148149,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6641,6 +6641,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15578852,
             "range": "± 167675",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7956e0ca3c3277821ad22047f7a76bc20b7664b2",
+          "message": "Merge pull request #132 from esaueng/codex/reconcile-pr-129-after-128\n\nfix(io): classify generic periodic STEP face bounds",
+          "timestamp": "2026-08-11T19:30:23-04:00",
+          "tree_id": "2fcbbd4395f19a7a4619c30d0ebba29b4adce3c9",
+          "url": "https://github.com/esaueng/brepkit/commit/7956e0ca3c3277821ad22047f7a76bc20b7664b2"
+        },
+        "date": 1786491146947,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 554869,
+            "range": "± 11943",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 622418,
+            "range": "± 32488",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7913,
+            "range": "± 101",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 502160,
+            "range": "± 2896",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16254999,
+            "range": "± 219503",
             "unit": "ns/iter"
           }
         ]
