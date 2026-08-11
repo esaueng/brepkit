@@ -4,6 +4,7 @@ use brepkit_math::det_hash::DetHashMap;
 use brepkit_math::vec::{Point3, Vec3};
 use brepkit_topology::Topology;
 
+use super::rim_chain::collect_full_turn_rim_cycles;
 use super::{TriangleMesh, TriangleMeshUV};
 
 /// A cell in the adaptive quadtree for NURBS tessellation.
@@ -60,12 +61,12 @@ pub(super) fn compute_v_param_range(
 ///
 /// A full torus has no boundary constraint on v, so the default is the full
 /// tube `(0, TAU)`. A toroidal *band* (e.g. a rim-fillet quarter-torus) is
-/// bounded by two closed circle edges sitting at distinct constant v; the band
-/// fills the arc between them. v is periodic, so two arcs are possible — the
-/// fillet band is the shorter one (a 90° rim corner spans π/2; we accept up to
-/// just under π). Returns `(0, TAU)` whenever the boundary doesn't clearly
-/// describe such a band (preserving full-tube tessellation for every other
-/// toroidal face).
+/// bounded by two circular boundary groups sitting at distinct constant v;
+/// each group may be one closed edge or an open arc chain. The band fills the
+/// arc between them. v is periodic, so two arcs are possible — the fillet band
+/// is the shorter one (a 90° rim corner spans π/2; we accept up to just under
+/// π). Returns `(0, TAU)` whenever the boundary doesn't clearly describe such
+/// a band (preserving full-tube tessellation for every other toroidal face).
 pub(super) fn compute_torus_v_range(
     topo: &Topology,
     face_data: &brepkit_topology::face::Face,
@@ -74,16 +75,25 @@ pub(super) fn compute_torus_v_range(
     use brepkit_topology::edge::EdgeCurve;
     use std::f64::consts::{PI, TAU};
 
-    // Collect the (constant) v of each closed circular boundary edge.
+    // Collect one constant-v level per circular boundary group. Split rim arcs
+    // all contribute the same level and collapse into one wrapped cluster.
     let mut circle_vs: Vec<f64> = Vec::new();
     if let Ok(wire) = topo.wire(face_data.outer_wire()) {
         for oe in wire.edges() {
             if let Ok(edge) = topo.edge(oe.edge())
                 && matches!(edge.curve(), EdgeCurve::Circle(_))
-                && edge.start() == edge.end()
-                && let Ok(vertex) = topo.vertex(edge.start())
+                && let (Ok(start), Ok(end)) = (topo.vertex(edge.start()), topo.vertex(edge.end()))
             {
-                circle_vs.push(torus.project_point(vertex.point()).1.rem_euclid(TAU));
+                let start_v = torus.project_point(start.point()).1.rem_euclid(TAU);
+                let end_v = torus.project_point(end.point()).1.rem_euclid(TAU);
+                let wrapped_delta = (end_v - start_v + PI).rem_euclid(TAU) - PI;
+                if wrapped_delta.abs() <= 1e-6
+                    && !circle_vs
+                        .iter()
+                        .any(|&level| ((start_v - level + PI).rem_euclid(TAU) - PI).abs() <= 1e-6)
+                {
+                    circle_vs.push(start_v);
+                }
             }
         }
     }
@@ -156,18 +166,18 @@ pub(super) fn compute_axial_range(
 /// every column between two pool samples, snaps nothing, and leaves the face
 /// sharing no rim vertex at all with its neighbours.
 ///
-/// So the anchor is the start vertex of the first CLOSED conic edge on the
-/// outer wire -- the same vertex `circle_param_range` anchors the polyline on.
+/// So the first preference is the start vertex of the first CLOSED conic edge
+/// on the outer wire -- the same vertex `circle_param_range` anchors the
+/// polyline on.
 ///
-/// `None` when the wire has no such edge, and then the caller keeps the old
-/// `(0, TAU)`. That restraint is load-bearing, not caution: an anchor is only
-/// safe when the two faces that must agree on it derive it from the SAME
-/// entity. A closed rim edge is shared by both faces that meet on it, so both
-/// read one vertex. Anything else is per-face — `make_sphere`'s two hemispheres
-/// share one equatorial loop but walk it in opposite directions, so "the first
-/// boundary vertex" is a different point on each, and anchoring there pulls
-/// their grids apart instead of together (measured: two tangent unit balls
-/// fused read 6.03 against 8.38).
+/// If no closed conic exists, an endpoint-connected full-turn chain of open
+/// circle arcs is safe too. Its anchor is the STORED start vertex of the
+/// minimum-index edge in the chain. That choice is independent of either
+/// face's wire orientation, so neighbours sharing the arc chain derive the
+/// same anchor. Arbitrary "first boundary vertex" choices remain unsafe:
+/// `make_sphere`'s two hemispheres share one equatorial loop but walk it in
+/// opposite directions, so such a choice pulls their grids apart instead of
+/// together (measured: two tangent unit balls fused read 6.03 against 8.38).
 fn full_turn_anchor<F>(
     topo: &Topology,
     face_data: &brepkit_topology::face::Face,
@@ -192,7 +202,40 @@ where
             return Some(project(sv.point()).0);
         }
     }
-    None
+
+    let mut use_counts: DetHashMap<usize, usize> = DetHashMap::default();
+    for oe in wire.edges() {
+        *use_counts.entry(oe.edge().index()).or_default() += 1;
+    }
+    let mut seen = std::collections::HashSet::new();
+    let mut curved = Vec::new();
+    for oe in wire.edges() {
+        if !seen.insert(oe.edge().index()) || use_counts.get(&oe.edge().index()) != Some(&1) {
+            continue;
+        }
+        let Ok(edge) = topo.edge(oe.edge()) else {
+            continue;
+        };
+        if edge.start() != edge.end() && matches!(edge.curve(), EdgeCurve::Circle(_)) {
+            curved.push((oe.edge().index(), edge.start(), edge.end()));
+        }
+    }
+    let project_u = |point| project(point).0;
+    let cycles = (1..=curved.len()).find_map(|expected_cycles| {
+        collect_full_turn_rim_cycles(topo, &curved, &project_u, expected_cycles)
+            .ok()
+            .flatten()
+    })?;
+    let anchor_edge_index = cycles
+        .iter()
+        .filter(|cycle| !cycle.has_closed_edge)
+        .flat_map(|cycle| cycle.edge_indices.iter().copied())
+        .min()?;
+    let anchor_edge = topo
+        .edge(topo.edge_id_from_index(anchor_edge_index)?)
+        .ok()?;
+    let anchor = topo.vertex(anchor_edge.start()).ok()?;
+    Some(project(anchor.point()).0)
 }
 
 /// Compute the angular (u) range for an analytic face from its wire boundary.
