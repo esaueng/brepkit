@@ -718,9 +718,8 @@ mod tests {
         let original = add_edge(&mut topo, start, end);
         let first = add_edge(&mut topo, start, middle);
         let second = add_edge(&mut topo, middle, end);
-        let wire = topo.add_wire(
-            Wire::new(vec![OrientedEdge::new(original, false)], false).unwrap(),
-        );
+        let wire =
+            topo.add_wire(Wire::new(vec![OrientedEdge::new(original, false)], false).unwrap());
         let face = add_face(&mut topo, wire);
         let shell = add_shell(&mut topo, vec![face]);
         let solid = add_solid(&mut topo, shell, vec![]);
