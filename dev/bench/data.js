@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786422683628,
+  "lastUpdate": 1786422804216,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6479,6 +6479,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14209321,
             "range": "± 250500",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "06a09d1b2ca8550370116a83091c6eb6d6d7d62a",
+          "message": "Merge pull request #126 from esaueng/fix/green-baseline\n\nfix(operations): close 9 of 11 red-baseline tests across revolve, fuse, and split",
+          "timestamp": "2026-08-11T00:30:24-04:00",
+          "tree_id": "7c9975f72cfc1439a7b66f4ac853c5b4fa068a6f",
+          "url": "https://github.com/esaueng/brepkit/commit/06a09d1b2ca8550370116a83091c6eb6d6d7d62a"
+        },
+        "date": 1786422803047,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 525215,
+            "range": "± 12494",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 575182,
+            "range": "± 1658",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6496,
+            "range": "± 173",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 479885,
+            "range": "± 3443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15280291,
+            "range": "± 173492",
             "unit": "ns/iter"
           }
         ]
