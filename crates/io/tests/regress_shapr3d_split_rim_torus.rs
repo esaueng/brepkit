@@ -2,9 +2,9 @@
 
 #![allow(clippy::expect_used)]
 
-use brepkit_heal::upgrade::merge_split_rim_arcs::merge_split_rim_arcs;
 use brepkit_io::step::reader::read_step;
 use brepkit_math::tolerance::Tolerance;
+use brepkit_operations::heal::merge_split_rim_arcs;
 use brepkit_operations::measure::solid_volume;
 use brepkit_operations::tessellate::{
     boundary_edge_count, non_manifold_edge_count, tessellate_solid_with_tolerance,

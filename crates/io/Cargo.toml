@@ -15,7 +15,6 @@ rust-version.workspace = true
 version.workspace = true
 
 [dependencies]
-brepkit-heal.workspace = true
 brepkit-math = {workspace = true, features = ["serde"]}
 brepkit-operations.workspace = true
 brepkit-topology.workspace = true

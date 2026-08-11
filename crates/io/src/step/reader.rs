@@ -30,12 +30,12 @@
 
 use std::collections::HashMap;
 
-use brepkit_heal::upgrade::merge_split_rim_arcs::merge_split_rim_arcs;
 use brepkit_math::aabb::Aabb2;
 use brepkit_math::frame::Frame3;
 use brepkit_math::predicates::point_in_polygon;
 use brepkit_math::tolerance::Tolerance;
 use brepkit_math::vec::{Point2, Point3, Vec3};
+use brepkit_operations::heal::merge_split_rim_arcs;
 use brepkit_topology::Topology;
 use brepkit_topology::edge::{Edge, EdgeCurve};
 use brepkit_topology::face::{Face, FaceSurface};
