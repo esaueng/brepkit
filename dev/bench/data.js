@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786422804216,
+  "lastUpdate": 1786427772536,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6533,6 +6533,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15280291,
             "range": "± 173492",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5c07fd61dfe60a580df962e619c27f3a33288ad1",
+          "message": "Merge pull request #127 from esaueng/codex/fix-step-generic-face-bound-order\n\nfix(io): classify generic STEP face bounds",
+          "timestamp": "2026-08-11T01:54:12-04:00",
+          "tree_id": "c3eed32728fc76116458d9aa6f7a69128cb6fc03",
+          "url": "https://github.com/esaueng/brepkit/commit/5c07fd61dfe60a580df962e619c27f3a33288ad1"
+        },
+        "date": 1786427771352,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 455832,
+            "range": "± 4046",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 503937,
+            "range": "± 1114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6652,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 418744,
+            "range": "± 1477",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13272987,
+            "range": "± 11961",
             "unit": "ns/iter"
           }
         ]
