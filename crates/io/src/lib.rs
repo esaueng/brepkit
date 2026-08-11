@@ -64,6 +64,10 @@ pub enum IoError {
     #[error(transparent)]
     Operations(#[from] brepkit_operations::OperationsError),
 
+    /// An error while conservatively canonicalizing imported topology.
+    #[error(transparent)]
+    Healing(#[from] brepkit_heal::HealError),
+
     /// An error writing the ZIP archive.
     #[error(transparent)]
     Zip(#[from] zip::result::ZipError),
