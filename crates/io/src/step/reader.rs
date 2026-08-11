@@ -30,6 +30,7 @@
 
 use std::collections::HashMap;
 
+use brepkit_heal::upgrade::merge_split_rim_arcs::merge_split_rim_arcs;
 use brepkit_math::aabb::Aabb2;
 use brepkit_math::frame::Frame3;
 use brepkit_math::predicates::point_in_polygon;
@@ -80,8 +81,14 @@ pub fn read_step_with_limits(
     let Some(units) = resolve_unit_scale(&entities, has_solids)? else {
         return Ok(Vec::new());
     };
-    let mut builder = StepBuilder::new(topo, &entities, units);
-    builder.build_all_solids()
+    let solids = {
+        let mut builder = StepBuilder::new(topo, &entities, units);
+        builder.build_all_solids()?
+    };
+    for &solid_id in &solids {
+        merge_split_rim_arcs(topo, solid_id, Tolerance::new())?;
+    }
+    Ok(solids)
 }
 
 // ── Parsing ─────────────────────────────────────────────────────────
