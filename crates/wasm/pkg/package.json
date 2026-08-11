@@ -17,7 +17,7 @@
     "LICENSE",
     "COMMERCIAL-LICENSE.md"
   ],
-  "homepage": "https://github.com/esaueng/brepkit",
+  "homepage": "https://github.com/andymai/brepkit",
   "keywords": [
     "cad",
     "brep",
@@ -31,7 +31,7 @@
   "name": "brepkit-wasm",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/esaueng/brepkit.git"
+    "url": "https://github.com/andymai/brepkit"
   },
   "sideEffects": [
     "./brepkit_wasm.js",
@@ -39,5 +39,5 @@
   ],
   "type": "module",
   "types": "brepkit_wasm.d.ts",
-  "version": "3.2.18"
+  "version": "3.2.22"
 }
