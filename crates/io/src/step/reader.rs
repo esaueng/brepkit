@@ -605,6 +605,12 @@ const POLYLINE_WELD_EPS: f64 = 1e-9;
 /// its orientation.
 const FACE_BOUND_CLASSIFICATION_DEFLECTION: f64 = Tolerance::loose().linear;
 
+/// Maximum surface residual accepted while projecting an already-approximated
+/// STEP trim curve into UV.  The curve and the adaptive classifier can each
+/// contribute at most one classification deflection; exceeding their sum is
+/// rejected rather than silently snapping the topology onto the surface.
+const FACE_BOUND_SURFACE_RESIDUAL: f64 = 2.0 * FACE_BOUND_CLASSIFICATION_DEFLECTION;
+
 /// Maximum adaptive subdivisions per seeded curve interval.  Every curved
 /// edge starts with eight intervals, so periodic curves cannot hide a whole
 /// revolution behind coincident endpoints or a zero midpoint deviation.
@@ -620,13 +626,36 @@ struct FaceBoundCandidate {
 }
 
 #[derive(Debug)]
-struct PlanarBoundLoop {
+struct FaceBoundLoop {
     candidate_index: usize,
     polygon: Vec<Point2>,
     bounds: Aabb2,
     signed_area: f64,
     perimeter: f64,
     probe: Point2,
+    seam_flexible_u: bool,
+    seam_flexible_v: bool,
+}
+
+#[derive(Debug, Clone, Copy)]
+struct PeriodicUvDomain {
+    u_period: Option<f64>,
+    v_period: Option<f64>,
+    u_scale: f64,
+    v_scale: f64,
+}
+
+impl PeriodicUvDomain {
+    fn scale(self, point: Point2) -> Point2 {
+        Point2::new(point.x() * self.u_scale, point.y() * self.v_scale)
+    }
+
+    fn scaled_periods(self) -> (Option<f64>, Option<f64>) {
+        (
+            self.u_period.map(|period| period * self.u_scale),
+            self.v_period.map(|period| period * self.v_scale),
+        )
+    }
 }
 
 /// Reconstructs topology from parsed STEP entities.
@@ -836,9 +865,9 @@ impl<'a> StepBuilder<'a> {
     /// Resolve the semantic perimeter independently of STEP aggregate order.
     ///
     /// Explicit `FACE_OUTER_BOUND` remains authoritative on every surface.
-    /// Generic multi-bound faces are currently classified only in a planar
-    /// domain; other surfaces fail closed until their periodic/polar UV
-    /// domains can be unwrapped without guessing.
+    /// Generic multi-bound faces are classified in either a stable plane frame
+    /// or a seam-aware periodic UV domain.  Non-periodic parametric surfaces
+    /// still fail closed rather than falling back to aggregate order.
     fn resolve_face_bounds(
         &self,
         face_ref: u64,
@@ -885,6 +914,9 @@ impl<'a> StepBuilder<'a> {
         match surface {
             FaceSurface::Plane { normal, d } => {
                 self.resolve_generic_planar_bounds(face_ref, candidates, *normal, *d)
+            }
+            _ if periodic_uv_domain(surface).is_some() => {
+                self.resolve_generic_periodic_bounds(face_ref, candidates, surface)
             }
             _ => Err(IoError::ParseError {
                 reason: format!(
@@ -958,13 +990,15 @@ impl<'a> StepBuilder<'a> {
                         candidate.bound_ref, candidate.source_position
                     ),
                 })?;
-            loops.push(PlanarBoundLoop {
+            loops.push(FaceBoundLoop {
                 candidate_index,
                 polygon,
                 bounds,
                 signed_area,
                 perimeter,
                 probe,
+                seam_flexible_u: false,
+                seam_flexible_v: false,
             });
         }
 
@@ -990,7 +1024,7 @@ impl<'a> StepBuilder<'a> {
                     .signed_area
                     .abs()
                     .total_cmp(&loops[right].signed_area.abs())
-                    .then_with(|| planar_loop_geometry_cmp(&loops[left], &loops[right]))
+                    .then_with(|| face_bound_loop_geometry_cmp(&loops[left], &loops[right]))
             });
             parents[child_index] = possible.first().copied();
         }
@@ -1019,7 +1053,8 @@ impl<'a> StepBuilder<'a> {
         let mut inner_loops: Vec<usize> = (0..loops.len())
             .filter(|&index| index != outer_loop)
             .collect();
-        inner_loops.sort_by(|&left, &right| planar_loop_geometry_cmp(&loops[left], &loops[right]));
+        inner_loops
+            .sort_by(|&left, &right| face_bound_loop_geometry_cmp(&loops[left], &loops[right]));
         Ok((
             candidates[outer_candidate].wire,
             inner_loops
@@ -1027,6 +1062,324 @@ impl<'a> StepBuilder<'a> {
                 .map(|index| candidates[loops[index].candidate_index].wire)
                 .collect(),
         ))
+    }
+
+    fn resolve_generic_periodic_bounds(
+        &self,
+        face_ref: u64,
+        candidates: &[FaceBoundCandidate],
+        surface: &FaceSurface,
+    ) -> Result<(WireId, Vec<WireId>), IoError> {
+        let domain = periodic_uv_domain(surface).ok_or_else(|| IoError::ParseError {
+            reason: format!(
+                "ADVANCED_FACE #{face_ref} has no supported periodic UV domain for its {} surface",
+                surface.type_tag()
+            ),
+        })?;
+        let tol = Tolerance::new();
+        let margin = FACE_BOUND_CLASSIFICATION_DEFLECTION + tol.linear;
+        let (u_period, v_period) = domain.scaled_periods();
+        let mut loops = Vec::with_capacity(candidates.len());
+
+        for (candidate_index, candidate) in candidates.iter().enumerate() {
+            let (polygon, seam_flexible_u, seam_flexible_v) =
+                self.sample_periodic_bound(face_ref, *candidate, surface, domain)?;
+            let bounds = Aabb2::try_from_points(polygon.iter().copied()).ok_or_else(|| {
+                IoError::ParseError {
+                    reason: format!(
+                        "ADVANCED_FACE #{face_ref} bound #{} at position {} has no sampled UV points",
+                        candidate.bound_ref, candidate.source_position
+                    ),
+                }
+            })?;
+            let signed_area = polygon_signed_area(&polygon);
+            let perimeter = polygon_perimeter(&polygon);
+            if polygon.len() < 3
+                || !signed_area.is_finite()
+                || !perimeter.is_finite()
+                || perimeter <= tol.linear
+                || signed_area.abs() <= perimeter * tol.linear
+            {
+                return Err(IoError::ParseError {
+                    reason: format!(
+                        "ADVANCED_FACE #{face_ref} bound #{} at position {} is degenerate in the \
+                         unwrapped {} UV domain",
+                        candidate.bound_ref,
+                        candidate.source_position,
+                        surface.type_tag()
+                    ),
+                });
+            }
+
+            for (axis, period, span) in [
+                ("u", u_period, bounds.max.x() - bounds.min.x()),
+                ("v", v_period, bounds.max.y() - bounds.min.y()),
+            ] {
+                if let Some(period) = period
+                    && span > period + 4.0 * margin
+                {
+                    return Err(IoError::ParseError {
+                        reason: format!(
+                            "ADVANCED_FACE #{face_ref} bound #{} spans more than one {axis} \
+                             period in the unwrapped {} UV domain",
+                            candidate.bound_ref,
+                            surface.type_tag()
+                        ),
+                    });
+                }
+            }
+
+            let probe =
+                polygon_interior_probe(&polygon, bounds).ok_or_else(|| IoError::ParseError {
+                    reason: format!(
+                        "ADVANCED_FACE #{face_ref} bound #{} at position {} has no reliable \
+                         interior probe in the unwrapped {} UV domain",
+                        candidate.bound_ref,
+                        candidate.source_position,
+                        surface.type_tag()
+                    ),
+                })?;
+            loops.push(FaceBoundLoop {
+                candidate_index,
+                polygon,
+                bounds,
+                signed_area,
+                perimeter,
+                probe,
+                seam_flexible_u,
+                seam_flexible_v,
+            });
+        }
+
+        let mut parents = vec![None; loops.len()];
+        for child_index in 0..loops.len() {
+            let child = &loops[child_index];
+            let mut possible = Vec::new();
+            for (parent_index, parent) in loops.iter().enumerate() {
+                if parent_index == child_index {
+                    continue;
+                }
+                let area_gap = parent.signed_area.abs() - child.signed_area.abs();
+                if area_gap <= child.perimeter * tol.linear {
+                    continue;
+                }
+                if periodic_loop_contains(parent, child, margin, u_period, v_period) {
+                    possible.push(parent_index);
+                }
+            }
+            possible.sort_by(|&left, &right| {
+                loops[left]
+                    .signed_area
+                    .abs()
+                    .total_cmp(&loops[right].signed_area.abs())
+                    .then_with(|| face_bound_loop_geometry_cmp(&loops[left], &loops[right]))
+            });
+            parents[child_index] = possible.first().copied();
+        }
+
+        let roots: Vec<usize> = parents
+            .iter()
+            .enumerate()
+            .filter_map(|(index, parent)| parent.is_none().then_some(index))
+            .collect();
+        if roots.len() != 1 {
+            let refs = roots
+                .iter()
+                .map(|&index| format!("#{}", candidates[loops[index].candidate_index].bound_ref))
+                .collect::<Vec<_>>()
+                .join(", ");
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "ADVANCED_FACE #{face_ref} generic FACE_BOUND loops do not have one enclosing \
+                     outer boundary in the unwrapped {} UV domain (top-level bounds: {refs})",
+                    surface.type_tag()
+                ),
+            });
+        }
+
+        let outer_loop = roots[0];
+        let outer_candidate = loops[outer_loop].candidate_index;
+        let mut inner_loops: Vec<usize> = (0..loops.len())
+            .filter(|&index| index != outer_loop)
+            .collect();
+        inner_loops
+            .sort_by(|&left, &right| face_bound_loop_geometry_cmp(&loops[left], &loops[right]));
+        Ok((
+            candidates[outer_candidate].wire,
+            inner_loops
+                .into_iter()
+                .map(|index| candidates[loops[index].candidate_index].wire)
+                .collect(),
+        ))
+    }
+
+    fn sample_periodic_bound(
+        &self,
+        face_ref: u64,
+        candidate: FaceBoundCandidate,
+        surface: &FaceSurface,
+        domain: PeriodicUvDomain,
+    ) -> Result<(Vec<Point2>, bool, bool), IoError> {
+        let wire = self
+            .topo
+            .wire(candidate.wire)
+            .map_err(|error| IoError::ParseError {
+                reason: format!(
+                    "ADVANCED_FACE #{face_ref} could not read bound #{} wire: {error}",
+                    candidate.bound_ref
+                ),
+            })?;
+        let (u_period, v_period) = domain.scaled_periods();
+        let margin = FACE_BOUND_CLASSIFICATION_DEFLECTION + Tolerance::new().linear;
+        let mut points = Vec::new();
+        let mut seam_flexible_u = false;
+        let mut seam_flexible_v = false;
+
+        for oriented in wire.edges() {
+            let edge = self
+                .topo
+                .edge(oriented.edge())
+                .map_err(|error| IoError::ParseError {
+                    reason: format!(
+                        "ADVANCED_FACE #{face_ref} could not read bound #{} edge: {error}",
+                        candidate.bound_ref
+                    ),
+                })?;
+            let mut edge_points = self.sample_bound_edge(edge)?;
+            if !oriented.is_forward() {
+                edge_points.reverse();
+            }
+            let mut group = edge_points
+                .into_iter()
+                .map(|point| {
+                    Self::project_periodic_bound_point(
+                        face_ref,
+                        candidate.bound_ref,
+                        surface,
+                        domain,
+                        point,
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()?;
+            unwrap_periodic_uv_path(&mut group, u_period, v_period).map_err(|axis| {
+                IoError::ParseError {
+                    reason: format!(
+                        "ADVANCED_FACE #{face_ref} bound #{} has an ambiguous half-period {axis} \
+                         step in its {} UV projection",
+                        candidate.bound_ref,
+                        surface.type_tag()
+                    ),
+                }
+            })?;
+
+            let repeated_opposite = wire.edges().iter().any(|other| {
+                other.edge() == oriented.edge() && other.is_forward() != oriented.is_forward()
+            });
+            if repeated_opposite && group.len() >= 2 {
+                let group_bounds = Aabb2::try_from_points(group.iter().copied());
+                if let Some(group_bounds) = group_bounds {
+                    let u_span = group_bounds.max.x() - group_bounds.min.x();
+                    let v_span = group_bounds.max.y() - group_bounds.min.y();
+                    seam_flexible_u |= u_period.is_some() && u_span <= margin && v_span > margin;
+                    seam_flexible_v |= v_period.is_some() && v_span <= margin && u_span > margin;
+                }
+            }
+
+            if let Some(previous) = points.last().copied() {
+                shift_periodic_uv_group(&mut group, previous, u_period, v_period);
+                let Some(first) = group.first().copied() else {
+                    continue;
+                };
+                if (first - previous).length() > margin {
+                    return Err(IoError::ParseError {
+                        reason: format!(
+                            "ADVANCED_FACE #{face_ref} bound #{} is discontinuous in the \
+                             unwrapped {} UV domain",
+                            candidate.bound_ref,
+                            surface.type_tag()
+                        ),
+                    });
+                }
+                group.remove(0);
+            }
+            points.extend(group);
+        }
+
+        let (Some(first), Some(last)) = (points.first().copied(), points.last().copied()) else {
+            return Ok((points, seam_flexible_u, seam_flexible_v));
+        };
+        if (last - first).length() > margin {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "ADVANCED_FACE #{face_ref} bound #{} does not close in the unwrapped {} UV \
+                     domain; period-winding bounds cannot be assigned an outer role safely",
+                    candidate.bound_ref,
+                    surface.type_tag()
+                ),
+            });
+        }
+        points.pop();
+        points.dedup_by(|left, right| (*left - *right).length() <= margin);
+        Ok((points, seam_flexible_u, seam_flexible_v))
+    }
+
+    fn project_periodic_bound_point(
+        face_ref: u64,
+        bound_ref: u64,
+        surface: &FaceSurface,
+        domain: PeriodicUvDomain,
+        point: Point3,
+    ) -> Result<Point2, IoError> {
+        let (u, v) = surface
+            .project_point(point)
+            .filter(|(u, v)| u.is_finite() && v.is_finite())
+            .ok_or_else(|| IoError::ParseError {
+                reason: format!(
+                    "ADVANCED_FACE #{face_ref} bound #{bound_ref} cannot be projected into its {} \
+                     UV domain",
+                    surface.type_tag()
+                ),
+            })?;
+        let reconstructed = surface.evaluate(u, v).ok_or_else(|| IoError::ParseError {
+            reason: format!(
+                "ADVANCED_FACE #{face_ref} bound #{bound_ref} cannot be evaluated in its {} UV \
+                 domain",
+                surface.type_tag()
+            ),
+        })?;
+        let residual = (reconstructed - point).length();
+        let margin = FACE_BOUND_SURFACE_RESIDUAL + Tolerance::new().linear;
+        if !residual.is_finite() || residual > margin {
+            return Err(IoError::ParseError {
+                reason: format!(
+                    "ADVANCED_FACE #{face_ref} bound #{bound_ref} leaves its {} surface by \
+                     {residual:.6e} mm during UV classification",
+                    surface.type_tag()
+                ),
+            });
+        }
+
+        for (axis, period, derivative) in [
+            ("u", domain.u_period, surface.partial_u(u, v)),
+            ("v", domain.v_period, surface.partial_v(u, v)),
+        ] {
+            if period.is_some()
+                && derivative.is_none_or(|vector| {
+                    let length = vector.length();
+                    !length.is_finite() || length <= Tolerance::new().linear
+                })
+            {
+                return Err(IoError::ParseError {
+                    reason: format!(
+                        "ADVANCED_FACE #{face_ref} bound #{bound_ref} reaches a singular periodic \
+                         {axis} coordinate on its {} surface",
+                        surface.type_tag()
+                    ),
+                });
+            }
+        }
+
+        Ok(domain.scale(Point2::new(u, v)))
     }
 
     fn sample_planar_bound(
@@ -2472,6 +2825,127 @@ fn point_segment_distance_3d(point: Point3, start: Point3, end: Point3) -> f64 {
     (point - (start + segment * parameter)).length()
 }
 
+/// Return a periodic parameter domain together with stable coordinate scales.
+///
+/// Scaling turns a cylinder's angular coordinate into developed arc length and
+/// keeps the containment tolerance in millimetres.  For the other analytic
+/// surfaces the scale is a characteristic metric only; positive independent
+/// scaling of u and v does not change loop containment.  Periodic NURBS retain
+/// their native knot-domain coordinates and are accepted only when projection
+/// can be verified against the surface point below.
+fn periodic_uv_domain(surface: &FaceSurface) -> Option<PeriodicUvDomain> {
+    use std::f64::consts::TAU;
+
+    let tol = Tolerance::new().linear;
+    match surface {
+        FaceSurface::Plane { .. } => None,
+        FaceSurface::Cylinder(cylinder) => Some(PeriodicUvDomain {
+            u_period: Some(TAU),
+            v_period: None,
+            u_scale: cylinder.radius().abs().max(tol),
+            v_scale: 1.0,
+        }),
+        FaceSurface::Cone(cone) => Some(PeriodicUvDomain {
+            u_period: Some(TAU),
+            v_period: None,
+            u_scale: cone.radius_at(1.0).abs().max(tol),
+            v_scale: 1.0,
+        }),
+        FaceSurface::Sphere(sphere) => Some(PeriodicUvDomain {
+            u_period: Some(TAU),
+            v_period: None,
+            u_scale: sphere.radius().abs().max(tol),
+            v_scale: sphere.radius().abs().max(tol),
+        }),
+        FaceSurface::Torus(torus) => Some(PeriodicUvDomain {
+            u_period: Some(TAU),
+            v_period: Some(TAU),
+            u_scale: (torus.major_radius() + torus.minor_radius()).abs().max(tol),
+            v_scale: torus.minor_radius().abs().max(tol),
+        }),
+        FaceSurface::Nurbs(surface) => {
+            let u_period = surface.is_periodic_u().then(|| {
+                let (start, end) = surface.domain_u();
+                end - start
+            });
+            let v_period = surface.is_periodic_v().then(|| {
+                let (start, end) = surface.domain_v();
+                end - start
+            });
+            let valid_period = |period: Option<f64>| {
+                period.is_none_or(|value| value.is_finite() && value > 64.0 * f64::EPSILON)
+            };
+            ((u_period.is_some() || v_period.is_some())
+                && valid_period(u_period)
+                && valid_period(v_period))
+            .then_some(PeriodicUvDomain {
+                u_period,
+                v_period,
+                u_scale: 1.0,
+                v_scale: 1.0,
+            })
+        }
+    }
+}
+
+/// Lift a densely sampled UV path to the period copy nearest its predecessor.
+/// Exact half-period steps have two equally near lifts and are rejected rather
+/// than allowing traversal order or `round` tie-breaking to assign topology.
+fn unwrap_periodic_uv_path(
+    points: &mut [Point2],
+    u_period: Option<f64>,
+    v_period: Option<f64>,
+) -> Result<(), &'static str> {
+    for index in 1..points.len() {
+        let mut point = points[index];
+        for (axis, period, previous, current) in [
+            ("u", u_period, points[index - 1].x(), point.x()),
+            ("v", v_period, points[index - 1].y(), point.y()),
+        ] {
+            let Some(period) = period else {
+                continue;
+            };
+            let delta = current - previous;
+            let turns = (delta / period).round();
+            let lifted = period.mul_add(-turns, current);
+            let reduced = lifted - previous;
+            let tie_margin = 64.0 * f64::EPSILON * period.abs().max(1.0);
+            if (reduced.abs() - 0.5 * period).abs() <= tie_margin {
+                return Err(axis);
+            }
+            if axis == "u" {
+                point = Point2::new(lifted, point.y());
+            } else {
+                point = Point2::new(point.x(), lifted);
+            }
+        }
+        points[index] = point;
+    }
+    Ok(())
+}
+
+/// Shift a whole already-unwrapped edge group onto the period copy whose first
+/// point meets the preceding edge.  Internal edge deltas remain authoritative.
+fn shift_periodic_uv_group(
+    group: &mut [Point2],
+    previous: Point2,
+    u_period: Option<f64>,
+    v_period: Option<f64>,
+) {
+    let Some(first) = group.first().copied() else {
+        return;
+    };
+    let u_shift = u_period.map_or(0.0, |period| {
+        -period * ((first.x() - previous.x()) / period).round()
+    });
+    let v_shift = v_period.map_or(0.0, |period| {
+        -period * ((first.y() - previous.y()) / period).round()
+    });
+    for point in group {
+        *point = Point2::new(point.x() + u_shift, point.y() + v_shift);
+    }
+}
+
 fn polygon_signed_area(polygon: &[Point2]) -> f64 {
     if polygon.len() < 3 {
         return 0.0;
@@ -2561,7 +3035,7 @@ fn bounds_contain(outer: Aabb2, inner: Aabb2, margin: f64) -> bool {
         && outer.max.y() + margin >= inner.max.y()
 }
 
-fn planar_loop_contains(parent: &PlanarBoundLoop, child: &PlanarBoundLoop, margin: f64) -> bool {
+fn planar_loop_contains(parent: &FaceBoundLoop, child: &FaceBoundLoop, margin: f64) -> bool {
     bounds_contain(parent.bounds, child.bounds, margin)
         && point_in_or_on_polygon(child.probe, &parent.polygon, margin)
         && child
@@ -2570,7 +3044,115 @@ fn planar_loop_contains(parent: &PlanarBoundLoop, child: &PlanarBoundLoop, margi
             .all(|&point| point_in_or_on_polygon(point, &parent.polygon, margin))
 }
 
-fn planar_loop_geometry_cmp(left: &PlanarBoundLoop, right: &PlanarBoundLoop) -> std::cmp::Ordering {
+fn translated_point(point: Point2, dx: f64, dy: f64) -> Point2 {
+    Point2::new(point.x() + dx, point.y() + dy)
+}
+
+fn periodic_axis_alignment(
+    parent_min: f64,
+    parent_max: f64,
+    parent_seam_flexible: bool,
+    child_min: f64,
+    child_max: f64,
+    period: Option<f64>,
+    margin: f64,
+) -> (f64, Vec<f64>) {
+    let Some(period) = period else {
+        return (0.0, vec![0.0]);
+    };
+    let parent_span = parent_max - parent_min;
+    let parent_center = 0.5 * (parent_min + parent_max);
+    let child_center = 0.5 * (child_min + child_max);
+    if parent_seam_flexible
+        && parent_span >= period - 4.0 * margin
+        && parent_span <= period + 4.0 * margin
+    {
+        // A developed full-period band repeats one generator edge in opposite
+        // directions.  Its seam is a coordinate cut, not a material boundary,
+        // so recenter that cut around the prospective child.
+        return (child_center - parent_center, vec![0.0]);
+    }
+
+    let nearest = ((parent_center - child_center) / period).round();
+    (
+        0.0,
+        [-1.0, 0.0, 1.0]
+            .into_iter()
+            .map(|offset| (nearest + offset) * period)
+            .collect(),
+    )
+}
+
+/// Containment on a periodic quotient.  Local loops are tested on the three
+/// nearest copies of each periodic axis.  A full developed band may move its
+/// repeated seam generator continuously; every other loop is limited to whole
+/// period translations.  More than one successful lift is ambiguous and fails
+/// closed.
+fn periodic_loop_contains(
+    parent: &FaceBoundLoop,
+    child: &FaceBoundLoop,
+    margin: f64,
+    u_period: Option<f64>,
+    v_period: Option<f64>,
+) -> bool {
+    let (parent_u_shift, child_u_shifts) = periodic_axis_alignment(
+        parent.bounds.min.x(),
+        parent.bounds.max.x(),
+        parent.seam_flexible_u,
+        child.bounds.min.x(),
+        child.bounds.max.x(),
+        u_period,
+        margin,
+    );
+    let (parent_v_shift, child_v_shifts) = periodic_axis_alignment(
+        parent.bounds.min.y(),
+        parent.bounds.max.y(),
+        parent.seam_flexible_v,
+        child.bounds.min.y(),
+        child.bounds.max.y(),
+        v_period,
+        margin,
+    );
+    let parent_polygon: Vec<Point2> = parent
+        .polygon
+        .iter()
+        .map(|&point| translated_point(point, parent_u_shift, parent_v_shift))
+        .collect();
+    let parent_bounds = Aabb2 {
+        min: translated_point(parent.bounds.min, parent_u_shift, parent_v_shift),
+        max: translated_point(parent.bounds.max, parent_u_shift, parent_v_shift),
+    };
+    let mut successful_lifts = 0usize;
+
+    for &child_u_shift in &child_u_shifts {
+        for &child_v_shift in &child_v_shifts {
+            let child_bounds = Aabb2 {
+                min: translated_point(child.bounds.min, child_u_shift, child_v_shift),
+                max: translated_point(child.bounds.max, child_u_shift, child_v_shift),
+            };
+            if !bounds_contain(parent_bounds, child_bounds, margin) {
+                continue;
+            }
+            let probe = translated_point(child.probe, child_u_shift, child_v_shift);
+            if !point_in_or_on_polygon(probe, &parent_polygon, margin) {
+                continue;
+            }
+            let all_inside = child.polygon.iter().all(|&point| {
+                point_in_or_on_polygon(
+                    translated_point(point, child_u_shift, child_v_shift),
+                    &parent_polygon,
+                    margin,
+                )
+            });
+            if all_inside {
+                successful_lifts += 1;
+            }
+        }
+    }
+    successful_lifts == 1
+}
+
+fn face_bound_loop_geometry_cmp(left: &FaceBoundLoop, right: &FaceBoundLoop) -> std::cmp::Ordering {
     left.bounds
         .min
         .x()
