@@ -35,6 +35,7 @@ use brepkit_math::frame::Frame3;
 use brepkit_math::predicates::point_in_polygon;
 use brepkit_math::tolerance::Tolerance;
 use brepkit_math::vec::{Point2, Point3, Vec3};
+use brepkit_operations::heal::merge_split_rim_arcs;
 use brepkit_topology::Topology;
 use brepkit_topology::edge::{Edge, EdgeCurve};
 use brepkit_topology::face::{Face, FaceSurface};
@@ -80,8 +81,14 @@ pub fn read_step_with_limits(
     let Some(units) = resolve_unit_scale(&entities, has_solids)? else {
         return Ok(Vec::new());
     };
-    let mut builder = StepBuilder::new(topo, &entities, units);
-    builder.build_all_solids()
+    let solids = {
+        let mut builder = StepBuilder::new(topo, &entities, units);
+        builder.build_all_solids()?
+    };
+    for &solid_id in &solids {
+        merge_split_rim_arcs(topo, solid_id, Tolerance::new())?;
+    }
+    Ok(solids)
 }
 
 // ── Parsing ─────────────────────────────────────────────────────────
