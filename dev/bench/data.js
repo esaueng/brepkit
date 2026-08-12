@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786555960873,
+  "lastUpdate": 1786556083572,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8261,6 +8261,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22125940,
             "range": "± 2012256",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d98ab8a157d2ffd8659fef71c6c9c2a68a6e58ef",
+          "message": "Merge pull request #186 from esaueng/codex/fix-vulnerability-in-arena-deserialization\n\nfix(io): validate arena solid references before replay",
+          "timestamp": "2026-08-12T13:32:23-04:00",
+          "tree_id": "3b8ae7574554be28b4b0dba2bbd2698eec7ac91e",
+          "url": "https://github.com/esaueng/brepkit/commit/d98ab8a157d2ffd8659fef71c6c9c2a68a6e58ef"
+        },
+        "date": 1786556081309,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 588513,
+            "range": "± 8702",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 667823,
+            "range": "± 15652",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7263,
+            "range": "± 130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 507747,
+            "range": "± 8604",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14827820,
+            "range": "± 269782",
             "unit": "ns/iter"
           }
         ]
