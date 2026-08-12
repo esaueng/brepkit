@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786493295482,
+  "lastUpdate": 1786494164106,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6803,6 +6803,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13504251,
             "range": "± 87869",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "715ea89bec3a8695f1d9313baea681077a322986",
+          "message": "Merge pull request #135 from esaueng/codex/rewrite-agent-instructions\n\ndocs: rewrite agent instructions from verified repository state",
+          "timestamp": "2026-08-11T20:20:53-04:00",
+          "tree_id": "06c404aec2ded76924e451b235a4ab24e7ff96bc",
+          "url": "https://github.com/esaueng/brepkit/commit/715ea89bec3a8695f1d9313baea681077a322986"
+        },
+        "date": 1786494162852,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 533835,
+            "range": "± 24654",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 529697,
+            "range": "± 6485",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6837,
+            "range": "± 72",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 508907,
+            "range": "± 32455",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15356162,
+            "range": "± 252876",
             "unit": "ns/iter"
           }
         ]
