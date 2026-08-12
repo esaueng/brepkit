@@ -109,20 +109,22 @@ fn parse_step_entities(
     let mut in_data = false;
     let mut found_data = false;
 
-    for statement in step_statements(input)? {
+    let mut found_endsec = false;
+    visit_step_statements(input, |statement| {
         let stmt = statement.trim();
         if !in_data {
             if stmt.eq_ignore_ascii_case("DATA") {
                 in_data = true;
                 found_data = true;
             }
-            continue;
+            return Ok(true);
         }
         if stmt.eq_ignore_ascii_case("ENDSEC") {
-            return Ok(entities);
+            found_endsec = true;
+            return Ok(false);
         }
         if stmt.is_empty() {
-            continue;
+            return Ok(true);
         }
 
         if let Some(eq_pos) = stmt.find('=') {
@@ -152,9 +154,12 @@ fn parse_step_entities(
                 ensure_limit("STEP entities", entities.len(), limits.max_model_entities)?;
             }
         }
-    }
+        Ok(true)
+    })?;
 
-    if found_data {
+    if found_endsec {
+        Ok(entities)
+    } else if found_data {
         Err(IoError::ParseError {
             reason: "no ENDSEC after DATA".to_string(),
         })
@@ -165,11 +170,17 @@ fn parse_step_entities(
     }
 }
 
-/// Tokenize Part 21 statements without treating semicolons inside strings or
-/// block comments as terminators. STEP escapes a quote inside a string as two
-/// consecutive single quotes.
-fn step_statements(input: &str) -> Result<Vec<String>, IoError> {
-    let mut statements = Vec::new();
+/// Visit Part 21 statements without treating semicolons inside strings or
+/// block comments as terminators. Statements are delivered one at a time so
+/// hostile input cannot create a collection proportional to its statement
+/// count. Returning `false` stops scanning, allowing the DATA parser to avoid
+/// processing arbitrary content after its `ENDSEC`.
+///
+/// STEP escapes a quote inside a string as two consecutive single quotes.
+fn visit_step_statements(
+    input: &str,
+    mut visit: impl FnMut(&str) -> Result<bool, IoError>,
+) -> Result<(), IoError> {
     let mut current = String::new();
     let mut chars = input.chars().peekable();
     let mut in_string = false;
@@ -209,8 +220,8 @@ fn step_statements(input: &str) -> Result<Vec<String>, IoError> {
             }
             ';' => {
                 let statement = current.trim();
-                if !statement.is_empty() {
-                    statements.push(statement.to_string());
+                if !statement.is_empty() && !visit(statement)? {
+                    return Ok(());
                 }
                 current.clear();
             }
@@ -234,7 +245,7 @@ fn step_statements(input: &str) -> Result<Vec<String>, IoError> {
             reason: "unterminated STEP statement".to_string(),
         });
     }
-    Ok(statements)
+    Ok(())
 }
 
 /// Parse `#123` into `123`.
@@ -4575,6 +4586,15 @@ mod tests {
         let entities = parse_step_entities(step, ImportLimits::default()).unwrap();
         assert_eq!(entities.len(), 1);
         assert!(entities.get(&1).unwrap().attrs.contains("1., 2.,3."));
+    }
+
+    #[test]
+    fn statement_scanner_streams_pre_data_statements_and_stops_after_data() {
+        let mut step = "A;".repeat(100_000);
+        step.push_str("DATA;ENDSEC;'unclosed content after the DATA section");
+
+        let entities = parse_step_entities(&step, ImportLimits::default()).unwrap();
+        assert!(entities.is_empty());
     }
 
     #[test]
