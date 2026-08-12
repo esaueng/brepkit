@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786551586628,
+  "lastUpdate": 1786552642864,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7343,6 +7343,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17081268,
             "range": "± 658986",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "52c9cd49eadea1a592f846b5e3fdc7096fd7f73a",
+          "message": "Merge pull request #156 from esaueng/codex/fix-unbounded-arena-deserialization-vulnerability\n\nfix(io): make arena deserialization atomic and validate deserialized NURBS/surfaces",
+          "timestamp": "2026-08-12T12:35:01-04:00",
+          "tree_id": "460a44f87d86e5021aa996526558946dd88f21bf",
+          "url": "https://github.com/esaueng/brepkit/commit/52c9cd49eadea1a592f846b5e3fdc7096fd7f73a"
+        },
+        "date": 1786552641366,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 475376,
+            "range": "± 60669",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 534382,
+            "range": "± 18019",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7227,
+            "range": "± 252",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 432386,
+            "range": "± 3655",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15113079,
+            "range": "± 354561",
             "unit": "ns/iter"
           }
         ]
