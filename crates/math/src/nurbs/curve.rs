@@ -28,7 +28,9 @@ impl NurbsCurve {
     /// # Errors
     ///
     /// Returns [`MathError::InvalidKnotVector`] if the knot vector length is
-    /// not equal to `control_points.len() + degree + 1`.
+    /// not equal to `control_points.len() + degree + 1`, or
+    /// [`MathError::InvalidKnotValue`] if a knot is non-finite or the vector
+    /// is not non-decreasing.
     ///
     /// Returns [`MathError::InvalidWeights`] if the weights vector length does
     /// not match the number of control points, or
@@ -48,6 +50,7 @@ impl NurbsCurve {
                 got: knots.len(),
             });
         }
+        super::validate_knot_values(&knots)?;
         if weights.len() != n {
             return Err(MathError::InvalidWeights {
                 expected: n,
@@ -366,6 +369,25 @@ mod tests {
             assert!(matches!(
                 make(weights),
                 Err(MathError::InvalidWeightValue { .. })
+            ));
+        }
+    }
+
+    #[test]
+    fn rejects_nonfinite_and_decreasing_knots() {
+        let make = |knots| {
+            NurbsCurve::new(
+                1,
+                knots,
+                vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
+                vec![1.0, 1.0],
+            )
+        };
+
+        for knots in [vec![0.0, 0.0, f64::NAN, 1.0], vec![1.0, 1.0, 0.0, 0.0]] {
+            assert!(matches!(
+                make(knots),
+                Err(MathError::InvalidKnotValue { .. })
             ));
         }
     }
