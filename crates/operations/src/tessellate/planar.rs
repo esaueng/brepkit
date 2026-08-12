@@ -14,6 +14,33 @@ type CylinderUv = (f64, f64);
 type CylinderSample = (Point3, CylinderUv);
 type CylinderLoop = (Vec<Point3>, Vec<CylinderUv>);
 
+/// Maximum number of interior samples added by the hole-aware cylinder grid.
+///
+/// This grid is only a quality aid for the CDT; bounding it prevents extreme
+/// radius-to-height ratios from turning a compact face into unbounded work.
+const MAX_CYLINDER_GRID_POINTS: usize = 1_000_000;
+
+fn cylinder_grid_rows(
+    physical_u_step: f64,
+    v_span: f64,
+    u_columns: usize,
+) -> Result<usize, crate::OperationsError> {
+    let rows = (v_span / physical_u_step.max(f64::EPSILON)).ceil().max(2.0);
+    let max_rows = MAX_CYLINDER_GRID_POINTS
+        .checked_div(u_columns)
+        .unwrap_or(0)
+        .saturating_add(1);
+    #[allow(clippy::cast_precision_loss)]
+    if !rows.is_finite() || rows > max_rows as f64 {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: format!(
+                "cylindrical face tessellation grid exceeds the {MAX_CYLINDER_GRID_POINTS}-point work limit"
+            ),
+        });
+    }
+    Ok(rows as usize)
+}
+
 /// Tessellate a cylindrical face using its actual boundary polygon (CDT-based).
 ///
 /// Used for faces with non-rectangular boundaries (e.g., boolean sub-faces
@@ -511,9 +538,7 @@ pub(super) fn tessellate_cylinder_with_holes(
     // pockets or bands are harmless: the pocket-parity and band predicates
     // below remove their triangles.
     let physical_u_step = cyl.radius() * (outer_u.1 - outer_u.0) / nu as f64;
-    let nv = ((outer_v.1 - outer_v.0) / physical_u_step.max(f64::EPSILON))
-        .ceil()
-        .max(2.0) as usize;
+    let nv = cylinder_grid_rows(physical_u_step, outer_v.1 - outer_v.0, nu.saturating_sub(1))?;
     for iu in 1..nu {
         #[allow(clippy::cast_precision_loss)]
         let u = (outer_u.1 - outer_u.0).mul_add(iu as f64 / nu as f64, outer_u.0);
@@ -1822,6 +1847,27 @@ pub(super) fn run_planar_cdt(
     }
 
     Ok((result, steiner))
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use super::{MAX_CYLINDER_GRID_POINTS, cylinder_grid_rows};
+
+    #[test]
+    fn cylinder_grid_rows_accepts_bounded_grid() {
+        assert_eq!(cylinder_grid_rows(0.5, 10.0, 18).unwrap(), 20);
+    }
+
+    #[test]
+    fn cylinder_grid_rows_rejects_excessive_work() {
+        let error = cylinder_grid_rows(1.0e-9, 1.0, 18).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains(&format!("{MAX_CYLINDER_GRID_POINTS}-point work limit"))
+        );
+    }
 }
 
 #[cfg(test)]
