@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786568014646,
+  "lastUpdate": 1786568370736,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9557,6 +9557,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16928498,
             "range": "± 1837417",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e04029c02f8d9cd112351e187666b69308ad6a8d",
+          "message": "Merge pull request #167 from esaueng/codex/propose-fix-for-nurbs-knot-validation-issue\n\nmath: reject malformed NURBS knot vectors to avoid evaluation panics",
+          "timestamp": "2026-08-12T16:57:20-04:00",
+          "tree_id": "778b2007bac4eac8c13bc9bff28fb28cb1d3ab4a",
+          "url": "https://github.com/esaueng/brepkit/commit/e04029c02f8d9cd112351e187666b69308ad6a8d"
+        },
+        "date": 1786568369382,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 702724,
+            "range": "± 21210",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 784370,
+            "range": "± 38984",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8296,
+            "range": "± 354",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 606242,
+            "range": "± 28111",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18606056,
+            "range": "± 1235824",
             "unit": "ns/iter"
           }
         ]
