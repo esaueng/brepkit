@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786553268781,
+  "lastUpdate": 1786553395495,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7613,6 +7613,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17844545,
             "range": "± 623418",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e5774e21fb484f0aec91bfaeca6047475df4736f",
+          "message": "Merge pull request #166 from esaueng/codex/fix-fixed-seed-hash-maps-vulnerability\n\nfix(operations): randomize boolean assembly hashing",
+          "timestamp": "2026-08-12T12:46:45-04:00",
+          "tree_id": "5d5d6dbb0cf2d48aef8979bb3db289616e2ab5b4",
+          "url": "https://github.com/esaueng/brepkit/commit/e5774e21fb484f0aec91bfaeca6047475df4736f"
+        },
+        "date": 1786553394285,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 478280,
+            "range": "± 7557",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 584732,
+            "range": "± 30889",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6971,
+            "range": "± 65",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 468060,
+            "range": "± 17293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14473184,
+            "range": "± 121673",
             "unit": "ns/iter"
           }
         ]
