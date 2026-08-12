@@ -8,6 +8,13 @@
 /// Errors from math operations.
 #[derive(Debug, thiserror::Error)]
 pub enum MathError {
+    /// NURBS degree is unsupported.
+    #[error("invalid NURBS degree {degree}: degree must be at least 1")]
+    InvalidDegree {
+        /// Unsupported polynomial degree.
+        degree: usize,
+    },
+
     /// Knot vector length does not match control points and degree.
     #[error("invalid knot vector: expected {expected} knots, got {got}")]
     InvalidKnotVector {
