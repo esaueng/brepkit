@@ -515,6 +515,8 @@ fn same_oriented_circle(
         && (1.0 - a.normal().dot(b.normal())) <= tol.angular.max(1e-12)
 }
 
+const MAX_AMBIGUOUS_CIRCLE_ARC_COMPARISONS: usize = 4_096;
+
 fn ambiguous_circle_arc_warnings(
     topo: &Topology,
     face_id: brepkit_topology::face::FaceId,
@@ -524,8 +526,6 @@ fn ambiguous_circle_arc_warnings(
     // One diagnostic identifies the wire-level hazard. Bounding comparisons also
     // prevents a malformed wire with a huge endpoint bucket from making strict
     // validation quadratic when none of its circles match.
-    const MAX_COMPARISONS: usize = 4_096;
-
     let wire = topo.wire(wire_id)?;
     let mut by_endpoints = std::collections::HashMap::new();
     let mut comparisons = 0;
@@ -541,7 +541,7 @@ fn ambiguous_circle_arc_warnings(
             .entry((edge.start(), edge.end()))
             .or_insert_with(Vec::new);
         for &candidate_id in candidates.iter() {
-            if comparisons == MAX_COMPARISONS {
+            if comparisons == MAX_AMBIGUOUS_CIRCLE_ARC_COMPARISONS {
                 return Ok(vec![ValidationIssue {
                     severity: Severity::Warning,
                     description: format!(
