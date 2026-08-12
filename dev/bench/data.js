@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786557155949,
+  "lastUpdate": 1786557290780,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8747,6 +8747,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17542522,
             "range": "± 223321",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ebc590ea40b9c17136abef28f263614f5591205d",
+          "message": "Merge pull request #200 from esaueng/codex/propose-fix-for-quadratic-validation-dos\n\nfix(operations): bound component overlap validation",
+          "timestamp": "2026-08-12T13:51:38-04:00",
+          "tree_id": "4522f3e2af3d0f5e92b0900fa6bb267066ab3715",
+          "url": "https://github.com/esaueng/brepkit/commit/ebc590ea40b9c17136abef28f263614f5591205d"
+        },
+        "date": 1786557289409,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 600860,
+            "range": "± 22295",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 633041,
+            "range": "± 21448",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8183,
+            "range": "± 203",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 551070,
+            "range": "± 19528",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17032204,
+            "range": "± 300758",
             "unit": "ns/iter"
           }
         ]
