@@ -412,6 +412,36 @@ fn cut_disjoint_returns_a() {
     assert_eq!(check_result(&topo, result), 6);
 }
 
+#[test]
+fn nurbs_component_is_not_provably_disjoint_from_sampled_box() {
+    use brepkit_math::nurbs::surface::NurbsSurface;
+
+    let mut topo = Topology::new();
+    let blank = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 0.0);
+    let face_id = brepkit_topology::explorer::solid_faces(&topo, blank).unwrap()[0];
+    let nurbs = NurbsSurface::new(
+        1,
+        1,
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 1.0, 0.0)],
+            vec![Point3::new(1.0, 0.0, 10.0), Point3::new(1.0, 1.0, 0.0)],
+        ],
+        vec![vec![1.0, 1.0], vec![1.0, 1.0]],
+    )
+    .unwrap();
+    topo.face_mut(face_id)
+        .unwrap()
+        .set_surface(FaceSurface::Nurbs(nurbs));
+
+    let tool = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 9.5);
+    assert!(
+        !solids_provably_disjoint(&topo, blank, tool, Tolerance::new().linear),
+        "a sampled NURBS AABB cannot prove that the solids are disjoint"
+    );
+}
+
 /// A two-piece accumulator whose overall box spans the tool: whole-solid
 /// AABBs overlap, so only the per-component witness can prove the tool
 /// touches nothing. The cut must return the target unchanged.
