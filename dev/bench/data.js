@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786550742508,
+  "lastUpdate": 1786550910273,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7073,6 +7073,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 28135222,
             "range": "± 351066",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d309073096775ee25b3ce79de5d097cf51d9fca3",
+          "message": "Merge pull request #143 from esaueng/codex/fix-nonlocal-blend-convexity-vulnerability\n\nKeep planar blend convexity classification local",
+          "timestamp": "2026-08-12T12:04:31-04:00",
+          "tree_id": "98a85c484a7166cb9e4d6470b68b3c449dced90b",
+          "url": "https://github.com/esaueng/brepkit/commit/d309073096775ee25b3ce79de5d097cf51d9fca3"
+        },
+        "date": 1786550908823,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 528379,
+            "range": "± 39451",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 614046,
+            "range": "± 60923",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8283,
+            "range": "± 243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 547982,
+            "range": "± 33331",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15898521,
+            "range": "± 496596",
             "unit": "ns/iter"
           }
         ]
