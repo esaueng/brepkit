@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786557432290,
+  "lastUpdate": 1786558093338,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8855,6 +8855,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17010694,
             "range": "± 885224",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "abd14fc25ac673a73bc4cc2b531ba23501a0947b",
+          "message": "Merge pull request #204 from esaueng/codex/propose-fix-for-non-manifold-boolean-acceptance\n\nfix(boolean): reject non-manifold tangent pinches",
+          "timestamp": "2026-08-12T14:06:25-04:00",
+          "tree_id": "d49aed8d85265e4b699eb78dd2a110712e359437",
+          "url": "https://github.com/esaueng/brepkit/commit/abd14fc25ac673a73bc4cc2b531ba23501a0947b"
+        },
+        "date": 1786558091822,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 468881,
+            "range": "± 994",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 537982,
+            "range": "± 4327",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6573,
+            "range": "± 2",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 432434,
+            "range": "± 355",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14048251,
+            "range": "± 14047",
             "unit": "ns/iter"
           }
         ]
