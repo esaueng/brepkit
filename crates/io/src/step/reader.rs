@@ -616,6 +616,14 @@ const FACE_BOUND_SURFACE_RESIDUAL: f64 = 2.0 * FACE_BOUND_CLASSIFICATION_DEFLECT
 /// revolution behind coincident endpoints or a zero midpoint deviation.
 const FACE_BOUND_SAMPLE_DEPTH: u32 = 16;
 
+/// Resource ceilings for geometric classification of one attacker-controlled
+/// `ADVANCED_FACE`.  Ordinary B-Reps use only a handful of bounds per face;
+/// these caps keep containment and adaptive curve sampling predictably bounded.
+const MAX_FACE_BOUND_CANDIDATES: usize = 128;
+const MAX_FACE_BOUND_SAMPLES: usize = 32_768;
+const MAX_FACE_BOUND_EDGE_SAMPLES: usize = 8_192;
+const MAX_FACE_BOUND_CONTAINMENT_WORK: usize = 8_000_000;
+
 #[derive(Debug, Clone, Copy)]
 struct FaceBoundCandidate {
     bound_ref: u64,
@@ -798,6 +806,12 @@ impl<'a> StepBuilder<'a> {
         let all_refs = parse_refs(&attrs);
         let list_refs = parse_list_refs(&attrs);
 
+        ensure_limit(
+            "STEP bounds per ADVANCED_FACE",
+            list_refs.len(),
+            MAX_FACE_BOUND_CANDIDATES,
+        )?;
+
         // Surface ref is the last #ref that's not in the bounds list.
         let list_set: std::collections::HashSet<u64> = list_refs.iter().copied().collect();
         let surface_ref = all_refs
@@ -956,8 +970,10 @@ impl<'a> StepBuilder<'a> {
         })?;
 
         let mut loops = Vec::with_capacity(candidates.len());
+        let mut sampled_points = 0;
         for (candidate_index, candidate) in candidates.iter().enumerate() {
-            let polygon = self.sample_planar_bound(face_ref, *candidate, &frame)?;
+            let polygon =
+                self.sample_planar_bound(face_ref, *candidate, &frame, &mut sampled_points)?;
             let bounds = Aabb2::try_from_points(polygon.iter().copied()).ok_or_else(|| {
                 IoError::ParseError {
                     reason: format!(
@@ -1004,6 +1020,7 @@ impl<'a> StepBuilder<'a> {
 
         let margin = FACE_BOUND_CLASSIFICATION_DEFLECTION + tol.linear;
         let mut parents = vec![None; loops.len()];
+        let mut containment_work = 0usize;
         for child_index in 0..loops.len() {
             let child = &loops[child_index];
             let mut possible = Vec::new();
@@ -1015,6 +1032,13 @@ impl<'a> StepBuilder<'a> {
                 if area_gap <= child.perimeter * tol.linear {
                     continue;
                 }
+                containment_work = containment_work
+                    .saturating_add(parent.polygon.len().saturating_mul(child.polygon.len() + 1));
+                ensure_limit(
+                    "STEP face-bound containment work",
+                    containment_work,
+                    MAX_FACE_BOUND_CONTAINMENT_WORK,
+                )?;
                 if planar_loop_contains(parent, child, margin) {
                     possible.push(parent_index);
                 }
@@ -1080,10 +1104,16 @@ impl<'a> StepBuilder<'a> {
         let margin = FACE_BOUND_CLASSIFICATION_DEFLECTION + tol.linear;
         let (u_period, v_period) = domain.scaled_periods();
         let mut loops = Vec::with_capacity(candidates.len());
+        let mut sampled_points = 0;
 
         for (candidate_index, candidate) in candidates.iter().enumerate() {
-            let (polygon, seam_flexible_u, seam_flexible_v) =
-                self.sample_periodic_bound(face_ref, *candidate, surface, domain)?;
+            let (polygon, seam_flexible_u, seam_flexible_v) = self.sample_periodic_bound(
+                face_ref,
+                *candidate,
+                surface,
+                domain,
+                &mut sampled_points,
+            )?;
             let bounds = Aabb2::try_from_points(polygon.iter().copied()).ok_or_else(|| {
                 IoError::ParseError {
                     reason: format!(
@@ -1152,6 +1182,7 @@ impl<'a> StepBuilder<'a> {
         }
 
         let mut parents = vec![None; loops.len()];
+        let mut containment_work = 0usize;
         for child_index in 0..loops.len() {
             let child = &loops[child_index];
             let mut possible = Vec::new();
@@ -1163,6 +1194,13 @@ impl<'a> StepBuilder<'a> {
                 if area_gap <= child.perimeter * tol.linear {
                     continue;
                 }
+                containment_work = containment_work
+                    .saturating_add(parent.polygon.len().saturating_mul(child.polygon.len() + 1));
+                ensure_limit(
+                    "STEP face-bound containment work",
+                    containment_work,
+                    MAX_FACE_BOUND_CONTAINMENT_WORK,
+                )?;
                 if periodic_loop_contains(parent, child, margin, u_period, v_period) {
                     possible.push(parent_index);
                 }
@@ -1219,6 +1257,7 @@ impl<'a> StepBuilder<'a> {
         candidate: FaceBoundCandidate,
         surface: &FaceSurface,
         domain: PeriodicUvDomain,
+        sampled_points: &mut usize,
     ) -> Result<(Vec<Point2>, bool, bool), IoError> {
         let wire = self
             .topo
@@ -1246,6 +1285,12 @@ impl<'a> StepBuilder<'a> {
                     ),
                 })?;
             let mut edge_points = self.sample_bound_edge(edge)?;
+            *sampled_points = sampled_points.saturating_add(edge_points.len());
+            ensure_limit(
+                "sampled points per STEP ADVANCED_FACE",
+                *sampled_points,
+                MAX_FACE_BOUND_SAMPLES,
+            )?;
             if !oriented.is_forward() {
                 edge_points.reverse();
             }
@@ -1387,6 +1432,7 @@ impl<'a> StepBuilder<'a> {
         face_ref: u64,
         candidate: FaceBoundCandidate,
         frame: &Frame3,
+        sampled_points: &mut usize,
     ) -> Result<Vec<Point2>, IoError> {
         let wire = self
             .topo
@@ -1409,6 +1455,12 @@ impl<'a> StepBuilder<'a> {
                     ),
                 })?;
             let mut edge_points = self.sample_bound_edge(edge)?;
+            *sampled_points = sampled_points.saturating_add(edge_points.len());
+            ensure_limit(
+                "sampled points per STEP ADVANCED_FACE",
+                *sampled_points,
+                MAX_FACE_BOUND_SAMPLES,
+            )?;
             if !oriented.is_forward() {
                 edge_points.reverse();
             }
@@ -2775,6 +2827,9 @@ fn sample_bound_curve_interval<F>(
 where
     F: Fn(f64) -> Point3,
 {
+    if out.len() >= MAX_FACE_BOUND_EDGE_SAMPLES {
+        return false;
+    }
     let span = parameter_b - parameter_a;
     let parameter_q1 = span.mul_add(0.25, parameter_a);
     let parameter_mid = span.mul_add(0.5, parameter_a);
