@@ -985,6 +985,9 @@ pub fn boolean_with_options(
     Ok(result)
 }
 
+/// Maximum number of tools accepted by [`compound_cut`].
+pub const MAX_COMPOUND_CUT_TOOLS: usize = 256;
+
 /// Sequential compound cut via GFA.
 ///
 /// Cuts the `target` solid by each tool in order using sequential
@@ -992,13 +995,22 @@ pub fn boolean_with_options(
 ///
 /// # Errors
 ///
-/// Returns an error if any individual cut fails.
+/// Returns an error if the tool count exceeds [`MAX_COMPOUND_CUT_TOOLS`] or
+/// any individual cut fails.
 pub fn compound_cut(
     topo: &mut Topology,
     target: SolidId,
     tools: &[SolidId],
     opts: BooleanOptions,
 ) -> Result<SolidId, crate::OperationsError> {
+    if tools.len() > MAX_COMPOUND_CUT_TOOLS {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: format!(
+                "compound_cut accepts at most {MAX_COMPOUND_CUT_TOOLS} tools, got {}",
+                tools.len()
+            ),
+        });
+    }
     // Batched fast path: merge the tools into one multi-piece solid and cut
     // ONCE. Sequential cutting re-runs the full boolean pipeline against the
     // whole target per tool — O(target × tools); the lite magnet-drill pass
@@ -1007,7 +1019,10 @@ pub fn compound_cut(
     // identical. Tools are first grouped into AABB-overlap clusters
     // (union-find): tools in one cluster get a real fuse (the coaxial
     // magnet+screw drill pair), while the pairwise-disjoint cluster
-    // representatives merge via the free disjoint-shell shortcut.
+    // representatives are copied once and joined by a single disjoint-shell
+    // merge. Avoid folding through `boolean(Fuse)` here: that shortcut copies
+    // the growing accumulator on every iteration and retains quadratic
+    // topology in the arena.
     //
     // A SINGLE cluster batches too. That case used to fall through to the
     // sequential loop on the assumption that fusing one overlapping blob costs
@@ -1031,25 +1046,17 @@ pub fn compound_cut(
         // grinds against it (11 s and lost cones on a 4x4 baseplate, #1488).
         // A fallback-tainted merge is a FAILED merge for batching purposes:
         // the sequential per-tool cuts are exact and never see the tangency.
-        // Taint propagates as Err from `fuse_cluster` and from the cross-
-        // cluster merge fuses below, so a discarded merge never touches the
-        // public fallback counter.
-        let merged = clusters.iter().try_fold(None::<SolidId>, |acc, cluster| {
-            let fused = fuse_cluster(topo, cluster)?;
-            match acc {
-                None => Ok(Some(fused)),
-                Some(prev) => {
-                    let m = boolean_inner(topo, BooleanOp::Fuse, prev, fused)?;
-                    if LAST_USED_MESH_FALLBACK.with(std::cell::Cell::take) {
-                        return Err(crate::OperationsError::InvalidInput {
-                            reason: "cluster merge degraded to mesh fallback".to_string(),
-                        });
-                    }
-                    Ok(Some(m))
-                }
-            }
-        });
-        if let Ok(Some(tool)) = merged
+        // Taint propagates as Err from `fuse_cluster`, so a discarded merge
+        // never touches the public fallback counter.
+        let merged = clusters
+            .iter()
+            .map(|cluster| {
+                let fused = fuse_cluster(topo, cluster)?;
+                crate::copy::copy_solid(topo, fused)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(|solids| crate::compound_ops::merge_disjoint_solids(topo, &solids));
+        if let Ok(tool) = merged
             && let Ok(cut) = boolean(topo, BooleanOp::Cut, target, tool)
         {
             result = cut;
@@ -1229,10 +1236,26 @@ pub fn boolean_with_evolution(
             let healed_ok = crate::heal::remove_degenerate_edges(topo, result, tol.linear).is_ok()
                 && crate::heal::remove_wire_spurs(topo, result).is_ok();
 
+            // Apply the same semantic safety checks as the standard GFA path.
+            // Structural validation alone cannot detect a closed Cut result
+            // that incorrectly retains the tool interior.
+            let components = crate::boolean::assembly::face_components(topo, result);
+            let cut_safe = op != BooleanOp::Cut
+                || brepkit_algo::classifier::try_build_analytic_classifier(topo, b)
+                    .as_ref()
+                    .is_none_or(|cls_b| {
+                        all_component_centers_outside(topo, &components, cls_b, tol)
+                    });
+            let semantic_ok = is_closed_manifold(topo, result).is_ok_and(|closed| closed)
+                && (op != BooleanOp::Intersect
+                    || has_free_edges(topo, result).is_ok_and(|free| !free))
+                && cut_safe
+                && operands_are_represented(topo, op, result, a, b, tol);
+
             // Trust the faithful path only if its result is valid; otherwise
             // fall through to boolean()'s full pipeline (fast paths + mesh
             // fallback + validation), matching boolean()'s contract.
-            if healed_ok && validate_boolean_result(topo, result).is_ok() {
+            if healed_ok && semantic_ok && validate_boolean_result(topo, result).is_ok() {
                 let mut evo = crate::evolution::EvolutionMap::exact();
                 let mut sourced: HashSet<usize> = HashSet::default();
                 for (out_idx, src) in origins {
