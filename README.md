@@ -10,7 +10,7 @@ Solid modeling kernel for Rust and WebAssembly.
 [![License: AGPL-3.0-only or commercial](https://img.shields.io/badge/License-AGPL--3.0%20%2F%20Commercial-blue.svg)](#license)
 [![Rust 1.88+](https://img.shields.io/badge/rust-1.88%2B-orange.svg)](https://www.rust-lang.org/) [![unsafe denied](https://img.shields.io/badge/unsafe-denied-success.svg)](#why-a-cad-kernel)
 
-**[Architecture](#architecture)** · **[Performance](#performance)** · **[Getting Started](#getting-started)** · **[Known Limitations](#known-limitations)** · **[Stability](./STABILITY.md)** · **[Contributing](./CONTRIBUTING.md)**
+**[Architecture](#architecture)** · **[Performance](#performance)** · **[Getting Started](#getting-started)** · **[Local Development](#local-development)** · **[Distribution and Self-Hosting](#distribution-and-self-hosting)** · **[Known Limitations](#known-limitations)** · **[Stability](./STABILITY.md)** · **[Contributing](./CONTRIBUTING.md)**
 
 </div>
 
@@ -211,9 +211,18 @@ The Rust crates require Rust 1.88 or newer. The WASM package has no toolchain re
 
 ### As a WASM package
 
+The public `brepkit-wasm` npm package is published by the upstream project.
+To install this fork's committed WASM package, use pnpm with its supported
+GitHub subdirectory selector and pin a commit for reproducible builds:
+
 ```bash
-npm install brepkit-wasm
+pnpm add brepkit-wasm@github:esaueng/brepkit#main\&path:/crates/wasm/pkg
 ```
+
+`npm install brepkit-wasm` intentionally resolves the upstream npm release,
+not this fork. If npm is required, build and pack this fork locally, then
+install the resulting tarball as shown in
+[Distribution and Self-Hosting](#distribution-and-self-hosting).
 
 ```js
 import { BrepKernel } from 'brepkit-wasm';
@@ -236,23 +245,65 @@ brepkit-operations = { git = "https://github.com/esaueng/brepkit" }
 brepkit-io = { git = "https://github.com/esaueng/brepkit" }        # optional
 ```
 
-### Building from source
+### Local Development
 
-Requires Rust 1.88 or newer.
+The repository pins Rust in `rust-toolchain.toml`; install the WASM target and
+`wasm-pack` before building the package. Node.js is only needed for the WASM
+package checks.
 
 ```bash
-cargo build --workspace
-cargo test --workspace
-cargo clippy --all-targets -- -D warnings
-cargo fmt --all
+rustup target add wasm32-unknown-unknown
+cargo install wasm-pack
+npm install
 
-# WASM (with I/O)
-cargo build -p brepkit-wasm --target wasm32-unknown-unknown --release
+cargo build --workspace --all-features
+cargo fmt --all -- --check
+cargo clippy --all-targets --all-features -- -D warnings
+cargo nextest run --workspace --no-fail-fast
 
-# WASM (smaller, no I/O)
-cargo build -p brepkit-wasm --target wasm32-unknown-unknown --release --no-default-features
+# Builds both browser and Node targets, validates the package, and tests both
+# the files in place and a freshly installed consumer.
+cargo xtask wasm-build --skip-opt
 
-# API docs
+# The installed-package health check can also be run against crates/wasm/pkg.
+node scripts/test-wasm-package-consumer.mjs
+```
+
+`cargo xtask wasm-build` rewrites `crates/wasm/pkg`, which is generated and
+committed for GitHub-source consumers. Do not edit that directory by hand.
+
+### Distribution and Self-Hosting
+
+brepkit is a library, not a web service: it has no HTTP server, deployment
+manifest, or `/health` endpoint to run. Applications deploy it by bundling the
+WASM package with their own browser, desktop, or server application.
+
+The fork's distributable artifact is `crates/wasm/pkg`. To produce an npm
+tarball that works with npm or an internal registry:
+
+```bash
+cargo xtask wasm-build --skip-opt
+cd crates/wasm/pkg
+npm pack
+# In the consuming application:
+npm install /absolute/path/to/brepkit-wasm-<version>.tgz
+```
+
+For a browser application, let a bundler import `brepkit-wasm`; it will retain
+the generated JavaScript and `.wasm` asset together. When serving those files
+yourself, serve the `.wasm` file as `application/wasm` and deploy it beside its
+generated JavaScript loader. Production releases build and validate this same
+artifact in the `Release & Publish` workflow; publishing to the public npm
+name requires the upstream package credentials, so this fork's supported
+public distribution path is the committed GitHub package above.
+
+The package-consumer smoke check packs the artifact, installs it in an empty
+temporary project, and verifies `BrepKernel.makeBox` and `volume`. It is the
+production health check for this library artifact.
+
+### API docs
+
+```bash
 cargo doc --workspace --no-deps --open
 ```
 

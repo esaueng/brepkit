@@ -470,6 +470,21 @@ pub fn run_smoke_test() -> Result<()> {
     Ok(())
 }
 
+/// Pack and install the generated package in an empty consumer before release.
+pub fn run_consumer_smoke_test() -> Result<()> {
+    println!("\nRunning package consumer smoke test...");
+
+    let script = project_root()?.join("scripts/test-wasm-package-consumer.mjs");
+    if !script.exists() {
+        bail!("Package consumer smoke test script not found: {}", script.display());
+    }
+
+    run_cmd(Command::new("node").arg(&script)).context("package consumer smoke test failed")?;
+
+    println!("  Package consumer smoke test passed");
+    Ok(())
+}
+
 /// Publish the WASM package to npm.
 pub fn publish(dry_run: bool) -> Result<()> {
     let pkg = pkg_dir()?;
