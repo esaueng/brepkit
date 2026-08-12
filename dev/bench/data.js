@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786556889413,
+  "lastUpdate": 1786557017192,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8639,6 +8639,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14711908,
             "range": "± 679323",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "df75ca40bedc383877936413a5174258eddd7ba8",
+          "message": "Merge pull request #185 from esaueng/codex/fix-token-exposure-in-publish-workflow\n\nci: isolate WASM package push from untrusted build",
+          "timestamp": "2026-08-12T13:47:06-04:00",
+          "tree_id": "8ce15e2dbe6ea7b59864a20bc6f64563fca7c326",
+          "url": "https://github.com/esaueng/brepkit/commit/df75ca40bedc383877936413a5174258eddd7ba8"
+        },
+        "date": 1786557015769,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 551995,
+            "range": "± 23170",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 635292,
+            "range": "± 11955",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8111,
+            "range": "± 224",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 561409,
+            "range": "± 34785",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18071345,
+            "range": "± 798709",
             "unit": "ns/iter"
           }
         ]
