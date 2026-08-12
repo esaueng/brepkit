@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786560138898,
+  "lastUpdate": 1786560751793,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9125,6 +9125,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21482591,
             "range": "± 1497793",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d0a0584127ad30f68ec274ffcdda4763977f7062",
+          "message": "Merge pull request #207 from esaueng/codex/fix-non-manifold-edge-issue-in-weld-function\n\nfix(fillet): reject non-manifold weld results",
+          "timestamp": "2026-08-12T14:50:29-04:00",
+          "tree_id": "542bb0c9ef6cf4a0a72a057576933901e0626e56",
+          "url": "https://github.com/esaueng/brepkit/commit/d0a0584127ad30f68ec274ffcdda4763977f7062"
+        },
+        "date": 1786560750368,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 519347,
+            "range": "± 24356",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 559470,
+            "range": "± 23349",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6894,
+            "range": "± 207",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 500183,
+            "range": "± 9157",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15562030,
+            "range": "± 485899",
             "unit": "ns/iter"
           }
         ]
