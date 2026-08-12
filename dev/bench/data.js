@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786565050879,
+  "lastUpdate": 1786566400784,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9449,6 +9449,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14656827,
             "range": "± 153299",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7751ffa93a3e712972562db355a1f1b85459a8b4",
+          "message": "Merge pull request #164 from esaueng/codex/propose-fix-for-nurbs-boundary-vulnerability\n\nfix(algo): scope split registry anchors by pave block",
+          "timestamp": "2026-08-12T16:24:24-04:00",
+          "tree_id": "0bd0608f778a77bc1ec97f91fd998b18b1feb260",
+          "url": "https://github.com/esaueng/brepkit/commit/7751ffa93a3e712972562db355a1f1b85459a8b4"
+        },
+        "date": 1786566399233,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 530229,
+            "range": "± 43218",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 587317,
+            "range": "± 40388",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7319,
+            "range": "± 178",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 463662,
+            "range": "± 38028",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13786157,
+            "range": "± 278188",
             "unit": "ns/iter"
           }
         ]
