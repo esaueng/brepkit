@@ -29,6 +29,8 @@ impl NurbsCurve {
     ///
     /// Returns [`MathError::InvalidKnotVector`] if the knot vector length is
     /// not equal to `control_points.len() + degree + 1`.
+    /// Returns [`MathError::InvalidControlPointCount`] if there are fewer than
+    /// `degree + 1` control points.
     ///
     /// Returns [`MathError::InvalidWeights`] if the weights vector length does
     /// not match the number of control points, or
@@ -41,6 +43,21 @@ impl NurbsCurve {
         weights: Vec<f64>,
     ) -> Result<Self, MathError> {
         let n = control_points.len();
+        let minimum_control_points =
+            degree
+                .checked_add(1)
+                .ok_or(MathError::InvalidControlPointCount {
+                    degree,
+                    minimum: usize::MAX,
+                    got: n,
+                })?;
+        if n < minimum_control_points {
+            return Err(MathError::InvalidControlPointCount {
+                degree,
+                minimum: minimum_control_points,
+                got: n,
+            });
+        }
         let expected_knots = n + degree + 1;
         if knots.len() != expected_knots {
             return Err(MathError::InvalidKnotVector {
@@ -351,6 +368,24 @@ use super::basis::binomial;
 #[allow(clippy::expect_used, clippy::cast_lossless, clippy::suboptimal_flops)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_too_few_control_points_for_degree() {
+        for (degree, knots, control_points, weights) in [
+            (1, vec![0.0, 0.0], vec![], vec![]),
+            (
+                2,
+                vec![0.0, 0.0, 0.0, 1.0, 1.0],
+                vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0)],
+                vec![1.0, 1.0],
+            ),
+        ] {
+            assert!(matches!(
+                NurbsCurve::new(degree, knots, control_points, weights),
+                Err(MathError::InvalidControlPointCount { .. })
+            ));
+        }
+    }
 
     #[test]
     fn rejects_nonpositive_and_nonfinite_weights() {
