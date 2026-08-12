@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786561389329,
+  "lastUpdate": 1786565050879,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9395,6 +9395,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16294633,
             "range": "± 1016653",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2afcda06d452d948a4d35cc2b8ec061d234060b9",
+          "message": "Merge pull request #149 from esaueng/codex/fix-unbounded-memory-allocation-in-minkowski-sum\n\nfix(operations): bound Minkowski sum work",
+          "timestamp": "2026-08-12T16:01:52-04:00",
+          "tree_id": "5a6717408991244bbaad5862d0cb98a547f5c703",
+          "url": "https://github.com/esaueng/brepkit/commit/2afcda06d452d948a4d35cc2b8ec061d234060b9"
+        },
+        "date": 1786565049496,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 597133,
+            "range": "± 28598",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 624741,
+            "range": "± 15631",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7401,
+            "range": "± 75",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 493784,
+            "range": "± 15338",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14656827,
+            "range": "± 153299",
             "unit": "ns/iter"
           }
         ]
