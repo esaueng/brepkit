@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786548210367,
+  "lastUpdate": 1786548366358,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6965,6 +6965,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17050754,
             "range": "± 586053",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0dd1a7644e6c7b4baeac951f9991efcd972ea640",
+          "message": "Merge pull request #139 from esaueng/codex/fix-quadratic-vulnerability-in-step-import\n\nfix(heal): bound split rim midpoint validation to avoid quadratic DoS",
+          "timestamp": "2026-08-12T11:20:52-04:00",
+          "tree_id": "227e9ca27f8819ba0ed2448b6e3d76308e40ec41",
+          "url": "https://github.com/esaueng/brepkit/commit/0dd1a7644e6c7b4baeac951f9991efcd972ea640"
+        },
+        "date": 1786548365066,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 524849,
+            "range": "± 15503",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 636887,
+            "range": "± 23647",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7877,
+            "range": "± 239",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 522158,
+            "range": "± 30252",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15150810,
+            "range": "± 1011098",
             "unit": "ns/iter"
           }
         ]
