@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786551420290,
+  "lastUpdate": 1786551586628,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7289,6 +7289,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17167129,
             "range": "± 1055421",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "576992aa6970f9cf0d8c4e03606f461a1e209059",
+          "message": "Merge pull request #155 from esaueng/codex/fix-cpu-exhaustion-vulnerability-in-gfa\n\nfix(algo): bound interior chord sampling to mitigate quadratic CPU path",
+          "timestamp": "2026-08-12T12:15:30-04:00",
+          "tree_id": "1d078b5e7cfe8f0ec38a33754055906032363aad",
+          "url": "https://github.com/esaueng/brepkit/commit/576992aa6970f9cf0d8c4e03606f461a1e209059"
+        },
+        "date": 1786551585407,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 553494,
+            "range": "± 32006",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 596363,
+            "range": "± 8851",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7267,
+            "range": "± 75",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 510741,
+            "range": "± 21798",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17081268,
+            "range": "± 658986",
             "unit": "ns/iter"
           }
         ]
