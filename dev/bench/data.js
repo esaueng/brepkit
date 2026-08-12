@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786551258489,
+  "lastUpdate": 1786551420290,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7235,6 +7235,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21163762,
             "range": "± 1340737",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5cc9c1c2616ac890e2e46a03c8dc946fb3361e32",
+          "message": "Merge pull request #152 from esaueng/codex/fix-false-negative-in-analytic-intersection\n\nfix(math): avoid unsound analytic-analytic intersection rejection",
+          "timestamp": "2026-08-12T12:12:07-04:00",
+          "tree_id": "52683cb5b512eb72cf22d1f15b23b786e4c2f8e9",
+          "url": "https://github.com/esaueng/brepkit/commit/5cc9c1c2616ac890e2e46a03c8dc946fb3361e32"
+        },
+        "date": 1786551419080,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 692809,
+            "range": "± 53641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 823742,
+            "range": "± 59730",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8872,
+            "range": "± 375",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 530543,
+            "range": "± 20461",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17167129,
+            "range": "± 1055421",
             "unit": "ns/iter"
           }
         ]
