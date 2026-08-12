@@ -168,6 +168,11 @@ fn parse_ascii_body(
         let Some(n_verts) = vals.next().map(|count| count as usize) else {
             continue;
         };
+        if n_verts == 0 {
+            return Err(crate::IoError::ParseError {
+                reason: format!("PLY face must contain at least one vertex: {line}"),
+            });
+        }
 
         ensure_limit("PLY face vertices", n_verts, limits.max_model_entities)?;
         triangle_count = triangle_count.saturating_add(n_verts.saturating_sub(2));
@@ -379,6 +384,14 @@ mod tests {
         let mesh = read_ply(ply).unwrap();
         assert_eq!(mesh.positions.len(), 3);
         assert_eq!(mesh.indices.len(), 3);
+    }
+
+    #[test]
+    fn rejects_ascii_face_with_zero_vertices() {
+        let ply = b"ply\nformat ascii 1.0\nelement vertex 3\nproperty float x\nproperty float y\nproperty float z\nelement face 1\nproperty list uchar int vertex_indices\nend_header\n0 0 0\n1 0 0\n0 1 0\n0\n";
+
+        let err = read_ply(ply).unwrap_err();
+        assert!(matches!(err, crate::IoError::ParseError { .. }));
     }
 
     #[test]
