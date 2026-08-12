@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786551096651,
+  "lastUpdate": 1786551258489,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7181,6 +7181,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16413159,
             "range": "± 538173",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "fd33f19abf1310798ba1a84418ac15006d986f38",
+          "message": "Merge pull request #151 from esaueng/codex/fix-unbounded-densification-in-sweep-path\n\nfix(sweep): bound path densification output",
+          "timestamp": "2026-08-12T12:10:37-04:00",
+          "tree_id": "5efc0f99e955a6a8b6b1abeb8e48d1ca943ee765",
+          "url": "https://github.com/esaueng/brepkit/commit/fd33f19abf1310798ba1a84418ac15006d986f38"
+        },
+        "date": 1786551257222,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 789223,
+            "range": "± 92279",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 759667,
+            "range": "± 65009",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 9041,
+            "range": "± 268",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 723168,
+            "range": "± 81437",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21163762,
+            "range": "± 1340737",
             "unit": "ns/iter"
           }
         ]
