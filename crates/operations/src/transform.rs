@@ -52,13 +52,15 @@ pub(crate) fn reject_degenerate_transform(matrix: &Mat4) -> Result<(), crate::Op
     };
 
     let m = &matrix.0;
-    if m[3].map(f64::to_bits)
-        != [
-            0.0_f64.to_bits(),
-            0.0_f64.to_bits(),
-            0.0_f64.to_bits(),
-            1.0_f64.to_bits(),
-        ]
+    // Ulp-scale tolerance, not an exact comparison: inverting a rigid frame
+    // matrix through the adjugate legitimately yields entries like -0.0 or
+    // 1.0000000000000002 in this row. A genuinely projective row is far
+    // outside this band.
+    let affine_wobble = 8.0 * f64::EPSILON;
+    if m[3][0].abs() > affine_wobble
+        || m[3][1].abs() > affine_wobble
+        || m[3][2].abs() > affine_wobble
+        || (m[3][3] - 1.0).abs() > affine_wobble
     {
         return Err(degenerate("the bottom row is not affine"));
     }
