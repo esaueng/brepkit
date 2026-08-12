@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786553395495,
+  "lastUpdate": 1786553560771,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7667,6 +7667,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14473184,
             "range": "± 121673",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "255633af052784c9ffbde9e733711a7d4f560eac",
+          "message": "Merge pull request #169 from esaueng/codex/fix-wasm-ply-import-vulnerability\n\nfix(io): reject zero-vertex ASCII PLY faces",
+          "timestamp": "2026-08-12T12:49:40-04:00",
+          "tree_id": "ae0b06337ae1d98c9c1b272326a3f54b32743f50",
+          "url": "https://github.com/esaueng/brepkit/commit/255633af052784c9ffbde9e733711a7d4f560eac"
+        },
+        "date": 1786553559381,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 742735,
+            "range": "± 108660",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 699072,
+            "range": "± 35535",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8021,
+            "range": "± 517",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 480528,
+            "range": "± 35987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14069291,
+            "range": "± 224517",
             "unit": "ns/iter"
           }
         ]
