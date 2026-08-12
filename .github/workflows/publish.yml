@@ -27,11 +27,10 @@ jobs:
       contents: write
       pull-requests: write
       issues: write
-    # `secrets` is not a valid context in a step-level `if`, so surface the
-    # app credentials as env vars and branch on those instead.
+    # `secrets` is not a valid context in a step-level `if`. Surface only a
+    # derived availability flag; keep the credentials scoped to token minting.
     env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      HAS_APP_CREDENTIALS: ${{ secrets.BREPKIT_BOT_APP_ID != '' && secrets.BREPKIT_BOT_PRIVATE_KEY != '' }}
     outputs:
       release_created: ${{ steps.release.outputs['release_created'] }}
       tag_name: ${{ steps.release.outputs['tag_name'] }}
@@ -45,10 +44,10 @@ jobs:
       # only when the secrets exist and fall back to GITHUB_TOKEN.
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
-        if: ${{ env.APP_ID != '' && env.APP_PRIVATE_KEY != '' }}
+        if: ${{ env.HAS_APP_CREDENTIALS == 'true' }}
         with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.BREPKIT_BOT_APP_ID }}
+          private-key: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
 
       - uses: googleapis/release-please-action@45996ed1f6d02564a971a2fa1b5860e934307cf7 # v5.0.0
         id: release
@@ -71,15 +70,14 @@ jobs:
       contents: write
       pull-requests: write
     env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      HAS_APP_CREDENTIALS: ${{ secrets.BREPKIT_BOT_APP_ID != '' && secrets.BREPKIT_BOT_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
-        if: ${{ env.APP_ID != '' && env.APP_PRIVATE_KEY != '' }}
+        if: ${{ env.HAS_APP_CREDENTIALS == 'true' }}
         with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.BREPKIT_BOT_APP_ID }}
+          private-key: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
       - name: Enable auto-merge
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
@@ -119,15 +117,14 @@ jobs:
     permissions:
       contents: write
     env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      HAS_APP_CREDENTIALS: ${{ secrets.BREPKIT_BOT_APP_ID != '' && secrets.BREPKIT_BOT_PRIVATE_KEY != '' }}
     steps:
       - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
         id: app-token
-        if: ${{ env.APP_ID != '' && env.APP_PRIVATE_KEY != '' }}
+        if: ${{ env.HAS_APP_CREDENTIALS == 'true' }}
         with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.APP_PRIVATE_KEY }}
+          app-id: ${{ secrets.BREPKIT_BOT_APP_ID }}
+          private-key: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
