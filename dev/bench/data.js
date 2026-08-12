@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786556622666,
+  "lastUpdate": 1786556757074,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8531,6 +8531,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17121068,
             "range": "± 392666",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "402e9a2160c6befd03885f2cff360ba5140c363a",
+          "message": "Merge pull request #193 from esaueng/codex/fix-hard-coded-bridge-band-issue\n\nfix(algo): scale face splitter bridge bands",
+          "timestamp": "2026-08-12T13:42:39-04:00",
+          "tree_id": "00efb360baf492ed7dca367dd99709b54477a407",
+          "url": "https://github.com/esaueng/brepkit/commit/402e9a2160c6befd03885f2cff360ba5140c363a"
+        },
+        "date": 1786556754675,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 579759,
+            "range": "± 34372",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 663788,
+            "range": "± 33983",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8906,
+            "range": "± 951",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 606667,
+            "range": "± 62182",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21193159,
+            "range": "± 2164119",
             "unit": "ns/iter"
           }
         ]
