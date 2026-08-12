@@ -1299,30 +1299,28 @@ fn find_cap_circle(topo: &Topology, face_id: FaceId) -> Option<(Point3, f64)> {
 ///
 /// A coarse preview deflection inscribes too few facets in a curved face and
 /// under-counts its volume; volume is a precise query, so cap the deflection at
-/// a small fraction of the solid's extent, estimated as the diagonal of the
-/// **vertex** bounding box. (Curvature can bulge slightly beyond the vertices,
-/// so this under-estimates the true AABB — but only by making the cap
-/// conservatively finer, which is safe.) Never coarsens a finer request, and
-/// falls back to `requested` if the extent cannot be determined.
+/// a small fraction of the solid's curvature-aware bounding-box diagonal.
+/// Using only topology vertices is not sufficient: a closed circular edge can
+/// have one coincident start/end vertex even when its radius is enormous. Such
+/// an under-estimate would force an unnecessarily tiny deflection and allow a
+/// compact model to exhaust resources during tessellation. Never coarsens a
+/// finer request, and falls back to `requested` if the extent cannot be
+/// determined.
 ///
 /// A solid-extent scale (rather than per-curved-face curvature radius) is used
 /// deliberately: it keeps the deflection consistent between a sub-solid and a
 /// boolean result containing it, preserving the `volume(A ∪ B) == volume(A) +
 /// volume(B)` invariant for coincident-contact fuses. A curvature-radius cap
 /// would tessellate a shared face differently in each context and break it.
-fn volume_tessellation_deflection(topo: &Topology, solid: SolidId, requested: f64) -> f64 {
-    let Ok(pts) = collect_solid_vertex_points(topo, solid) else {
+pub(super) fn volume_tessellation_deflection(
+    topo: &Topology,
+    solid: SolidId,
+    requested: f64,
+) -> f64 {
+    let Ok(aabb) = super::solid_bounding_box(topo, solid) else {
         return requested;
     };
-    let Some((&first, rest)) = pts.split_first() else {
-        return requested;
-    };
-    let (mut lo, mut hi) = (first, first);
-    for p in rest {
-        lo = Point3::new(lo.x().min(p.x()), lo.y().min(p.y()), lo.z().min(p.z()));
-        hi = Point3::new(hi.x().max(p.x()), hi.y().max(p.y()), hi.z().max(p.z()));
-    }
-    let diag = (hi - lo).length();
+    let diag = (aabb.max - aabb.min).length();
     if !diag.is_finite() || diag <= 0.0 {
         return requested;
     }
