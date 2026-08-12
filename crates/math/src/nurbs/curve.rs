@@ -203,6 +203,24 @@ impl NurbsCurve {
         validate_weight_values(&self.weights)
     }
 
+    /// Validate all structural invariants normally enforced by [`Self::new`].
+    ///
+    /// This is intended for serialization formats that populate the private
+    /// fields directly in order to preserve their exact floating-point values.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same validation errors as [`Self::new`].
+    pub fn validate(&self) -> Result<(), MathError> {
+        Self::new(
+            self.degree,
+            self.knots.clone(),
+            self.control_points.clone(),
+            self.weights.clone(),
+        )?;
+        Ok(())
+    }
+
     /// Evaluate the curve at parameter `u` using De Boor's algorithm.
     ///
     /// For rational curves this performs the perspective divide automatically.
