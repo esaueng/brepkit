@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786556210411,
+  "lastUpdate": 1786556327625,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8369,6 +8369,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15982418,
             "range": "± 1259322",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a24718028c74d77b4d2347845b39b9a35f0de947",
+          "message": "Merge pull request #189 from esaueng/codex/fix-batch-helicalsweep-oom-vulnerability\n\nfix(operations): bound helical sweep work to prevent unbounded allocations",
+          "timestamp": "2026-08-12T13:36:47-04:00",
+          "tree_id": "9efc5c80dbb266dd0c2f53f9cd7bdc1cc769e836",
+          "url": "https://github.com/esaueng/brepkit/commit/a24718028c74d77b4d2347845b39b9a35f0de947"
+        },
+        "date": 1786556326307,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 534448,
+            "range": "± 9933",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 611295,
+            "range": "± 27001",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7540,
+            "range": "± 488",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 487332,
+            "range": "± 24049",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16297813,
+            "range": "± 2076955",
             "unit": "ns/iter"
           }
         ]
