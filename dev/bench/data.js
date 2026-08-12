@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786556083572,
+  "lastUpdate": 1786556210411,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8315,6 +8315,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14827820,
             "range": "± 269782",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "da14278af657ce5ec7ec64afcbb4047fbcb3a55b",
+          "message": "Merge pull request #187 from esaueng/codex/fix-deletesolid-for-quadratic-traversal-vulnerability\n\nfix(topology): deduplicate solid retirement traversal",
+          "timestamp": "2026-08-12T13:33:48-04:00",
+          "tree_id": "3cac7809e6e53a8bc59bd8d435aa93098bcf66b5",
+          "url": "https://github.com/esaueng/brepkit/commit/da14278af657ce5ec7ec64afcbb4047fbcb3a55b"
+        },
+        "date": 1786556209051,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 497772,
+            "range": "± 18880",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 567578,
+            "range": "± 32657",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7202,
+            "range": "± 307",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 494839,
+            "range": "± 21514",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15982418,
+            "range": "± 1259322",
             "unit": "ns/iter"
           }
         ]
