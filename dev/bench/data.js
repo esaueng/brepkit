@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786559679662,
+  "lastUpdate": 1786559814287,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9017,6 +9017,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 19706165,
             "range": "± 3454165",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0fb0469967393f2dd409a6188818f89d7c8eaf11",
+          "message": "Merge pull request #206 from esaueng/codex/fix-near-pinch-fillet-validation-issue\n\nfix(blend): retain cross edges for near-pinched stripes by using closure tolerance",
+          "timestamp": "2026-08-12T14:34:04-04:00",
+          "tree_id": "f9c024817cd7d44ebace4c8ecda72559b2ef084e",
+          "url": "https://github.com/esaueng/brepkit/commit/0fb0469967393f2dd409a6188818f89d7c8eaf11"
+        },
+        "date": 1786559812959,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 519001,
+            "range": "± 8141",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 541921,
+            "range": "± 2672",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7110,
+            "range": "± 89",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 471369,
+            "range": "± 1940",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14817855,
+            "range": "± 112671",
             "unit": "ns/iter"
           }
         ]
