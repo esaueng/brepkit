@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786548366358,
+  "lastUpdate": 1786550742508,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7019,6 +7019,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15150810,
             "range": "± 1011098",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "ee9a66394b7a79a61379bae1c45ce2e2eef5b632",
+          "message": "Merge pull request #140 from esaueng/codex/propose-fix-for-split-rim-cpu-dos\n\nfix(operations): avoid quadratic split-rim scans",
+          "timestamp": "2026-08-12T12:02:59-04:00",
+          "tree_id": "251901421415553704c5aa4a485a5d5ef02cac4f",
+          "url": "https://github.com/esaueng/brepkit/commit/ee9a66394b7a79a61379bae1c45ce2e2eef5b632"
+        },
+        "date": 1786550741209,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 998513,
+            "range": "± 110122",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1087875,
+            "range": "± 7656",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11669,
+            "range": "± 1821",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 924605,
+            "range": "± 12407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 28135222,
+            "range": "± 351066",
             "unit": "ns/iter"
           }
         ]
