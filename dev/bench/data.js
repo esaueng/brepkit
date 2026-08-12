@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786495221128,
+  "lastUpdate": 1786548210367,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6911,6 +6911,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13456862,
             "range": "± 39296",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "4cebc7aa6db9a54b246f497dfd36105af525254d",
+          "message": "Merge pull request #138 from esaueng/codex/fix-cpu-and-memory-dos-vulnerability\n\nfix(operations): bound periodic rim validation and cap ambiguous-arc diagnostics",
+          "timestamp": "2026-08-12T11:20:14-04:00",
+          "tree_id": "2f9076228a0f45c8e6c92da0edba2ccaab24efbc",
+          "url": "https://github.com/esaueng/brepkit/commit/4cebc7aa6db9a54b246f497dfd36105af525254d"
+        },
+        "date": 1786548209121,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 757973,
+            "range": "± 106006",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 916629,
+            "range": "± 131435",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11405,
+            "range": "± 1385",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 606451,
+            "range": "± 124348",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17050754,
+            "range": "± 586053",
             "unit": "ns/iter"
           }
         ]
