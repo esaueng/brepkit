@@ -32,6 +32,13 @@ use brepkit_topology::solid::SolidId;
 
 use crate::error::OffsetError;
 
+/// Upper bound on cavity shells accepted by the pairwise disjointness check.
+///
+/// The check below intentionally compares every pair. Keeping this limit near
+/// one thousand bounds that work to roughly half a million comparisons even
+/// when a solid came from an untrusted importer.
+const MAX_CAVITY_SHELLS: usize = 1_024;
+
 /// Where a cavity check is being applied, for error wording.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum Stage {
@@ -57,8 +64,9 @@ impl Stage {
 /// # Errors
 ///
 /// Returns [`OffsetError::InvalidInput`] naming cavity shells when a cavity
-/// reaches or crosses the outer boundary, when two cavities meet, or when a
-/// shell has no geometry to bound.
+/// reaches or crosses the outer boundary, when two cavities meet, when the
+/// solid exceeds the cavity work budget, or when a shell has no geometry to
+/// bound.
 pub fn check_cavity_extents(
     topo: &Topology,
     solid: SolidId,
@@ -69,6 +77,16 @@ pub fn check_cavity_extents(
     let inner_shells = solid_data.inner_shells().to_vec();
     if inner_shells.is_empty() {
         return Ok(());
+    }
+    if inner_shells.len() > MAX_CAVITY_SHELLS {
+        return Err(OffsetError::InvalidInput {
+            reason: format!(
+                "offset of solids with cavity shells supports at most {MAX_CAVITY_SHELLS} \
+                 cavities; the {} has {}",
+                stage.as_str(),
+                inner_shells.len(),
+            ),
+        });
     }
     let outer = shell_extent(topo, solid_data.outer_shell(), stage)?;
 
