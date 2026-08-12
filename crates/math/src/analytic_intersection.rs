@@ -1278,7 +1278,6 @@ pub fn intersect_analytic_analytic_bounded(
     // a grid point on A to its projection on B can be large even near
     // the intersection (e.g., sphere R=2 and cylinder R=1 → gap ≈ 1).
     let seed_threshold = diag_a.max(diag_b).max(1.0) * 0.5;
-    let mut min_dist = f64::INFINITY;
 
     #[allow(clippy::cast_precision_loss)]
     for ia in 0..grid_res {
@@ -1294,7 +1293,6 @@ pub fn intersect_analytic_analytic_bounded(
             let (ub, vb) = project_analytic(&b, pa, u_range_b, v_range_b);
             let pb = surf_b(ub, vb);
             let dist = (pa - pb).length();
-            min_dist = min_dist.min(dist);
 
             if dist < seed_threshold {
                 // Use the coarse seed directly. The marching algorithm
@@ -1309,19 +1307,6 @@ pub fn intersect_analytic_analytic_bounded(
                 seeds.push((mid, (ua, va), (ub, vb)));
             }
         }
-    }
-
-    // Cheap rejection: the grid samples surface A; the closest sample's
-    // distance to B lower-bounds how near the two bounded patches come. A
-    // transversal crossing puts a sample within ~one grid cell of it
-    // (distance on the order of a cell), so if even the nearest sample is
-    // several cells away the patches cannot cross — skip the expensive
-    // marching and return empty. Result-preserving: non-crossing pairs
-    // already march to nothing, just slowly (this is the gridfinity lip's
-    // ~80 inner-wall × outer-wall pairs that dominate pavefiller time).
-    let reject_dist = (char_size / grid_res as f64) * 3.0;
-    if min_dist > reject_dist {
-        return Ok(vec![]);
     }
 
     if seeds.is_empty() {
@@ -1996,7 +1981,11 @@ fn algebraic_parallel_cone_cylinder(
     v_range_cyl: Option<(f64, f64)>,
 ) -> Result<Option<Vec<IntersectionCurve>>, MathError> {
     let axis = cone.axis();
-    if axis.dot(cyl.axis()).abs() < 1.0 - 1e-10 {
+    // A dot-product comparison loses the first-order angular error near 1.0:
+    // an axis tilted by 1e-5 radians still has a dot product within 1e-10 of
+    // one.  This construction requires the axes themselves to be parallel, so
+    // classify their angular separation directly.
+    if axis.cross(cyl.axis()).length() > Tolerance::new().angular {
         return Ok(None); // Skew/oblique — general marcher.
     }
 
@@ -2739,6 +2728,30 @@ mod tests {
             algebraic_parallel_cone_cylinder(&cone, &cyl, None, None)
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn near_parallel_cone_cylinder_defers_to_other_paths() {
+        let cone = ConicalSurface::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            std::f64::consts::FRAC_PI_4,
+        )
+        .unwrap();
+        let tilt = 1e-5_f64;
+        let cyl = CylindricalSurface::new(
+            Point3::new(1000.0, 0.0, 0.0),
+            Vec3::new(tilt.sin(), 0.0, tilt.cos()),
+            5.0,
+        )
+        .unwrap();
+
+        assert!(
+            algebraic_parallel_cone_cylinder(&cone, &cyl, None, None)
+                .unwrap()
+                .is_none(),
+            "a tilted cylinder must use the general intersection path"
         );
     }
 
