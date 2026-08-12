@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786574771555,
+  "lastUpdate": 1786578127398,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9773,6 +9773,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15277282,
             "range": "± 297913",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5cdfb7bf1ba6648777870561a5774b67905c7aa1",
+          "message": "Merge pull request #219 from esaueng/codex/bump-kernel-3-2-32\n\nchore(release): bump kernel to 3.2.32",
+          "timestamp": "2026-08-12T19:39:38-04:00",
+          "tree_id": "8a55a840af0bb34a3d058dbb660aa93917c8731b",
+          "url": "https://github.com/esaueng/brepkit/commit/5cdfb7bf1ba6648777870561a5774b67905c7aa1"
+        },
+        "date": 1786578126071,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 584105,
+            "range": "± 35098",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 630596,
+            "range": "± 26161",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7848,
+            "range": "± 287",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 518803,
+            "range": "± 19286",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16248975,
+            "range": "± 882837",
             "unit": "ns/iter"
           }
         ]
