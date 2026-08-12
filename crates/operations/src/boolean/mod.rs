@@ -2281,9 +2281,11 @@ fn aabbs_clear_gap(
 /// a clear gap: every connected face component of `a` is separated from every
 /// connected face component of `b` by more than `margin` on some axis.
 ///
-/// Soundness: component AABBs come from [`crate::measure::face_set_bounding_box`],
-/// which is a conservative *outer* bound (vertices plus surface-curvature
-/// expansion). If two components' true geometry overlapped or touched, their
+/// Soundness: components containing NURBS faces are rejected because their
+/// sampled face boxes are not proven conservative. All accepted component
+/// AABBs come from [`crate::measure::face_set_bounding_box`] as conservative
+/// *outer* bounds (vertices plus surface-curvature expansion). If two
+/// components' true geometry overlapped or touched, their
 /// boxes would touch or overlap and [`aabbs_clear_gap`] would (correctly)
 /// return `false`. So a `true` result guarantees a real positive gap between
 /// the two solids — never a false "disjoint" for touching/coincident inputs,
@@ -2306,7 +2308,21 @@ fn solids_provably_disjoint(topo: &Topology, a: SolidId, b: SolidId, margin: f64
     let boxes = |comps: &[Vec<FaceId>]| -> Option<Vec<brepkit_math::aabb::Aabb3>> {
         comps
             .iter()
-            .map(|faces| crate::measure::face_set_bounding_box(topo, faces).ok())
+            .map(|faces| {
+                // NURBS face bounds use finite sampling over the trimmed
+                // domain. A high-degree surface can protrude between those
+                // samples, so separation of that sampled box is not proof of
+                // geometric disjointness. Fall through to the exact boolean
+                // pipeline rather than risking a skipped Cut (or Fuse).
+                let has_nurbs = faces.iter().try_fold(false, |has_nurbs, &face_id| {
+                    let face = topo.face(face_id).ok()?;
+                    Some(has_nurbs || matches!(face.surface(), FaceSurface::Nurbs(_)))
+                })?;
+                if has_nurbs {
+                    return None;
+                }
+                crate::measure::face_set_bounding_box(topo, faces).ok()
+            })
             .collect()
     };
     let (Some(boxes_a), Some(boxes_b)) = (boxes(&comps_a), boxes(&comps_b)) else {
