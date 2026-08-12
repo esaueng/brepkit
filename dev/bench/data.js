@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786555280455,
+  "lastUpdate": 1786555405483,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7991,6 +7991,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17991022,
             "range": "± 964382",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "19db1d97aff1e49bc40ecc01e42bbfdd968be23d",
+          "message": "Merge pull request #180 from esaueng/codex/fix-wasm-offset-cpu-exhaustion-vulnerability\n\nfix(offset): limit cavity overlap checks to prevent quadratic CPU DoS",
+          "timestamp": "2026-08-12T13:19:46-04:00",
+          "tree_id": "f9aa2f3c1f4757a0fd7d471d0ee60afeb3f02cdc",
+          "url": "https://github.com/esaueng/brepkit/commit/19db1d97aff1e49bc40ecc01e42bbfdd968be23d"
+        },
+        "date": 1786555404129,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 958068,
+            "range": "± 65436",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 707995,
+            "range": "± 16612",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8142,
+            "range": "± 513",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 591780,
+            "range": "± 9596",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17045231,
+            "range": "± 154217",
             "unit": "ns/iter"
           }
         ]
