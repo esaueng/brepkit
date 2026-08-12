@@ -27,6 +27,24 @@ pub fn collect_full_turn_rim_cycles(
     project_u: &dyn Fn(Point3) -> f64,
     expected_cycles: usize,
 ) -> Result<Option<Vec<RimCycle>>, crate::OperationsError> {
+    let Some(cycles) = collect_full_turn_rim_cycles_any(topo, curved, project_u)? else {
+        return Ok(None);
+    };
+    if cycles.len() != expected_cycles {
+        return Ok(None);
+    }
+    Ok(Some(cycles))
+}
+
+/// Collect all curved-edge cycles whose projected parameter winds one full turn.
+///
+/// Unlike [`collect_full_turn_rim_cycles`], this does not require the caller to
+/// know the number of cycles before walking the edge graph.
+pub(super) fn collect_full_turn_rim_cycles_any(
+    topo: &Topology,
+    curved: &[(usize, VertexId, VertexId)],
+    project_u: &dyn Fn(Point3) -> f64,
+) -> Result<Option<Vec<RimCycle>>, crate::OperationsError> {
     let mut by_vertex: HashMap<VertexId, Vec<usize>> = HashMap::new();
     for (position, &(_, start, end)) in curved.iter().enumerate() {
         by_vertex.entry(start).or_default().push(position);
@@ -114,9 +132,6 @@ pub fn collect_full_turn_rim_cycles(
         });
     }
 
-    if cycles.len() != expected_cycles {
-        return Ok(None);
-    }
     Ok(Some(cycles))
 }
 
