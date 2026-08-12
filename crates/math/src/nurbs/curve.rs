@@ -27,6 +27,8 @@ impl NurbsCurve {
     ///
     /// # Errors
     ///
+    /// Returns [`MathError::InvalidDegree`] if `degree` is zero.
+    ///
     /// Returns [`MathError::InvalidKnotVector`] if the knot vector length is
     /// not equal to `control_points.len() + degree + 1`.
     ///
@@ -40,6 +42,9 @@ impl NurbsCurve {
         control_points: Vec<Point3>,
         weights: Vec<f64>,
     ) -> Result<Self, MathError> {
+        if degree == 0 {
+            return Err(MathError::InvalidDegree { degree });
+        }
         let n = control_points.len();
         let expected_knots = n + degree + 1;
         if knots.len() != expected_knots {
@@ -351,6 +356,19 @@ use super::basis::binomial;
 #[allow(clippy::expect_used, clippy::cast_lossless, clippy::suboptimal_flops)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn rejects_degree_zero() {
+        assert!(matches!(
+            NurbsCurve::new(
+                0,
+                vec![0.0, 0.5, 1.0],
+                vec![Point3::new(0.0, 0.0, 0.0), Point3::new(1.0, 0.0, 0.0),],
+                vec![1.0, 1.0],
+            ),
+            Err(MathError::InvalidDegree { degree: 0 })
+        ));
+    }
 
     #[test]
     fn rejects_nonpositive_and_nonfinite_weights() {
