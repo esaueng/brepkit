@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786570596644,
+  "lastUpdate": 1786574771555,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9719,6 +9719,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14300890,
             "range": "± 304835",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b3b11058e85851e5d0ca8461fa16bf0cc14a46f1",
+          "message": "Merge pull request #218 from esaueng/codex/phase-k1-resize-blend\n\nfeat(operations): add exact blend resizing",
+          "timestamp": "2026-08-12T18:43:50-04:00",
+          "tree_id": "601ad1ddb63ccfd0fdb0430f1320a61ae0072e04",
+          "url": "https://github.com/esaueng/brepkit/commit/b3b11058e85851e5d0ca8461fa16bf0cc14a46f1"
+        },
+        "date": 1786574770104,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 582551,
+            "range": "± 12235",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 614831,
+            "range": "± 46944",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7393,
+            "range": "± 233",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 539163,
+            "range": "± 18148",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15277282,
+            "range": "± 297913",
             "unit": "ns/iter"
           }
         ]
