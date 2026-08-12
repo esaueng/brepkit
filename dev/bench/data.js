@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786494164106,
+  "lastUpdate": 1786495221128,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -6857,6 +6857,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15356162,
             "range": "± 252876",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5c5a30e5f90f391070702df62074255dc6910e58",
+          "message": "Merge pull request #137 from esaueng/codex/correct-agent-guide-after-135\n\ndocs: correct agent guide invariants",
+          "timestamp": "2026-08-11T20:38:27-04:00",
+          "tree_id": "106918920429ebbc2f402eecec66de29b2f26679",
+          "url": "https://github.com/esaueng/brepkit/commit/5c5a30e5f90f391070702df62074255dc6910e58"
+        },
+        "date": 1786495219926,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 468919,
+            "range": "± 932",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 515466,
+            "range": "± 6563",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6722,
+            "range": "± 70",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 456020,
+            "range": "± 917",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13456862,
+            "range": "± 39296",
             "unit": "ns/iter"
           }
         ]
