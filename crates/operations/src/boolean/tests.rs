@@ -146,6 +146,26 @@ fn compound_cut_disjoint_drills_matches_sequential() {
 }
 
 #[test]
+fn compound_cut_rejects_excessive_tool_count() {
+    let mut topo = Topology::new();
+    let target = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    let tool = crate::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+    let tools = vec![tool; super::MAX_COMPOUND_CUT_TOOLS + 1];
+    let err = compound_cut(
+        &mut topo,
+        target,
+        &tools,
+        BooleanOptions {
+            unify_faces: false,
+            ..BooleanOptions::default()
+        },
+    )
+    .unwrap_err();
+
+    assert!(err.to_string().contains("accepts at most 256 tools"));
+}
+
+#[test]
 fn compound_cut_overlapping_tools_match_union_cut_volume() {
     // Two tools that overlap EACH OTHER form ONE AABB cluster, so this exercises
     // the batched path — though the batch falls back to the sequential loop on
@@ -839,6 +859,33 @@ fn fuse_evolution_is_faithful() {
     assert_eq!(
         attributed, result_faces,
         "every result face should trace to an input face"
+    );
+}
+
+#[test]
+fn cut_evolution_rejects_untouched_gfa_blank() {
+    use brepkit_math::mat::Mat4;
+
+    // The cylinder crosses the plate's x=0 wall by 0.5 mm. GFA can lose the
+    // tool in this configuration and return the original six-face plate: a
+    // structurally valid solid, but not the requested difference.
+    let mut topo = Topology::new();
+    let plate = crate::primitives::make_box(&mut topo, 60.0, 40.0, 8.0).unwrap();
+    let tool = crate::primitives::make_cylinder(&mut topo, 10.0, 16.0).unwrap();
+    crate::transform::transform_solid(&mut topo, tool, &Mat4::translation(-9.5, 20.0, -4.0))
+        .unwrap();
+
+    let (result, evolution) =
+        boolean_with_evolution(&mut topo, BooleanOp::Cut, plate, tool).unwrap();
+    let volume = crate::measure::solid_volume(&topo, result, 0.1).unwrap();
+
+    assert!(
+        volume < 60.0 * 40.0 * 8.0,
+        "evolution cut returned the untouched plate ({volume})"
+    );
+    assert!(
+        !evolution.modified.is_empty(),
+        "accepted result must retain evolution data"
     );
 }
 
