@@ -8,11 +8,16 @@
 /// Errors from math operations.
 #[derive(Debug, thiserror::Error)]
 pub enum MathError {
-    /// NURBS degree is unsupported.
-    #[error("invalid NURBS degree {degree}: degree must be at least 1")]
+    /// NURBS degree is unsupported: zero, or not smaller than the number of
+    /// control points.
+    #[error(
+        "invalid NURBS degree {degree} with {control_points} control points: degree must be at least 1 and less than the control point count"
+    )]
     InvalidDegree {
-        /// Unsupported polynomial degree.
+        /// Requested polynomial degree.
         degree: usize,
+        /// Number of supplied control points.
+        control_points: usize,
     },
 
     /// Knot vector length does not match control points and degree.
