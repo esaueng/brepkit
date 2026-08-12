@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786560751793,
+  "lastUpdate": 1786561000457,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9179,6 +9179,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15562030,
             "range": "± 485899",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f3591af3330e1a91268ca11716ba17dea842a1ce",
+          "message": "Merge pull request #210 from esaueng/codex/fix-unsafe-ci-artifact-extraction\n\nfix(ci): validate committed WASM artifact",
+          "timestamp": "2026-08-12T14:54:10-04:00",
+          "tree_id": "853d5c013bd3f10e6ac77b2befe440aa838d3988",
+          "url": "https://github.com/esaueng/brepkit/commit/f3591af3330e1a91268ca11716ba17dea842a1ce"
+        },
+        "date": 1786560999071,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 697680,
+            "range": "± 111293",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1026748,
+            "range": "± 141580",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8298,
+            "range": "± 529",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 917019,
+            "range": "± 23641",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 22010105,
+            "range": "± 5779872",
             "unit": "ns/iter"
           }
         ]
