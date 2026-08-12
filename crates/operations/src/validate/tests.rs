@@ -999,6 +999,38 @@ fn sealed_fragment_floating_inside_the_stock_is_reported_disconnected() {
 }
 
 #[test]
+fn overlap_veto_bounds_component_pair_checks() {
+    let mut topo = Topology::new();
+    let mut faces = Vec::new();
+    let mut components = Vec::new();
+
+    // 92 components produce 4,186 pairs, just over the fixed validation
+    // budget. Keep them far apart so an unbounded scan would visit every pair.
+    for i in 0..92 {
+        let component = crate::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+        crate::transform::transform_solid(
+            &mut topo,
+            component,
+            &brepkit_math::mat::Mat4::translation(f64::from(i) * 2.0, 0.0, 0.0),
+        )
+        .unwrap();
+        let shell = topo.solid(component).unwrap().outer_shell();
+        let component_faces = topo.shell(shell).unwrap().faces().to_vec();
+        faces.extend_from_slice(&component_faces);
+        components.push(component_faces);
+    }
+
+    let shell = topo.add_shell(brepkit_topology::shell::Shell::new(faces).unwrap());
+    let solid = topo.add_solid(brepkit_topology::solid::Solid::new(shell, vec![]));
+    let genus = vec![0; components.len()];
+
+    assert!(
+        outer_components_materially_overlap(&topo, solid, &components, &genus).unwrap(),
+        "exhausting the pair budget must fail closed"
+    );
+}
+
+#[test]
 fn ambiguous_same_order_circle_arcs_are_reported_as_a_warning() {
     use brepkit_math::curves::Circle3D;
     use brepkit_math::vec::{Point3, Vec3};
