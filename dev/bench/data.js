@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786555405483,
+  "lastUpdate": 1786555548065,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8045,6 +8045,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 17045231,
             "range": "± 154217",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8234e7be650e1466ef8bc361f51d567abbdc0268",
+          "message": "Merge pull request #181 from esaueng/codex/fix-cavity-offset-validation-issue\n\nfix(offset): reject collapsing cavity offsets",
+          "timestamp": "2026-08-12T13:22:25-04:00",
+          "tree_id": "c20a5b71eab47bcbe9c1effeffe94c7e490484db",
+          "url": "https://github.com/esaueng/brepkit/commit/8234e7be650e1466ef8bc361f51d567abbdc0268"
+        },
+        "date": 1786555546726,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 644621,
+            "range": "± 16832",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 707596,
+            "range": "± 17521",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8674,
+            "range": "± 1321",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 581419,
+            "range": "± 57694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26031732,
+            "range": "± 4026846",
             "unit": "ns/iter"
           }
         ]
