@@ -5,6 +5,7 @@
 //! blend faces and sampling contact curves.
 
 use brepkit_math::nurbs::curve::NurbsCurve;
+use brepkit_math::tolerance::Tolerance;
 use brepkit_math::traits::ParametricSurface;
 use brepkit_math::vec::{Point3, Vec3};
 use brepkit_topology::Topology;
@@ -16,11 +17,46 @@ use brepkit_topology::wire::{OrientedEdge, Wire, WireId};
 use crate::BlendError;
 use crate::stripe::Stripe;
 
+fn is_pinched(a: Point3, b: Point3) -> bool {
+    (a - b).length() <= Tolerance::new().linear
+}
+
 /// Sample the start and end points of a NURBS curve.
 #[must_use]
 pub fn sample_nurbs_endpoints(curve: &NurbsCurve) -> Vec<Point3> {
     let (t0, t1) = curve.domain();
     vec![curve.evaluate(t0), curve.evaluate(t1)]
+}
+
+fn contact_geometry_matches(
+    edge_curve: &EdgeCurve,
+    edge_start: Point3,
+    edge_end: Point3,
+    want_curve: &NurbsCurve,
+    tolerance: f64,
+) -> bool {
+    if matches!(edge_curve, EdgeCurve::Line) {
+        let chord = edge_end - edge_start;
+        let chord_len_sq = chord.dot(chord);
+        if chord_len_sq <= f64::EPSILON {
+            return want_curve
+                .control_points()
+                .iter()
+                .all(|point| (*point - edge_start).length() <= tolerance);
+        }
+
+        return want_curve.control_points().iter().all(|point| {
+            let offset = *point - edge_start;
+            let parameter = offset.dot(chord) / chord_len_sq;
+            let distance = (offset - chord * parameter).length();
+            distance <= tolerance && parameter >= -tolerance && parameter <= 1.0 + tolerance
+        });
+    }
+
+    let (t0, t1) = want_curve.domain();
+    let want_mid = want_curve.evaluate((t0 + t1) * 0.5);
+    let edge_mid = edge_curve.evaluate_with_endpoints(0.5, edge_start, edge_end);
+    (edge_mid - want_mid).length() <= tolerance
 }
 
 /// Create a blend face from a stripe's surface and contact curves.
@@ -35,9 +71,9 @@ pub fn sample_nurbs_endpoints(curve: &NurbsCurve) -> Vec<Point3> {
 /// span the same contacts. Minting fresh edges for curves the trimmed
 /// neighbours already carry leaves two edge entities per contact — each used
 /// by one face — opening the shell along every blend flank. A trimmer edge
-/// is adopted (with its vertices) when its endpoints match the stripe's
-/// contact endpoints within the weld band, in either orientation; otherwise
-/// that side falls back to a fresh edge.
+/// is adopted (with its vertices) when its endpoints and geometry match the
+/// stripe's contact curve within the weld band, in either orientation;
+/// otherwise that side falls back to a fresh edge.
 pub fn create_blend_face_with_contacts(
     topo: &mut Topology,
     stripe: &Stripe,
@@ -59,13 +95,17 @@ pub fn create_blend_face_with_contacts(
     let adopt = |topo: &Topology,
                  eid: Option<brepkit_topology::edge::EdgeId>,
                  want_s: Point3,
-                 want_e: Point3|
+                 want_e: Point3,
+                 want_curve: &NurbsCurve|
      -> Option<(brepkit_topology::edge::EdgeId, bool, VertexId, VertexId)> {
         let eid = eid?;
         let e = topo.edge(eid).ok()?;
         let (sv, ev) = (e.start(), e.end());
         let sp = topo.vertex(sv).ok()?.point();
         let ep = topo.vertex(ev).ok()?.point();
+        if !contact_geometry_matches(e.curve(), sp, ep, want_curve, WELD) {
+            return None;
+        }
         if (sp - want_s).length() <= WELD && (ep - want_e).length() <= WELD {
             Some((eid, true, sv, ev))
         } else if (sp - want_e).length() <= WELD && (ep - want_s).length() <= WELD {
@@ -74,19 +114,20 @@ pub fn create_blend_face_with_contacts(
             None
         }
     };
-    let adopt1 = adopt(topo, contact1_edge, p1_start, p1_end);
+    let adopt1 = adopt(topo, contact1_edge, p1_start, p1_end, &stripe.contact1);
     // Contact 2 traverses end -> start in the quad below.
-    let adopt2 = adopt(topo, contact2_edge, p2_end, p2_start);
+    let adopt2 = adopt(topo, contact2_edge, p2_end, p2_start, &stripe.contact2);
 
     // A variable-radius stripe can pinch to a point at an end: both
     // contact curves land on the same position. Detect it up front so the
     // pinched end SHARES one vertex entity between the two contact curves
     // (the cross edge is skipped below, and separate entities would leave
     // the wire closed only positionally, not at entity level — see the
-    // closure tolerance note: validation treats vertices as coincident at
-    // 1e-7, tighter than the 1e-5 weld distance used here).
-    let end_degenerate = (p1_end - p2_end).length() < WELD;
-    let start_degenerate = (p2_start - p1_start).length() < WELD;
+    // closure tolerance note: only omit an edge when wire validation also
+    // treats its endpoints as coincident. The broader weld band is for edge
+    // adoption and must not be used to classify a cross edge as degenerate.
+    let end_degenerate = is_pinched(p1_end, p2_end);
+    let start_degenerate = is_pinched(p2_start, p1_start);
 
     // Create/reuse vertices (snapshot then allocate).
     let (v1s, v1e) = adopt1.map_or_else(
@@ -946,19 +987,20 @@ pub(crate) fn weld_coincident_free_edges(
         groups.entry(key).or_default().push((eid, sv, ev));
     }
 
-    // For each group, rewrite all wires to use the first edge.
+    // Only pairs can be stitched into a manifold edge. Collapsing a larger
+    // coincident group would make the kept edge belong to three or more
+    // faces, hiding the original boundaries behind a non-manifold edge.
     let mut replace: HashMap<EdgeId, (EdgeId, bool)> = HashMap::new();
     for members in groups.values() {
-        if members.len() < 2 {
+        if members.len() != 2 {
             continue;
         }
         let (keep, keep_sv, _) = members[0];
         let keep_sp = topo.vertex(keep_sv)?.point();
-        for &(dup, dup_sv, _) in &members[1..] {
-            let dup_sp = topo.vertex(dup_sv)?.point();
-            let same_dir = (dup_sp - keep_sp).length() < WELD;
-            replace.insert(dup, (keep, same_dir));
-        }
+        let (dup, dup_sv, _) = members[1];
+        let dup_sp = topo.vertex(dup_sv)?.point();
+        let same_dir = (dup_sp - keep_sp).length() < WELD;
+        replace.insert(dup, (keep, same_dir));
     }
     if replace.is_empty() {
         return Ok(());
@@ -1280,4 +1322,99 @@ pub(crate) fn propagate_orientation(
         log::debug!("propagate_orientation: flipped {flipped} faces");
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    #![allow(clippy::expect_used)]
+
+    use std::collections::HashSet;
+
+    use super::*;
+
+    #[test]
+    fn weld_does_not_collapse_three_coincident_free_edges() {
+        let mut topo = Topology::new();
+        let mut faces = Vec::new();
+
+        for _ in 0..3 {
+            let start = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 0.0), 1e-7));
+            let end = topo.add_vertex(Vertex::new(Point3::new(1.0, 0.0, 0.0), 1e-7));
+            let edge = topo.add_edge(Edge::new(start, end, EdgeCurve::Line));
+            let wire = topo.add_wire(
+                Wire::new(vec![OrientedEdge::new(edge, true)], false).expect("open wire"),
+            );
+            faces.push(topo.add_face(Face::new(
+                wire,
+                Vec::new(),
+                FaceSurface::Plane {
+                    normal: Vec3::new(0.0, 0.0, 1.0),
+                    d: 0.0,
+                },
+            )));
+        }
+
+        weld_coincident_free_edges(&mut topo, &faces).expect("weld pass");
+
+        let remaining: HashSet<_> = faces
+            .iter()
+            .map(|&face| {
+                let wire = topo.face(face).expect("face").outer_wire();
+                topo.wire(wire).expect("wire").edges()[0].edge()
+            })
+            .collect();
+        assert_eq!(remaining.len(), 3, "ambiguous weld group must stay open");
+    }
+
+    #[test]
+    fn near_pinch_outside_closure_tolerance_keeps_cross_edge() {
+        let origin = Point3::new(0.0, 0.0, 0.0);
+
+        assert!(is_pinched(origin, Point3::new(5e-8, 0.0, 0.0)));
+        assert!(!is_pinched(origin, Point3::new(5e-6, 0.0, 0.0)));
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn straight_contact_edge_does_not_match_curved_stripe_contact() {
+        let start = Point3::new(0.0, 0.0, 0.0);
+        let end = Point3::new(1.0, 0.0, 0.0);
+        let curved = NurbsCurve::new(
+            2,
+            vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            vec![start, Point3::new(0.5, 0.5, 0.0), end],
+            vec![1.0, 1.0, 1.0],
+        )
+        .expect("valid quadratic NURBS");
+
+        assert!(!contact_geometry_matches(
+            &EdgeCurve::Line,
+            start,
+            end,
+            &curved,
+            1e-5,
+        ));
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn straight_contact_matches_nonuniform_linear_nurbs() {
+        let start = Point3::new(0.0, 0.0, 0.0);
+        let end = Point3::new(1.0, 0.0, 0.0);
+        let nonuniform = NurbsCurve::new(
+            1,
+            vec![0.0, 0.0, 0.5, 1.0, 1.0],
+            vec![start, Point3::new(0.9, 0.0, 0.0), end],
+            vec![1.0, 1.0, 1.0],
+        )
+        .expect("valid linear NURBS");
+
+        assert!(contact_geometry_matches(
+            &EdgeCurve::Line,
+            start,
+            end,
+            &nonuniform,
+            1e-5,
+        ));
+    }
 }

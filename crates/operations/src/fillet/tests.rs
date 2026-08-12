@@ -81,6 +81,42 @@ fn fillet_result_is_manifold() {
 }
 
 #[test]
+fn edge_use_check_rejects_over_shared_edges() {
+    use brepkit_math::vec::Vec3;
+    use brepkit_topology::edge::{Edge, EdgeCurve};
+    use brepkit_topology::face::Face;
+    use brepkit_topology::shell::Shell;
+    use brepkit_topology::solid::Solid;
+    use brepkit_topology::vertex::Vertex;
+    use brepkit_topology::wire::{OrientedEdge, Wire};
+
+    let mut topo = Topology::new();
+    let start = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 0.0), 1e-7));
+    let end = topo.add_vertex(Vertex::new(Point3::new(1.0, 0.0, 0.0), 1e-7));
+    let edge = topo.add_edge(Edge::new(start, end, EdgeCurve::Line));
+    let mut faces = Vec::new();
+    for _ in 0..3 {
+        let wire = topo
+            .add_wire(Wire::new(vec![OrientedEdge::new(edge, true)], false).expect("open wire"));
+        faces.push(topo.add_face(Face::new(
+            wire,
+            Vec::new(),
+            FaceSurface::Plane {
+                normal: Vec3::new(0.0, 0.0, 1.0),
+                d: 0.0,
+            },
+        )));
+    }
+    let shell = topo.add_shell(Shell::new(faces).expect("shell"));
+    let solid = topo.add_solid(Solid::new(shell, Vec::new()));
+
+    assert_eq!(
+        solid_edge_use_issues(&topo, solid).expect("edge-use check"),
+        (false, true)
+    );
+}
+
+#[test]
 fn fillet_zero_radius_error() {
     let mut topo = Topology::new();
     let cube = make_unit_cube_manifold(&mut topo);
