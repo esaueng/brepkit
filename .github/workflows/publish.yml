@@ -156,7 +156,9 @@ jobs:
       # execute third-party build scripts, so it must never share a process,
       # workspace, or Git directory with a repository write token.
       - name: Archive generated package
-        run: tar -czf committed-wasm-package.tar.gz crates/wasm/pkg
+        # Use the system binary by absolute path: build scripts can append a
+        # malicious replacement to GITHUB_PATH for later steps in this job.
+        run: /usr/bin/tar -czf committed-wasm-package.tar.gz crates/wasm/pkg
 
       - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
         with:
@@ -193,12 +195,20 @@ jobs:
 
       - name: Install generated package
         run: |
-          rm -rf crates/wasm/pkg
-          tar -xzf committed-wasm-package.tar.gz
+          # Do not extract an artifact produced by untrusted build-time code
+          # into the checkout. The installer accepts only regular files and
+          # directories beneath crates/wasm/pkg and writes only to that tree.
+          /usr/bin/python3 scripts/install-wasm-package-archive.py \
+            committed-wasm-package.tar.gz crates/wasm/pkg
 
       - name: Commit refreshed package
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
+          # Disable every Git hook, including post-commit and pre-push hooks
+          # that --no-verify does not suppress, while a write token is present.
+          GIT_CONFIG_COUNT: 1
+          GIT_CONFIG_KEY_0: core.hooksPath
+          GIT_CONFIG_VALUE_0: /dev/null
         run: |
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
