@@ -223,7 +223,7 @@ const TRIM_SAMPLES_PER_EDGE: usize = 16;
 /// parameter span well inside [`NURBS_DOMAIN_PAD`].
 const NURBS_TRIM_SAMPLES_PER_EDGE: usize = 8;
 
-/// Roughly how many boundary samples one NURBS face may spend on recovery.
+/// Maximum number of boundary samples one NURBS face may spend on recovery.
 ///
 /// Per-edge sampling alone makes the cost scale with edge count, and a face
 /// carved up by neighbouring features can carry dozens of edges — the same
@@ -232,6 +232,22 @@ const NURBS_TRIM_SAMPLES_PER_EDGE: usize = 8;
 /// bounded, and costs such a face nothing: its own edge endpoints already
 /// resolve the boundary finely.
 const NURBS_TRIM_SAMPLE_BUDGET: usize = 64;
+
+/// Evenly reduce boundary samples to the fixed NURBS inversion budget.
+///
+/// Sampling first and then reducing keeps coverage spread over the outer and
+/// inner wires while placing a hard bound on both the duplicate filtering and
+/// surface inversion performed by [`nurbs_patch_domain`].
+fn limit_nurbs_trim_samples(samples: Vec<Point3>) -> Vec<Point3> {
+    if samples.len() <= NURBS_TRIM_SAMPLE_BUDGET {
+        return samples;
+    }
+
+    let last = samples.len() - 1;
+    (0..NURBS_TRIM_SAMPLE_BUDGET)
+        .map(|i| samples[i * last / (NURBS_TRIM_SAMPLE_BUDGET - 1)])
+        .collect()
+}
 
 /// Newton tolerance for inverting a boundary sample onto its NURBS surface.
 ///
@@ -452,7 +468,7 @@ fn nurbs_patch_domain(
         .checked_div(face_boundary_edge_count(topo, face_id))
         .unwrap_or(NURBS_TRIM_SAMPLES_PER_EDGE)
         .clamp(1, NURBS_TRIM_SAMPLES_PER_EDGE);
-    let pts = face_boundary_samples(topo, face_id, per_edge);
+    let pts = limit_nurbs_trim_samples(face_boundary_samples(topo, face_id, per_edge));
     if pts.is_empty() {
         return PatchDomain {
             u: full_u,
@@ -857,5 +873,30 @@ fn expand_cone_at_vertices(
                 Point3::new(coa.x() + r * sx, coa.y() + r * sy, coa.z() + r * sz),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn nurbs_trim_samples_are_strictly_bounded_and_span_input() {
+        let samples: Vec<_> = (0..1_024)
+            .map(|i| Point3::new(f64::from(i), 0.0, 0.0))
+            .collect();
+
+        let limited = limit_nurbs_trim_samples(samples);
+
+        assert_eq!(limited.len(), NURBS_TRIM_SAMPLE_BUDGET);
+        assert_eq!(limited.first().map(|point| point.x()), Some(0.0));
+        assert_eq!(limited.last().map(|point| point.x()), Some(1_023.0));
+    }
+
+    #[test]
+    fn nurbs_trim_samples_below_budget_are_preserved() {
+        let samples = vec![Point3::new(1.0, 2.0, 3.0), Point3::new(4.0, 5.0, 6.0)];
+
+        assert_eq!(limit_nurbs_trim_samples(samples.clone()), samples);
     }
 }
