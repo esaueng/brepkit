@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786555134340,
+  "lastUpdate": 1786555280455,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7937,6 +7937,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 24306233,
             "range": "± 1283704",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "a0c0ffbf06af7dfca07e58abe1ff5bc98a42f0e9",
+          "message": "Merge pull request #179 from esaueng/codex/propose-fix-for-cpu-dos-vulnerability-ynx46y\n\nfix(check): bound curved face trim integration",
+          "timestamp": "2026-08-12T13:18:19-04:00",
+          "tree_id": "b96af090c9c08722729b5ad56d93754c39ef45cb",
+          "url": "https://github.com/esaueng/brepkit/commit/a0c0ffbf06af7dfca07e58abe1ff5bc98a42f0e9"
+        },
+        "date": 1786555279073,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 643700,
+            "range": "± 27742",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 697346,
+            "range": "± 74054",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 9043,
+            "range": "± 696",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 557950,
+            "range": "± 15175",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17991022,
+            "range": "± 964382",
             "unit": "ns/iter"
           }
         ]
