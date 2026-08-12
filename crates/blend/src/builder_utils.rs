@@ -5,6 +5,7 @@
 //! blend faces and sampling contact curves.
 
 use brepkit_math::nurbs::curve::NurbsCurve;
+use brepkit_math::tolerance::Tolerance;
 use brepkit_math::traits::ParametricSurface;
 use brepkit_math::vec::{Point3, Vec3};
 use brepkit_topology::Topology;
@@ -15,6 +16,10 @@ use brepkit_topology::wire::{OrientedEdge, Wire, WireId};
 
 use crate::BlendError;
 use crate::stripe::Stripe;
+
+fn is_pinched(a: Point3, b: Point3) -> bool {
+    (a - b).length() <= Tolerance::new().linear
+}
 
 /// Sample the start and end points of a NURBS curve.
 #[must_use]
@@ -100,10 +105,11 @@ pub fn create_blend_face_with_contacts(
     // pinched end SHARES one vertex entity between the two contact curves
     // (the cross edge is skipped below, and separate entities would leave
     // the wire closed only positionally, not at entity level — see the
-    // closure tolerance note: validation treats vertices as coincident at
-    // 1e-7, tighter than the 1e-5 weld distance used here).
-    let end_degenerate = (p1_end - p2_end).length() < WELD;
-    let start_degenerate = (p2_start - p1_start).length() < WELD;
+    // closure tolerance note: only omit an edge when wire validation also
+    // treats its endpoints as coincident. The broader weld band is for edge
+    // adoption and must not be used to classify a cross edge as degenerate.
+    let end_degenerate = is_pinched(p1_end, p2_end);
+    let start_degenerate = is_pinched(p2_start, p1_start);
 
     // Create/reuse vertices (snapshot then allocate).
     let (v1s, v1e) = adopt1.map_or_else(
@@ -1302,6 +1308,14 @@ pub(crate) fn propagate_orientation(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn near_pinch_outside_closure_tolerance_keeps_cross_edge() {
+        let origin = Point3::new(0.0, 0.0, 0.0);
+
+        assert!(is_pinched(origin, Point3::new(5e-8, 0.0, 0.0)));
+        assert!(!is_pinched(origin, Point3::new(5e-6, 0.0, 0.0)));
+    }
 
     #[test]
     #[allow(clippy::expect_used)]
