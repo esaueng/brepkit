@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786554037222,
+  "lastUpdate": 1786555134340,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7883,6 +7883,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14602183,
             "range": "± 238649",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "3536d887b5541e7f0ee5c3053e0c3b68070cf410",
+          "message": "Merge pull request #176 from esaueng/codex/fix-vulnerability-in-manual-workflow-dispatch\n\nfix(ci): restrict manual package sync to main and pin checkout/push",
+          "timestamp": "2026-08-12T13:16:34-04:00",
+          "tree_id": "6c9c79f1f871e1151c21eee79b2be89b54f1eacc",
+          "url": "https://github.com/esaueng/brepkit/commit/3536d887b5541e7f0ee5c3053e0c3b68070cf410"
+        },
+        "date": 1786555132390,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 597235,
+            "range": "± 94027",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 874762,
+            "range": "± 74978",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7472,
+            "range": "± 635",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 631845,
+            "range": "± 72629",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 24306233,
+            "range": "± 1283704",
             "unit": "ns/iter"
           }
         ]
