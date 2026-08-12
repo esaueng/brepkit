@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786558619343,
+  "lastUpdate": 1786559679662,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8963,6 +8963,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 20572710,
             "range": "± 3022183",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cbd5d8b6d85fffddf9c8c2430a2dd09d35434755",
+          "message": "Merge pull request #202 from esaueng/codex/fix-nurbs-bounding-box-vulnerability\n\nBound NURBS trim sampling to prevent quadratic CPU DoS",
+          "timestamp": "2026-08-12T14:31:57-04:00",
+          "tree_id": "3cf0cd6f70b90d3215cd9b5414bb727132b49d63",
+          "url": "https://github.com/esaueng/brepkit/commit/cbd5d8b6d85fffddf9c8c2430a2dd09d35434755"
+        },
+        "date": 1786559678280,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 822575,
+            "range": "± 136526",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1064183,
+            "range": "± 161347",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12035,
+            "range": "± 1475",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 659811,
+            "range": "± 91745",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 19706165,
+            "range": "± 3454165",
             "unit": "ns/iter"
           }
         ]
