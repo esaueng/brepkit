@@ -1260,6 +1260,8 @@ pub(super) fn hole_removal_seeds(
     use brepkit_math::predicates::point_in_polygon;
     use brepkit_math::vec::Point2;
 
+    const PARENT_SEARCH_BUDGET_PER_WIRE: usize = 64;
+
     let polys: Vec<Vec<Point2>> = inner_wire_ranges
         .iter()
         .map(|&(start, end)| (start..end).map(|i| pts2d[i]).collect())
@@ -1291,34 +1293,68 @@ pub(super) fn hole_removal_seeds(
         })
         .collect();
 
-    let mut out = Vec::new();
-    for (i, seed) in seeds.iter().enumerate() {
-        let Some(seed) = *seed else { continue };
+    // Process smaller boxes first.  For valid, non-intersecting face wires the
+    // first larger polygon containing a wire is its immediate parent.  This
+    // turns concentric inputs from an all-pairs containment pass into one test
+    // per wire.
+    let mut order: Vec<usize> = (0..polys.len()).collect();
+    order.sort_by(|&a, &b| {
+        let area = |bbox: Option<(f64, f64, f64, f64)>| {
+            bbox.map_or(f64::INFINITY, |(x0, y0, x1, y1)| (x1 - x0) * (y1 - y0))
+        };
+        area(boxes[a]).total_cmp(&area(boxes[b]))
+    });
+
+    // Bounding boxes can overlap without their wires nesting.  Bound those
+    // rejected candidates as well, so a face made from many interlocking thin
+    // boxes cannot restore quadratic CPU work.  Ordinary wires find their
+    // parent immediately (or have disjoint bounds), leaving ample headroom.
+    let mut search_budget = polys.len().saturating_mul(PARENT_SEARCH_BUDGET_PER_WIRE);
+    let mut parents = vec![None; polys.len()];
+    let mut unconditional = vec![false; polys.len()];
+    for (position, &i) in order.iter().enumerate() {
+        let Some(seed) = seeds[i] else { continue };
         // `find_interior_seed` falls back to the centroid when no vertex
         // bisector candidate lands inside, and that fallback can sit outside a
         // sufficiently degenerate wire. Depth measured from a point that is not
         // in its own wire is meaningless, so drop back to the pre-nesting
         // behaviour — flood from it unconditionally — rather than guess.
         if !point_in_polygon(seed, &polys[i]) {
-            out.push(seed);
+            unconditional[i] = true;
             continue;
         }
-        let mut depth = 1;
-        for (j, poly) in polys.iter().enumerate() {
-            if j == i {
-                continue;
-            }
+        for &j in &order[position + 1..] {
             let Some((x0, y0, x1, y1)) = boxes[j] else {
                 continue;
             };
             if seed.x() < x0 || seed.x() > x1 || seed.y() < y0 || seed.y() > y1 {
                 continue;
             }
-            if point_in_polygon(seed, poly) {
-                depth += 1;
+            if search_budget == 0 {
+                // Preserve the old safe fallback: an unclassified wire is
+                // treated as a hole rather than allowing attacker-controlled
+                // topology to consume unbounded CPU.
+                break;
+            }
+            search_budget -= 1;
+            if point_in_polygon(seed, &polys[j]) {
+                parents[i] = Some(j);
+                break;
             }
         }
-        if depth % 2 == 1 {
+    }
+
+    // Parents always have larger boxes, so reverse order computes each parent
+    // depth before its children without another containment query.
+    let mut depths = vec![1usize; polys.len()];
+    let mut out = Vec::new();
+    for &i in order.iter().rev() {
+        if let Some(parent) = parents[i] {
+            depths[i] = depths[parent] + 1;
+        }
+        if let Some(seed) = seeds[i]
+            && (unconditional[i] || depths[i] % 2 == 1)
+        {
             out.push(seed);
         }
     }
@@ -1786,4 +1822,31 @@ pub(super) fn run_planar_cdt(
     }
 
     Ok((result, steiner))
+}
+
+#[cfg(test)]
+mod hole_seed_tests {
+    use super::hole_removal_seeds;
+    use brepkit_math::vec::Point2;
+
+    #[test]
+    fn concentric_wires_keep_even_odd_parity_at_scale() {
+        let wire_count = 1_000;
+        let mut points = Vec::with_capacity(wire_count * 3);
+        let mut ranges = Vec::with_capacity(wire_count);
+        for i in 0..wire_count {
+            let radius = (wire_count - i) as f64;
+            let start = points.len();
+            points.extend([
+                Point2::new(0.0, radius),
+                Point2::new(-radius, -radius),
+                Point2::new(radius, -radius),
+            ]);
+            ranges.push((start, points.len()));
+        }
+
+        let seeds = hole_removal_seeds(&points, &ranges);
+
+        assert_eq!(seeds.len(), wire_count / 2);
+    }
 }

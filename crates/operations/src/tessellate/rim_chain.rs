@@ -27,6 +27,16 @@ pub fn collect_full_turn_rim_cycles(
     project_u: &dyn Fn(Point3) -> f64,
     expected_cycles: usize,
 ) -> Result<Option<Vec<RimCycle>>, crate::OperationsError> {
+    let cycles = collect_full_turn_rim_cycles_any(topo, curved, project_u)?;
+    Ok(cycles.filter(|cycles| cycles.len() == expected_cycles))
+}
+
+/// Collect all full-turn rim cycles without requiring a particular count.
+pub fn collect_full_turn_rim_cycles_any(
+    topo: &Topology,
+    curved: &[(usize, VertexId, VertexId)],
+    project_u: &dyn Fn(Point3) -> f64,
+) -> Result<Option<Vec<RimCycle>>, crate::OperationsError> {
     let mut by_vertex: HashMap<VertexId, Vec<usize>> = HashMap::new();
     for (position, &(_, start, end)) in curved.iter().enumerate() {
         by_vertex.entry(start).or_default().push(position);
@@ -98,10 +108,13 @@ pub fn collect_full_turn_rim_cycles(
             let u0 = project_u(topo.vertex(from)?.point());
             let u1 = project_u(topo.vertex(to)?.point());
             let u_mid = project_u(midpoint);
+            if !u0.is_finite() || !u1.is_finite() || !u_mid.is_finite() {
+                return Ok(None);
+            }
             winding += wrap_pi(u_mid - u0) + wrap_pi(u1 - u_mid);
             traversal_vertex = Some(to);
         }
-        if !has_closed_edge && (winding.abs() - TAU).abs() > 1e-6 {
+        if !has_closed_edge && (!winding.is_finite() || (winding.abs() - TAU).abs() > 1e-6) {
             return Ok(None);
         }
 
@@ -114,9 +127,6 @@ pub fn collect_full_turn_rim_cycles(
         });
     }
 
-    if cycles.len() != expected_cycles {
-        return Ok(None);
-    }
     Ok(Some(cycles))
 }
 
@@ -181,6 +191,25 @@ mod tests {
         let cycles =
             collect_full_turn_rim_cycles(&topo, &curved, &|point| circle.project(point), 2)
                 .unwrap();
+
+        assert!(cycles.is_none());
+    }
+
+    #[test]
+    fn non_finite_projection_is_not_a_rim_cycle() {
+        let circle =
+            Circle3D::new(Point3::new(0.0, 0.0, 0.0), Vec3::new(0.0, 0.0, 1.0), 2.0).unwrap();
+        let mut topo = Topology::new();
+        let start = topo.add_vertex(Vertex::new(circle.evaluate(0.0), 1e-7));
+        let split = topo.add_vertex(Vertex::new(circle.evaluate(std::f64::consts::PI), 1e-7));
+        let first = topo.add_edge(Edge::new(start, split, EdgeCurve::Circle(circle.clone())));
+        let second = topo.add_edge(Edge::new(split, start, EdgeCurve::Circle(circle)));
+        let curved = [
+            (first.index(), start, split),
+            (second.index(), split, start),
+        ];
+
+        let cycles = collect_full_turn_rim_cycles(&topo, &curved, &|_| f64::NAN, 1).unwrap();
 
         assert!(cycles.is_none());
     }

@@ -985,6 +985,9 @@ pub fn boolean_with_options(
     Ok(result)
 }
 
+/// Maximum number of tools accepted by [`compound_cut`].
+pub const MAX_COMPOUND_CUT_TOOLS: usize = 256;
+
 /// Sequential compound cut via GFA.
 ///
 /// Cuts the `target` solid by each tool in order using sequential
@@ -992,13 +995,22 @@ pub fn boolean_with_options(
 ///
 /// # Errors
 ///
-/// Returns an error if any individual cut fails.
+/// Returns an error if the tool count exceeds [`MAX_COMPOUND_CUT_TOOLS`] or
+/// any individual cut fails.
 pub fn compound_cut(
     topo: &mut Topology,
     target: SolidId,
     tools: &[SolidId],
     opts: BooleanOptions,
 ) -> Result<SolidId, crate::OperationsError> {
+    if tools.len() > MAX_COMPOUND_CUT_TOOLS {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: format!(
+                "compound_cut accepts at most {MAX_COMPOUND_CUT_TOOLS} tools, got {}",
+                tools.len()
+            ),
+        });
+    }
     // Batched fast path: merge the tools into one multi-piece solid and cut
     // ONCE. Sequential cutting re-runs the full boolean pipeline against the
     // whole target per tool — O(target × tools); the lite magnet-drill pass
@@ -1007,7 +1019,10 @@ pub fn compound_cut(
     // identical. Tools are first grouped into AABB-overlap clusters
     // (union-find): tools in one cluster get a real fuse (the coaxial
     // magnet+screw drill pair), while the pairwise-disjoint cluster
-    // representatives merge via the free disjoint-shell shortcut.
+    // representatives are copied once and joined by a single disjoint-shell
+    // merge. Avoid folding through `boolean(Fuse)` here: that shortcut copies
+    // the growing accumulator on every iteration and retains quadratic
+    // topology in the arena.
     //
     // A SINGLE cluster batches too. That case used to fall through to the
     // sequential loop on the assumption that fusing one overlapping blob costs
@@ -1031,25 +1046,17 @@ pub fn compound_cut(
         // grinds against it (11 s and lost cones on a 4x4 baseplate, #1488).
         // A fallback-tainted merge is a FAILED merge for batching purposes:
         // the sequential per-tool cuts are exact and never see the tangency.
-        // Taint propagates as Err from `fuse_cluster` and from the cross-
-        // cluster merge fuses below, so a discarded merge never touches the
-        // public fallback counter.
-        let merged = clusters.iter().try_fold(None::<SolidId>, |acc, cluster| {
-            let fused = fuse_cluster(topo, cluster)?;
-            match acc {
-                None => Ok(Some(fused)),
-                Some(prev) => {
-                    let m = boolean_inner(topo, BooleanOp::Fuse, prev, fused)?;
-                    if LAST_USED_MESH_FALLBACK.with(std::cell::Cell::take) {
-                        return Err(crate::OperationsError::InvalidInput {
-                            reason: "cluster merge degraded to mesh fallback".to_string(),
-                        });
-                    }
-                    Ok(Some(m))
-                }
-            }
-        });
-        if let Ok(Some(tool)) = merged
+        // Taint propagates as Err from `fuse_cluster`, so a discarded merge
+        // never touches the public fallback counter.
+        let merged = clusters
+            .iter()
+            .map(|cluster| {
+                let fused = fuse_cluster(topo, cluster)?;
+                crate::copy::copy_solid(topo, fused)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(|solids| crate::compound_ops::merge_disjoint_solids(topo, &solids));
+        if let Ok(tool) = merged
             && let Ok(cut) = boolean(topo, BooleanOp::Cut, target, tool)
         {
             result = cut;
@@ -1229,10 +1236,26 @@ pub fn boolean_with_evolution(
             let healed_ok = crate::heal::remove_degenerate_edges(topo, result, tol.linear).is_ok()
                 && crate::heal::remove_wire_spurs(topo, result).is_ok();
 
+            // Apply the same semantic safety checks as the standard GFA path.
+            // Structural validation alone cannot detect a closed Cut result
+            // that incorrectly retains the tool interior.
+            let components = crate::boolean::assembly::face_components(topo, result);
+            let cut_safe = op != BooleanOp::Cut
+                || brepkit_algo::classifier::try_build_analytic_classifier(topo, b)
+                    .as_ref()
+                    .is_none_or(|cls_b| {
+                        all_component_centers_outside(topo, &components, cls_b, tol)
+                    });
+            let semantic_ok = is_closed_manifold(topo, result).is_ok_and(|closed| closed)
+                && (op != BooleanOp::Intersect
+                    || has_free_edges(topo, result).is_ok_and(|free| !free))
+                && cut_safe
+                && operands_are_represented(topo, op, result, a, b, tol);
+
             // Trust the faithful path only if its result is valid; otherwise
             // fall through to boolean()'s full pipeline (fast paths + mesh
             // fallback + validation), matching boolean()'s contract.
-            if healed_ok && validate_boolean_result(topo, result).is_ok() {
+            if healed_ok && semantic_ok && validate_boolean_result(topo, result).is_ok() {
                 let mut evo = crate::evolution::EvolutionMap::exact();
                 let mut sourced: HashSet<usize> = HashSet::default();
                 for (out_idx, src) in origins {
@@ -2281,9 +2304,12 @@ fn aabbs_clear_gap(
 /// a clear gap: every connected face component of `a` is separated from every
 /// connected face component of `b` by more than `margin` on some axis.
 ///
-/// Soundness: component AABBs come from [`crate::measure::face_set_bounding_box`],
-/// which is a conservative *outer* bound (vertices plus surface-curvature
-/// expansion). If two components' true geometry overlapped or touched, their
+/// Soundness: components containing NURBS faces are rejected because their
+/// sampled bounding boxes are not guaranteed to contain every surface
+/// extremum. The remaining component AABBs come from
+/// [`crate::measure::face_set_bounding_box`] and are conservative *outer*
+/// bounds (vertices plus analytic surface-curvature expansion). If two
+/// components' true geometry overlapped or touched, their
 /// boxes would touch or overlap and [`aabbs_clear_gap`] would (correctly)
 /// return `false`. So a `true` result guarantees a real positive gap between
 /// the two solids — never a false "disjoint" for touching/coincident inputs,
@@ -2306,7 +2332,17 @@ fn solids_provably_disjoint(topo: &Topology, a: SolidId, b: SolidId, margin: f64
     let boxes = |comps: &[Vec<FaceId>]| -> Option<Vec<brepkit_math::aabb::Aabb3>> {
         comps
             .iter()
-            .map(|faces| crate::measure::face_set_bounding_box(topo, faces).ok())
+            .map(|faces| {
+                let has_nurbs = faces.iter().try_fold(false, |has_nurbs, &face_id| {
+                    topo.face(face_id)
+                        .map(|face| has_nurbs || matches!(face.surface(), FaceSurface::Nurbs(_)))
+                        .ok()
+                })?;
+                if has_nurbs {
+                    return None;
+                }
+                crate::measure::face_set_bounding_box(topo, faces).ok()
+            })
             .collect()
     };
     let (Some(boxes_a), Some(boxes_b)) = (boxes(&comps_a), boxes(&comps_b)) else {
@@ -2948,7 +2984,9 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
         })
         .collect();
 
-    // Reject NESTING, not mere AABB overlap.
+    // AABB separation proves disjointness. Overlap requires a narrow-phase
+    // surface test: neither containment nor topological validation rules out
+    // partially intersecting closed components.
     //
     // Nesting is the hazard worth rejecting (a blob sitting inside another
     // piece's cavity is not a disjoint union); side-by-side pieces are exactly
@@ -2963,15 +3001,6 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
     // available here; the ray-parity confirmation below earns the answer
     // instead of inferring it.
     //
-    // Overlap is the wrong predicate for that, because an AABB is only tight on
-    // axis-aligned geometry. Two ROTATED bars a clear distance apart each span
-    // the whole diagonal envelope, so their boxes interpenetrate and an
-    // overlap test calls them touching — which is why a kumiko lattice cut,
-    // whose members are diagonal, could never be accepted and fell back to the
-    // mesh path on every band (see
-    // `tests::rotated_separate_pieces_are_recognised_as_disjoint`). Containment
-    // is tight in the direction that matters: nesting implies it, and rotation
-    // does not manufacture it.
     let eps = COMPONENT_OVERLAP_MARGIN_MM;
     let contains = |(o_min, o_max): (Point3, Point3), (i_min, i_max): (Point3, Point3)| {
         o_min.x() - eps <= i_min.x()
@@ -2989,6 +3018,49 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
     // pair falls back to the conservative answer.
     for i in 0..aabbs.len() {
         for j in (i + 1)..aabbs.len() {
+            let (a_min, a_max) = aabbs[i];
+            let (b_min, b_max) = aabbs[j];
+            let overlaps = a_min.x() <= b_max.x() + eps
+                && a_max.x() + eps >= b_min.x()
+                && a_min.y() <= b_max.y() + eps
+                && a_max.y() + eps >= b_min.y()
+                && a_min.z() <= b_max.z() + eps
+                && a_max.z() + eps >= b_min.z();
+            if !overlaps {
+                continue;
+            }
+
+            let span = Point3::new(
+                a_max.x().max(b_max.x()) - a_min.x().min(b_min.x()),
+                a_max.y().max(b_max.y()) - a_min.y().min(b_min.y()),
+                a_max.z().max(b_max.z()) - a_min.z().min(b_min.z()),
+            );
+            let diagonal = (span.x().powi(2) + span.y().powi(2) + span.z().powi(2)).sqrt();
+            let deflection = (diagonal / 200.0).max(1e-4);
+            let mut meshes = [Vec::new(), Vec::new()];
+            for (slot, component) in [&components[i], &components[j]].into_iter().enumerate() {
+                for &fid in component {
+                    let Ok(mesh) = crate::tessellate::tessellate_with_uvs(topo, fid, deflection)
+                    else {
+                        return false;
+                    };
+                    for tri in mesh.mesh.indices.chunks_exact(3) {
+                        meshes[slot].push([
+                            mesh.mesh.positions[tri[0] as usize],
+                            mesh.mesh.positions[tri[1] as usize],
+                            mesh.mesh.positions[tri[2] as usize],
+                        ]);
+                    }
+                }
+            }
+            if meshes[0].iter().any(|&a| {
+                meshes[1]
+                    .iter()
+                    .any(|&b| crate::mesh_boolean::triangle_surfaces_intersect(a, b, eps))
+            }) {
+                return false;
+            }
+
             let (outer, inner) = if contains(aabbs[i], aabbs[j]) {
                 (i, j)
             } else if contains(aabbs[j], aabbs[i]) {
