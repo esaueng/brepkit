@@ -810,42 +810,6 @@ fn boolean_inner(
                     );
                     return Ok(result);
                 }
-                // Tangent-pinch acceptance (Fuse only): operands touching
-                // along a line — a box fused to a box sharing one edge, or a
-                // cylinder whose wall is tangent to a box's corner edge —
-                // produce a result that is CORRECT (exact volume, every
-                // material probe Inside) but inherently non-manifold at the
-                // contact line: the pinch edge is used by exactly 4 faces, and
-                // no fallback can make it manifold (the mesh boolean's output
-                // pinches identically, so these cases used to hard-fail with
-                // NonManifoldResult). Accept the GFA result when the ONLY
-                // defects are genuine pinches:
-                // - no free edges, no unclosed wires, no inner-shell surplus;
-                // - every over-shared edge is used exactly 4 times and its
-                //   midpoint lies ON BOTH operands' boundaries (a true contact
-                //   line — a damaged shell's over-shared edges fail this);
-                // - Euler balances with one extra unit per pinch edge (each
-                //   pinch identifies a vertex pair and an edge across the two
-                //   wedges: χ = 2 + pinches for a single pinched component).
-                if op == BooleanOp::Fuse
-                    && inner_shell_surplus == 0
-                    && open_shell_ok
-                    && operands_are_represented(topo, op, result, a, b, tol)
-                    && let Some(pinches) = tangent_pinch_count(topo, result, a, b)
-                    && pinches > 0
-                    && euler_balanced(
-                        euler - i64::try_from(pinches).unwrap_or(i64::MAX),
-                        inner_wire_count,
-                        1,
-                    )
-                {
-                    log::info!(
-                        "GFA tangent-pinch fuse accepted in {:.1}ms ({result_faces} faces, \
-                         {pinches} pinch edge(s))",
-                        timer_elapsed_ms(gfa_start)
-                    );
-                    return Ok(result);
-                }
                 // Which gate refused? Both acceptance paths are conjunctions,
                 // so the bare rejection below says nothing about the cause —
                 // and when `validate` is None the result is topologically fine
@@ -2883,13 +2847,26 @@ pub(crate) fn component_encloses_point(
     p: Point3,
     deflection: f64,
 ) -> Option<bool> {
+    component_encloses_any_point(topo, faces, &[p], deflection)
+}
+
+/// Does the closed surface made of `faces` enclose any of `points`?
+///
+/// Tessellates the component only once, which keeps multi-probe validation from
+/// repeating the expensive face tessellation for every boundary vertex.
+pub(crate) fn component_encloses_any_point(
+    topo: &Topology,
+    faces: &[FaceId],
+    points: &[Point3],
+    deflection: f64,
+) -> Option<bool> {
     // A sqrt-prime direction: irrational in every component, so the ray cannot
     // lie in a face plane or run along an edge — the same generic-direction
     // escape the ray-cast classifier uses for degenerate probes.
     let dir = Vec3::new(2.0_f64.sqrt(), 3.0_f64.sqrt(), 5.0_f64.sqrt())
         .normalize()
         .ok()?;
-    let mut crossings = 0usize;
+    let mut crossings = vec![0usize; points.len()];
     let mut any_triangle = false;
     for &fid in faces {
         let mesh = crate::tessellate::tessellate_with_uvs(topo, fid, deflection).ok()?;
@@ -2901,15 +2878,17 @@ pub(crate) fn component_encloses_point(
                 pos[tri[2] as usize],
             );
             any_triangle = true;
-            if let Some(hit) =
-                brepkit_math::ray_triangle::watertight_ray_triangle_intersect(p, dir, a, b, c)
-                && hit.t > 1e-9
-            {
-                crossings += 1;
+            for (&point, count) in points.iter().zip(&mut crossings) {
+                if let Some(hit) = brepkit_math::ray_triangle::watertight_ray_triangle_intersect(
+                    point, dir, a, b, c,
+                ) && hit.t > 1e-9
+                {
+                    *count += 1;
+                }
             }
         }
     }
-    any_triangle.then_some(crossings % 2 == 1)
+    any_triangle.then_some(crossings.into_iter().any(|count| count % 2 == 1))
 }
 
 /// Any vertex position on `faces`, for use as a probe point.
@@ -3325,71 +3304,6 @@ fn shell_is_closed_manifold(
         return Ok(false);
     }
     Ok(counts.values().all(|&c| c == 2))
-}
-
-/// Count genuine tangent-pinch edges, or `None` when the result carries any
-/// other topological defect.
-///
-/// A tangent-contact fuse (operands touching along a line — box∪box sharing
-/// one edge, a cylinder wall tangent to a box's corner edge) is inherently
-/// non-manifold at the contact line: four faces meet there and no
-/// representation choice can avoid it. Such a result is acceptable when it is
-/// otherwise pristine. Returns `Some(count)` iff:
-/// - no free edges and no unclosed wires;
-/// - every over-shared edge is used EXACTLY 4 times (two wedges of material);
-/// - each such edge's midpoint classifies `OnBoundary` against BOTH input
-///   operands (a true contact line; a damaged shell's over-shared edges are
-///   interior artifacts of one operand and fail this).
-///
-/// Classification errors return `None` — this acceptance is purely an
-/// upgrade, so unclassifiable geometry keeps the fallback behaviour.
-fn tangent_pinch_count(topo: &Topology, result: SolidId, a: SolidId, b: SolidId) -> Option<usize> {
-    let mut edge_uses: HashMap<brepkit_topology::edge::EdgeId, usize> = HashMap::default();
-    for fid in brepkit_topology::explorer::solid_faces(topo, result).ok()? {
-        let face = topo.face(fid).ok()?;
-        for wid in std::iter::once(face.outer_wire()).chain(face.inner_wires().iter().copied()) {
-            let wire = topo.wire(wid).ok()?;
-            if brepkit_topology::validation::validate_wire_closed(wire, topo).is_err() {
-                return None;
-            }
-            for oe in wire.edges() {
-                *edge_uses.entry(oe.edge()).or_insert(0) += 1;
-            }
-        }
-    }
-    if edge_uses.values().any(|&c| c == 1) {
-        return None;
-    }
-    let over: Vec<_> = edge_uses
-        .iter()
-        .filter(|&(_, &c)| c > 2)
-        .map(|(&eid, &c)| (eid, c))
-        .collect();
-    if over.iter().any(|&(_, c)| c != 4) {
-        return None;
-    }
-    // A point exactly on a corner edge classifies unreliably (the box∪box
-    // edge-touch midpoint reads Outside), so test contact by DISTANCE to
-    // each operand's boundary instead: a true contact line is at distance
-    // ~0 from both; a damaged shell's over-shared edge is interior to one
-    // operand and reads a positive distance from the other's boundary.
-    let contact_band = brepkit_math::tolerance::Tolerance::new().linear * 100.0;
-    for &(eid, _) in &over {
-        let edge = topo.edge(eid).ok()?;
-        let sp = topo.vertex(edge.start()).ok()?.point();
-        let ep = topo.vertex(edge.end()).ok()?.point();
-        let (d0, d1) = edge.curve().domain_with_endpoints(sp, ep);
-        let mid = edge
-            .curve()
-            .evaluate_with_endpoints(0.5 * (d0 + d1), sp, ep);
-        for operand in [a, b] {
-            let d = brepkit_check::distance::point_to_solid(topo, mid, operand).ok()?;
-            if d.distance > contact_band {
-                return None;
-            }
-        }
-    }
-    Some(over.len())
 }
 
 /// Check whether a solid's boundary has free edges: edges used by only
