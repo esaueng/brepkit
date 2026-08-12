@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786561251367,
+  "lastUpdate": 1786561389329,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9341,6 +9341,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14250526,
             "range": "± 322538",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c21b38dc53f34f9fc12070eb0a89a90211d3d76a",
+          "message": "Merge pull request #215 from esaueng/codex/fix-algorithmic-dos-vulnerability-in-ef-snap\n\nfix(algo): bound widened EF vertex lookup",
+          "timestamp": "2026-08-12T15:00:35-04:00",
+          "tree_id": "cca25d55e716981610c3a5280db2ff512056ffc1",
+          "url": "https://github.com/esaueng/brepkit/commit/c21b38dc53f34f9fc12070eb0a89a90211d3d76a"
+        },
+        "date": 1786561387866,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 651103,
+            "range": "± 35442",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 689714,
+            "range": "± 6592",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8845,
+            "range": "± 111",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 578584,
+            "range": "± 7055",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16294633,
+            "range": "± 1016653",
             "unit": "ns/iter"
           }
         ]
