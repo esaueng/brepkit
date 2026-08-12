@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786561000457,
+  "lastUpdate": 1786561127108,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9233,6 +9233,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 22010105,
             "range": "± 5779872",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7b3ad233fe9a558b7ea6b2a5e82be1bc28538667",
+          "message": "Merge pull request #212 from esaueng/codex/fix-unbounded-boolean-intersection-dos-vulnerability\n\nfix(operations): bound component intersection checks",
+          "timestamp": "2026-08-12T14:54:14-04:00",
+          "tree_id": "c023705837890fb87518312ca9c4348b1500df17",
+          "url": "https://github.com/esaueng/brepkit/commit/7b3ad233fe9a558b7ea6b2a5e82be1bc28538667"
+        },
+        "date": 1786561125677,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 548611,
+            "range": "± 29820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 574633,
+            "range": "± 9381",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7258,
+            "range": "± 177",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 482532,
+            "range": "± 12021",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16258374,
+            "range": "± 2394979",
             "unit": "ns/iter"
           }
         ]
