@@ -43,6 +43,36 @@ fn fuse_disjoint_cubes() {
 }
 
 #[test]
+fn nurbs_components_are_not_treated_as_provably_disjoint() {
+    use brepkit_math::nurbs::surface::NurbsSurface;
+
+    let mut topo = Topology::new();
+    let a = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 0.0);
+    let b = make_unit_cube_manifold_at(&mut topo, 5.0, 0.0, 0.0);
+    let face_id = brepkit_topology::explorer::solid_faces(&topo, a).unwrap()[0];
+    let nurbs = NurbsSurface::new(
+        1,
+        1,
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 1.0, 0.0)],
+            vec![Point3::new(1.0, 0.0, 0.0), Point3::new(1.0, 1.0, 0.0)],
+        ],
+        vec![vec![1.0, 1.0], vec![1.0, 1.0]],
+    )
+    .unwrap();
+    topo.face_mut(face_id)
+        .unwrap()
+        .set_surface(FaceSurface::Nurbs(nurbs));
+
+    assert!(
+        !solids_provably_disjoint(&topo, a, b, Tolerance::new().linear),
+        "sampled NURBS bounds must not authorize a disjoint boolean shortcut"
+    );
+}
+
+#[test]
 fn intersect_multi_piece_operand_keeps_disjoint_chunks() {
     // The lite divider clip: intersecting a multi-piece solid (two disjoint
     // cylinders merged into one solid) with a bar that crosses both
