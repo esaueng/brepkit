@@ -1016,6 +1016,36 @@ fn sealed_fragment_floating_inside_the_stock_is_reported_disconnected() {
 }
 
 #[test]
+fn partially_interpenetrating_components_are_reported_disconnected() {
+    let mut topo = Topology::new();
+    let a = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    let b = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    crate::transform::transform_solid(
+        &mut topo,
+        b,
+        &brepkit_math::mat::Mat4::translation(5.0, 5.0, 5.0),
+    )
+    .unwrap();
+
+    let a_shell = topo.solid(a).unwrap().outer_shell();
+    let b_shell = topo.solid(b).unwrap().outer_shell();
+    let mut faces = topo.shell(a_shell).unwrap().faces().to_vec();
+    faces.extend_from_slice(topo.shell(b_shell).unwrap().faces());
+    let shell = topo.add_shell(brepkit_topology::shell::Shell::new(faces).unwrap());
+    let malformed = topo.add_solid(brepkit_topology::solid::Solid::new(shell, vec![]));
+
+    let report = validate_solid(&topo, malformed).unwrap();
+    assert!(
+        report
+            .issues
+            .iter()
+            .any(|issue| issue.description.contains("disconnected")),
+        "partially interpenetrating components must not validate clean: {:?}",
+        report.issues
+    );
+}
+
+#[test]
 fn overlap_veto_bounds_component_pair_checks() {
     let mut topo = Topology::new();
     let mut faces = Vec::new();
