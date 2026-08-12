@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786550910273,
+  "lastUpdate": 1786551096651,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7127,6 +7127,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15898521,
             "range": "± 496596",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d5abe90123ef704a7c6a215afe3de39f8f677082",
+          "message": "Merge pull request #147 from esaueng/codex/fix-multisectionsweep-nurbs-validation-issue\n\nfix(math): reject invalid NURBS curve degrees",
+          "timestamp": "2026-08-12T12:06:26-04:00",
+          "tree_id": "66cebbe0842f96330f9bf757fa88255560745b58",
+          "url": "https://github.com/esaueng/brepkit/commit/d5abe90123ef704a7c6a215afe3de39f8f677082"
+        },
+        "date": 1786551095395,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 563189,
+            "range": "± 22894",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 638793,
+            "range": "± 14133",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8009,
+            "range": "± 63",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 522989,
+            "range": "± 13481",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16413159,
+            "range": "± 538173",
             "unit": "ns/iter"
           }
         ]
