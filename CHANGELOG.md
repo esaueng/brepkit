@@ -1,5 +1,19 @@
 # Changelog
 
+## [3.2.32](https://github.com/esaueng/brepkit/compare/v3.2.22...v3.2.32) (2026-08-12)
+
+
+### Features
+
+* **operations:** add exact blend resizing with face-evolution tracking
+
+
+### Bug Fixes
+
+* harden bounded execution and validation across booleans, blends, healing, imports, offsets, sweeps, and tessellation
+* preserve analytic topology and periodic boundary semantics across STEP, NURBS, torus, cylinder, and cavity workflows
+* make malformed or ambiguous geometry inputs fail closed without partial arena mutations
+
 ## [3.2.22](https://github.com/andymai/brepkit/compare/v3.2.21...v3.2.22) (2026-08-10)
 
 
