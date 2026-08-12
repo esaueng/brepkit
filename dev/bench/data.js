@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786553077202,
+  "lastUpdate": 1786553268781,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7559,6 +7559,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14748041,
             "range": "± 28246",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7f906450d20321b03e988cf27130bed3dc457c4b",
+          "message": "Merge pull request #163 from esaueng/codex/fix-nurbs-edge-classification-vulnerability\n\nfix(operations): verify spline geometry before normalization",
+          "timestamp": "2026-08-12T12:43:35-04:00",
+          "tree_id": "e1e8c76d519e7c73dc8fd022b33a33394ebe7fb3",
+          "url": "https://github.com/esaueng/brepkit/commit/7f906450d20321b03e988cf27130bed3dc457c4b"
+        },
+        "date": 1786553267268,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 504761,
+            "range": "± 3643",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 566039,
+            "range": "± 12066",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6933,
+            "range": "± 141",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 532635,
+            "range": "± 80219",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 17844545,
+            "range": "± 623418",
             "unit": "ns/iter"
           }
         ]
