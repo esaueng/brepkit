@@ -197,9 +197,9 @@ pub fn run_pave_filler_n(
         ));
     }
 
-    // Stage 1: Intersection over interacting pairs, accumulating into one arena.
+    // Stage 1: Intersection over every source pair, accumulating into one arena.
     init_pave_blocks_n(topo, sources, arena)?;
-    let pairs = interacting_pairs(topo, sources, tol);
+    let pairs = source_pairs(sources);
 
     for &(i, j) in &pairs {
         phase_vv::perform(topo, sources[i], sources[j], tol, arena)?;
@@ -262,33 +262,16 @@ fn init_pave_blocks_n(
     Ok(())
 }
 
-/// Axis-aligned bounding box of a solid from its vertices.
-fn solid_aabb(topo: &Topology, solid: SolidId) -> Option<brepkit_math::aabb::Aabb3> {
-    let mut pts = Vec::new();
-    for vid in brepkit_topology::explorer::solid_vertices(topo, solid).ok()? {
-        pts.push(topo.vertex(vid).ok()?.point());
-    }
-    brepkit_math::aabb::Aabb3::try_from_points(pts)
-}
-
-/// Source-index pairs `(i, j)` with `i < j` whose bounding boxes overlap (each
-/// expanded by tolerance so coincident-wall pairs are not missed). Two solids
-/// with disjoint boxes cannot intersect, so pruning them is result-preserving.
-/// A solid without a computable box is treated as interacting with all others
-/// (conservative — never drops a real interaction).
-fn interacting_pairs(topo: &Topology, sources: &[SolidId], tol: Tolerance) -> Vec<(usize, usize)> {
-    let boxes: Vec<Option<brepkit_math::aabb::Aabb3>> =
-        sources.iter().map(|&s| solid_aabb(topo, s)).collect();
+/// Every source-index pair `(i, j)` with `i < j`.
+///
+/// Do not prune this list using vertex-only bounds: analytic curves and
+/// surfaces can extend beyond their topological vertices, so such bounds are
+/// not conservative and can silently omit real intersections.
+fn source_pairs(sources: &[SolidId]) -> Vec<(usize, usize)> {
     let mut pairs = Vec::new();
     for i in 0..sources.len() {
         for j in (i + 1)..sources.len() {
-            let interact = match (boxes[i], boxes[j]) {
-                (Some(bi), Some(bj)) => bi.expanded(tol.linear).intersects(bj.expanded(tol.linear)),
-                _ => true,
-            };
-            if interact {
-                pairs.push((i, j));
-            }
+            pairs.push((i, j));
         }
     }
     pairs
