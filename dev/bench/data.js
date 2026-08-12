@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786552937488,
+  "lastUpdate": 1786553077202,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7505,6 +7505,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14924576,
             "range": "± 366272",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f8e4203b7858e3eaaad377a090b19850e8aecf2f",
+          "message": "Merge pull request #162 from esaueng/codex/fix-classification-of-partial-torus-rims\n\nRequire full torus winding for torus‑notch fast path",
+          "timestamp": "2026-08-12T12:42:17-04:00",
+          "tree_id": "b9a53b43a33ac56ab7d584867b6fd8fd5acefae2",
+          "url": "https://github.com/esaueng/brepkit/commit/f8e4203b7858e3eaaad377a090b19850e8aecf2f"
+        },
+        "date": 1786553075976,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 510677,
+            "range": "± 3112",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 664227,
+            "range": "± 48970",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7419,
+            "range": "± 128",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 479533,
+            "range": "± 18529",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14748041,
+            "range": "± 28246",
             "unit": "ns/iter"
           }
         ]
