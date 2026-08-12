@@ -286,6 +286,28 @@ fn compute_all_intersections(
     result
 }
 
+/// Whether two tessellated surfaces have a non-point intersection.
+///
+/// This is used by conservative validation gates which must fail closed when
+/// disconnected closed shells actually cross. Candidate-pair overflow is
+/// reported as `None` so callers do not accidentally treat an unchecked pair
+/// as disjoint.
+pub(crate) fn surfaces_intersect(
+    mesh_a: &TriangleMesh,
+    mesh_b: &TriangleMesh,
+    tolerance: f64,
+) -> Option<bool> {
+    let bvh_b = build_triangle_bvh(mesh_b);
+    let pairs = find_intersecting_pairs(
+        mesh_a,
+        &bvh_b,
+        tolerance,
+        MeshBooleanLimits::default().max_candidate_pairs,
+    )
+    .ok()?;
+    Some(!compute_all_intersections(mesh_a, mesh_b, &pairs, tolerance).is_empty())
+}
+
 /// Compute the intersection segments between two triangles.
 ///
 /// Transversal case: Moller interval overlap on the intersection line of the

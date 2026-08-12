@@ -2966,14 +2966,35 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
             && o_max.y() + eps >= i_max.y()
             && o_max.z() + eps >= i_max.z()
     };
-    // AABB containment is only the PRE-FILTER. It is necessary for nesting but
-    // far from sufficient: a ring's box contains the box of a separate piece
-    // sitting in its HOLE, and a lattice is full of rings. So a suspect pair
-    // gets a real ray-parity test against the enclosing candidate's own surface,
-    // and only genuine enclosure rejects. If the probe cannot be evaluated the
-    // pair falls back to the conservative answer.
+    let overlaps = |(a_min, a_max): (Point3, Point3), (b_min, b_max): (Point3, Point3)| {
+        a_min.x() <= b_max.x() + eps
+            && b_min.x() <= a_max.x() + eps
+            && a_min.y() <= b_max.y() + eps
+            && b_min.y() <= a_max.y() + eps
+            && a_min.z() <= b_max.z() + eps
+            && b_min.z() <= a_max.z() + eps
+    };
+    // Overlapping boxes require a real surface-intersection check: containment
+    // alone misses partial interpenetration. Containment remains a separate
+    // pre-filter for nesting, where surfaces do not cross. A ring's box can
+    // contain a separate piece sitting in its hole, so ray parity confirms
+    // actual enclosure. Any check that cannot be evaluated fails closed.
     for i in 0..aabbs.len() {
         for j in (i + 1)..aabbs.len() {
+            if overlaps(aabbs[i], aabbs[j]) {
+                let diagonal = |(min, max): (Point3, Point3)| (max - min).length();
+                let deflection = (diagonal(aabbs[i]).max(diagonal(aabbs[j])) / 200.0).max(1e-4);
+                let Some(mesh_i) = tessellate_component(topo, &components[i], deflection) else {
+                    return false;
+                };
+                let Some(mesh_j) = tessellate_component(topo, &components[j], deflection) else {
+                    return false;
+                };
+                match crate::mesh_boolean::surfaces_intersect(&mesh_i, &mesh_j, eps) {
+                    Some(true) | None => return false,
+                    Some(false) => {}
+                }
+            }
             let (outer, inner) = if contains(aabbs[i], aabbs[j]) {
                 (i, j)
             } else if contains(aabbs[j], aabbs[i]) {
@@ -2998,6 +3019,26 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
         }
     }
     true
+}
+
+fn tessellate_component(
+    topo: &Topology,
+    faces: &[FaceId],
+    deflection: f64,
+) -> Option<crate::tessellate::TriangleMesh> {
+    let mut result = crate::tessellate::TriangleMesh::default();
+    for &face in faces {
+        let mesh = crate::tessellate::tessellate_with_uvs(topo, face, deflection)
+            .ok()?
+            .mesh;
+        let offset = u32::try_from(result.positions.len()).ok()?;
+        result.positions.extend(mesh.positions);
+        result.normals.extend(mesh.normals);
+        result
+            .indices
+            .extend(mesh.indices.into_iter().map(|index| index + offset));
+    }
+    (!result.indices.is_empty()).then_some(result)
 }
 
 /// Fuse a multi-component TOOL by folding its disjoint pieces into the

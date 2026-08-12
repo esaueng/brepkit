@@ -6999,6 +6999,26 @@ fn rotated_separate_pieces_are_recognised_as_disjoint() {
     );
 }
 
+#[test]
+fn partially_overlapping_pieces_are_not_disjoint() {
+    use brepkit_math::mat::Mat4;
+    use brepkit_topology::explorer::solid_faces;
+
+    let mut topo = Topology::new();
+    let a = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    let b = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    crate::transform::transform_solid(&mut topo, b, &Mat4::translation(5.0, 0.0, 0.0)).unwrap();
+    let components = [a, b]
+        .iter()
+        .map(|&solid| solid_faces(&topo, solid).unwrap())
+        .collect::<Vec<_>>();
+
+    assert!(
+        !super::components_are_disjoint_pieces(&topo, &components),
+        "partially interpenetrating closed components must be rejected"
+    );
+}
+
 /// A nested piece must still be refused as a "disjoint union".
 ///
 /// This is the hazard the guard exists for and the reason it is not simply
