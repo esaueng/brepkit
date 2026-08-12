@@ -724,6 +724,19 @@ fn check_document_limits(document: &ParsedDocument, limits: ImportLimits) -> Res
         total_entities,
         limits.max_model_entities,
     )?;
+
+    for &index in &document.solid_roots {
+        if index >= document.solids.len() {
+            return Err(index_err("solid", index));
+        }
+    }
+    for compound in &document.compounds {
+        for &index in &compound.solids {
+            if index >= document.solids.len() {
+                return Err(index_err("solid", index));
+            }
+        }
+    }
     Ok(())
 }
 
@@ -742,6 +755,19 @@ fn checked_reference_count(
 }
 
 fn replay_document(
+    document: ParsedDocument,
+    topo: &mut Topology,
+) -> Result<DeserializedDocument, IoError> {
+    // Replay against a snapshot so every parse/validation/construction error
+    // leaves the caller's live topology untouched.  Committing with one move
+    // also preserves the fresh ids allocated relative to the existing arenas.
+    let mut staged = topo.clone();
+    let restored = replay_document_into(document, &mut staged)?;
+    *topo = staged;
+    Ok(restored)
+}
+
+fn replay_document_into(
     document: ParsedDocument,
     topo: &mut Topology,
 ) -> Result<DeserializedDocument, IoError> {
@@ -771,11 +797,9 @@ fn replay_document(
             .get(e.end)
             .ok_or_else(|| index_err("vertex", e.end))?;
         if let SerEdgeCurve::NurbsCurve(curve) = &e.curve {
-            curve
-                .validate_weights()
-                .map_err(|err| IoError::ParseError {
-                    reason: format!("invalid arena NURBS curve: {err}"),
-                })?;
+            curve.validate().map_err(|err| IoError::ParseError {
+                reason: format!("invalid arena NURBS curve: {err}"),
+            })?;
         }
         edge_ids.push(topo.add_edge(Edge::with_tolerance(
             start,
@@ -807,11 +831,9 @@ fn replay_document(
             inner.push(*wire_ids.get(iw).ok_or_else(|| index_err("wire", iw))?);
         }
         if let SerFaceSurface::Nurbs(surface) = &f.surface {
-            surface
-                .validate_weights()
-                .map_err(|err| IoError::ParseError {
-                    reason: format!("invalid arena NURBS surface: {err}"),
-                })?;
+            surface.validate().map_err(|err| IoError::ParseError {
+                reason: format!("invalid arena NURBS surface: {err}"),
+            })?;
         }
         let mut face = Face::new(outer, inner, f.surface.into_surface());
         face.set_reversed(f.reversed);
@@ -1023,6 +1045,57 @@ mod tests {
     }
 
     #[test]
+    fn malformed_document_is_atomic() {
+        let mut source = Topology::new();
+        let solid = make_box(&mut source, 10.0, 20.0, 30.0).unwrap();
+        let bytes = serialize_solid(&source, solid).unwrap();
+        let mut document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        document["wires"][0]["edges"][0]["edge"] = serde_json::json!(usize::MAX);
+        let malformed = serde_json::to_vec(&document).unwrap();
+
+        let mut destination = Topology::new();
+        let sentinel = destination.add_empty_solid();
+        let before = destination.clone();
+        let error = deserialize_solid(&malformed, &mut destination).unwrap_err();
+
+        assert!(matches!(error, IoError::ParseError { .. }));
+        assert_eq!(destination.num_vertices(), before.num_vertices());
+        assert_eq!(destination.num_edges(), before.num_edges());
+        assert_eq!(destination.num_wires(), before.num_wires());
+        assert_eq!(destination.num_faces(), before.num_faces());
+        assert_eq!(destination.num_shells(), before.num_shells());
+        assert_eq!(destination.num_solids(), before.num_solids());
+        assert!(destination.is_empty_solid(sentinel));
+    }
+
+    #[test]
+    fn structurally_invalid_nurbs_is_rejected_atomically() {
+        let mut source = Topology::new();
+        let solid = make_box(&mut source, 10.0, 20.0, 30.0).unwrap();
+        let bytes = serialize_solid(&source, solid).unwrap();
+        let mut document: serde_json::Value = serde_json::from_slice(&bytes).unwrap();
+        document["edges"][0]["curve"] = serde_json::json!({
+            "NurbsCurve": {
+                "degree": 2,
+                "knots": [],
+                "control_points": [],
+                "weights": []
+            }
+        });
+        let malformed = serde_json::to_vec(&document).unwrap();
+
+        let mut destination = Topology::new();
+        let sentinel = destination.add_empty_solid();
+        let error = deserialize_solid(&malformed, &mut destination).unwrap_err();
+
+        assert!(matches!(error, IoError::ParseError { .. }));
+        assert_eq!(destination.num_vertices(), 0);
+        assert_eq!(destination.num_edges(), 0);
+        assert_eq!(destination.num_solids(), 1);
+        assert!(destination.is_empty_solid(sentinel));
+    }
+
+    #[test]
     fn roundtrip_cylinder_preserves_analytic_surface_exact() {
         let mut topo = Topology::new();
         let solid = make_cylinder(&mut topo, 7.5, 12.5).unwrap();
@@ -1154,5 +1227,45 @@ mod tests {
         let roundtrip =
             serialize_document(&destination, &restored.solids, &restored.compounds).unwrap();
         assert_eq!(roundtrip, bytes);
+    }
+
+    #[test]
+    fn invalid_v2_solid_root_does_not_mutate_topology() {
+        let bytes = br#"{"version":2,"vertices":[],"edges":[],"wires":[],"faces":[],"shells":[{"faces":[]}],"solids":[{"outer_shell":0,"inner_shells":[]}],"solid_roots":[1],"compounds":[],"pcurves":[]}"#;
+        let mut destination = Topology::new();
+        destination.add_empty_solid();
+        let counts_before = (destination.num_shells(), destination.num_solids());
+
+        let error = deserialize_solids(bytes, &mut destination).unwrap_err();
+
+        assert!(error.to_string().contains("out-of-range solid index 1"));
+        assert_eq!(
+            (destination.num_shells(), destination.num_solids()),
+            counts_before
+        );
+    }
+
+    #[test]
+    fn invalid_v2_compound_member_does_not_mutate_topology() {
+        let bytes = br#"{"version":2,"vertices":[],"edges":[],"wires":[],"faces":[],"shells":[{"faces":[]}],"solids":[{"outer_shell":0,"inner_shells":[]}],"solid_roots":[],"compounds":[{"solids":[1]}],"pcurves":[]}"#;
+        let mut destination = Topology::new();
+        destination.add_empty_solid();
+        let counts_before = (
+            destination.num_shells(),
+            destination.num_solids(),
+            destination.num_compounds(),
+        );
+
+        let error = deserialize_document(bytes, &mut destination).unwrap_err();
+
+        assert!(error.to_string().contains("out-of-range solid index 1"));
+        assert_eq!(
+            (
+                destination.num_shells(),
+                destination.num_solids(),
+                destination.num_compounds(),
+            ),
+            counts_before
+        );
     }
 }
