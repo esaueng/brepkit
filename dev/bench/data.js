@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786552804318,
+  "lastUpdate": 1786552937488,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7451,6 +7451,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 18899639,
             "range": "± 1130296",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "854aadae69bc1820ac8857785b11853768e37799",
+          "message": "Merge pull request #160 from esaueng/codex/fix-unsafe-gfa-results-in-evolution-booleans\n\nfix(operations): validate evolution boolean semantics",
+          "timestamp": "2026-08-12T12:39:35-04:00",
+          "tree_id": "b0a85f93533fa77e52eb7a993139223eecbeb288",
+          "url": "https://github.com/esaueng/brepkit/commit/854aadae69bc1820ac8857785b11853768e37799"
+        },
+        "date": 1786552936194,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 489806,
+            "range": "± 7189",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 558465,
+            "range": "± 11670",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6986,
+            "range": "± 155",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 465194,
+            "range": "± 12804",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14924576,
+            "range": "± 366272",
             "unit": "ns/iter"
           }
         ]
