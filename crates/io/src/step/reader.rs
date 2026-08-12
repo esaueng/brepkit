@@ -81,14 +81,24 @@ pub fn read_step_with_limits(
     let Some(units) = resolve_unit_scale(&entities, has_solids)? else {
         return Ok(Vec::new());
     };
-    let solids = {
-        let mut builder = StepBuilder::new(topo, &entities, units);
-        builder.build_all_solids()?
-    };
-    for &solid_id in &solids {
-        merge_split_rim_arcs(topo, solid_id, Tolerance::new())?;
+    // Building a STEP model allocates topology incrementally. Keep the import
+    // transactional so an error in a later solid cannot expose geometry from
+    // an otherwise rejected file to the caller.
+    let snapshot = topo.clone();
+    let result = (|| {
+        let solids = {
+            let mut builder = StepBuilder::new(topo, &entities, units);
+            builder.build_all_solids()?
+        };
+        for &solid_id in &solids {
+            merge_split_rim_arcs(topo, solid_id, Tolerance::new())?;
+        }
+        Ok(solids)
+    })();
+    if result.is_err() {
+        topo.restore_preserving_handle_slots(&snapshot);
     }
-    Ok(solids)
+    result
 }
 
 // ── Parsing ─────────────────────────────────────────────────────────
@@ -4641,6 +4651,41 @@ mod tests {
         let solids = read_step(&step_str, &mut read_topo).unwrap();
 
         assert_eq!(solids.len(), 2);
+    }
+
+    #[test]
+    fn failed_multi_solid_import_is_transactional() {
+        let mut write_topo = Topology::new();
+        let first =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let second =
+            brepkit_operations::primitives::make_box(&mut write_topo, 2.0, 2.0, 2.0).unwrap();
+        let mut step = writer::write_step(&write_topo, &[first, second]).unwrap();
+
+        let second_solid_line = step
+            .lines()
+            .filter(|line| line.contains("MANIFOLD_SOLID_BREP"))
+            .nth(1)
+            .unwrap()
+            .to_owned();
+        let shell_reference = second_solid_line.rfind('#').unwrap();
+        let reference_end =
+            shell_reference + second_solid_line[shell_reference..].find(')').unwrap();
+        let mut malformed_line = second_solid_line.clone();
+        malformed_line.replace_range(shell_reference..reference_end, "#999999");
+        step = step.replacen(&second_solid_line, &malformed_line, 1);
+
+        let mut read_topo = Topology::new();
+        let result = read_step(&step, &mut read_topo);
+
+        assert!(result.is_err());
+        assert_eq!(read_topo.num_solids(), 0);
+        let fresh =
+            brepkit_operations::primitives::make_box(&mut read_topo, 3.0, 3.0, 3.0).unwrap();
+        assert!(
+            fresh.index() > 0,
+            "a handle allocated during the rejected import must not be reused"
+        );
     }
 
     #[test]
