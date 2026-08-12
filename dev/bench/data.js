@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786561127108,
+  "lastUpdate": 1786561251367,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9287,6 +9287,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16258374,
             "range": "± 2394979",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "af61eb4cce128abbc3b3cd5cc3d7542a0a15b632",
+          "message": "Merge pull request #211 from esaueng/codex/fix-midpoint-contact-check-vulnerability\n\nfix(blend): reuse nonuniform straight contacts",
+          "timestamp": "2026-08-12T14:57:39-04:00",
+          "tree_id": "0119ce6f88d9cd0e32561d19d9934e8f234202fb",
+          "url": "https://github.com/esaueng/brepkit/commit/af61eb4cce128abbc3b3cd5cc3d7542a0a15b632"
+        },
+        "date": 1786561249745,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 492313,
+            "range": "± 15137",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 580617,
+            "range": "± 39504",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7546,
+            "range": "± 531",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 474416,
+            "range": "± 2979",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14250526,
+            "range": "± 322538",
             "unit": "ns/iter"
           }
         ]
