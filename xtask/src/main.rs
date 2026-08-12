@@ -47,6 +47,7 @@ fn main() -> anyhow::Result<()> {
             wasm::merge_packages()?;
             wasm::validate_output()?;
             wasm::run_smoke_test()?;
+            wasm::run_consumer_smoke_test()?;
             println!("\n✅ WASM build and runtime smoke test complete.");
         }
         Command::WasmPublish { dry_run, no_simd } => {
@@ -56,6 +57,7 @@ fn main() -> anyhow::Result<()> {
             wasm::merge_packages()?;
             wasm::validate_output()?;
             wasm::run_smoke_test()?;
+            wasm::run_consumer_smoke_test()?;
             wasm::publish(dry_run)?;
         }
     }
