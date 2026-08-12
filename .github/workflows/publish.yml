@@ -115,7 +115,8 @@ jobs:
       ${{ (github.event_name == 'push'
            && !contains(github.event.head_commit.message, '[skip ci]'))
           || (github.event_name == 'workflow_dispatch'
-              && inputs.sync_package) }}
+              && inputs.sync_package
+              && github.ref == 'refs/heads/main') }}
     permissions:
       contents: write
     env:
@@ -131,6 +132,9 @@ jobs:
 
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
+          # A dispatch may select another ref in the UI. Keep repository code
+          # and the eventual package commit pinned to the protected branch.
+          ref: main
           token: ${{ steps.app-token.outputs.token || github.token }}
           # The build below compiles third-party crates' build scripts; do not
           # leave a write token in .git/config where they could read it. The
@@ -187,8 +191,8 @@ jobs:
           # Authenticate with a token-embedded URL: checkout ran with
           # persist-credentials: false, so origin carries no credentials.
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git pull --rebase --autostash "$remote" "${GITHUB_REF_NAME}"
-          git push "$remote" "HEAD:${GITHUB_REF_NAME}"
+          git pull --rebase --autostash "$remote" main
+          git push "$remote" HEAD:main
           echo "::notice::Committed brepkit-wasm ${VERSION}; consumers on #main pick it up on the next install."
 
   # Publish triggers on two events:
