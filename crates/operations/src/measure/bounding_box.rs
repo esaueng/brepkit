@@ -333,6 +333,19 @@ fn face_boundary_edge_count(topo: &Topology, face_id: FaceId) -> usize {
 /// which is what [`compute_angular_range`] tests, returning the full period
 /// when it finds none.
 fn torus_patch_domain(topo: &Topology, face_id: FaceId, t: &ToroidalSurface) -> PatchDomain {
+    // Inner wires bound holes, not the occupied patch. Their angular samples
+    // can therefore describe the complement of the face and must never be
+    // used to shrink a conservative box. Until domain recovery can classify
+    // periodic complements, retain the full analytic extent for holed faces.
+    if topo
+        .face(face_id)
+        .is_ok_and(|face| !face.inner_wires().is_empty())
+    {
+        return PatchDomain {
+            u: (0.0, TAU),
+            v: (0.0, TAU),
+        };
+    }
     let pts = face_boundary_samples(topo, face_id, TRIM_SAMPLES_PER_EDGE);
     let mut us = Vec::with_capacity(pts.len());
     let mut vs = Vec::with_capacity(pts.len());
@@ -357,6 +370,18 @@ fn torus_patch_domain(topo: &Topology, face_id: FaceId, t: &ToroidalSurface) -> 
 /// longitude keeps the full latitude span, exactly as before this was
 /// trim-aware.
 fn sphere_patch_domain(topo: &Topology, face_id: FaceId, s: &SphericalSurface) -> PatchDomain {
+    // As for a torus, an inner loop encloses excluded geometry. Falling back
+    // to the whole surface is conservative and prevents a hole near one side
+    // of the sphere from hiding the occupied face on the opposite side.
+    if topo
+        .face(face_id)
+        .is_ok_and(|face| !face.inner_wires().is_empty())
+    {
+        return PatchDomain {
+            u: (0.0, TAU),
+            v: (-FRAC_PI_2, FRAC_PI_2),
+        };
+    }
     let pts = face_boundary_samples(topo, face_id, TRIM_SAMPLES_PER_EDGE);
     let mut us = Vec::with_capacity(pts.len());
     let mut vs = Vec::with_capacity(pts.len());
