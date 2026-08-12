@@ -278,6 +278,24 @@ fn hollowing_a_solid_that_already_has_a_cavity_is_refused() {
 }
 
 #[test]
+fn excessive_cavity_count_is_refused_before_pairwise_checks() {
+    let mut topo = Topology::new();
+    let outer = make_box(&mut topo, 4.0, 4.0, 4.0).unwrap();
+    let inner = make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+    let cavity_shell = topo.solid(inner).unwrap().outer_shell();
+    for _ in 0..1_025 {
+        topo.solid_mut(outer).unwrap().add_inner_shell(cavity_shell);
+    }
+
+    let error = offset_solid(&mut topo, outer, 0.5, opts()).unwrap_err();
+    assert!(
+        matches!(&error, OffsetError::InvalidInput { reason }
+            if reason.contains("supports at most 1024 cavities") && reason.contains("has 1025")),
+        "expected a typed cavity work-budget refusal, got {error}"
+    );
+}
+
+#[test]
 fn a_solid_without_cavities_is_unaffected() {
     // The cavity work must not change what a plain body does.
     let mut topo = Topology::new();
