@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786552642864,
+  "lastUpdate": 1786552804318,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7397,6 +7397,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15113079,
             "range": "± 354561",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "1c1bce48c9cc1f05a7914ee4a15d32540c915533",
+          "message": "Merge pull request #158 from esaueng/codex/fix-partial-overlap-cap-synthesis-issue\n\nfix(algo): preserve holes in partial-overlap caps",
+          "timestamp": "2026-08-12T12:36:53-04:00",
+          "tree_id": "897144a7e373bb8e97e182f729d0e94f04bfb129",
+          "url": "https://github.com/esaueng/brepkit/commit/1c1bce48c9cc1f05a7914ee4a15d32540c915533"
+        },
+        "date": 1786552803047,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 565968,
+            "range": "± 78590",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 592190,
+            "range": "± 10862",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7840,
+            "range": "± 720",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 589324,
+            "range": "± 43235",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 18899639,
+            "range": "± 1130296",
             "unit": "ns/iter"
           }
         ]
