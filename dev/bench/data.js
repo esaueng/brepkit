@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786566400784,
+  "lastUpdate": 1786568014646,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9503,6 +9503,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13786157,
             "range": "± 278188",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "71e7b1481d7f876697c86bda0ffe0ef967974e24",
+          "message": "Merge pull request #165 from esaueng/codex/propose-fix-for-nurbs-domain-panic\n\nfix(math): reject degree-zero NURBS curves",
+          "timestamp": "2026-08-12T16:51:20-04:00",
+          "tree_id": "02c10229fff940f3fac5ebb58cf72ebf0ad8d22a",
+          "url": "https://github.com/esaueng/brepkit/commit/71e7b1481d7f876697c86bda0ffe0ef967974e24"
+        },
+        "date": 1786568013311,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 575628,
+            "range": "± 98616",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 635528,
+            "range": "± 37107",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 8257,
+            "range": "± 589",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 534877,
+            "range": "± 28804",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16928498,
+            "range": "± 1837417",
             "unit": "ns/iter"
           }
         ]
