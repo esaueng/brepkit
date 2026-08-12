@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786556327625,
+  "lastUpdate": 1786556476098,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8423,6 +8423,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 16297813,
             "range": "± 2076955",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "57d0f14cd03d4ab45b5ad4092905a1476ae7270b",
+          "message": "Merge pull request #190 from esaueng/codex/fix-bounding-box-calculations-for-torus-and-sphere\n\nKeep holed periodic face bounds conservative",
+          "timestamp": "2026-08-12T13:38:12-04:00",
+          "tree_id": "52bf5c9fb695060d0c3f35f5236e8bfcde214759",
+          "url": "https://github.com/esaueng/brepkit/commit/57d0f14cd03d4ab45b5ad4092905a1476ae7270b"
+        },
+        "date": 1786556474719,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 560990,
+            "range": "± 23174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 627677,
+            "range": "± 26167",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7216,
+            "range": "± 122",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 493425,
+            "range": "± 33152",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15832231,
+            "range": "± 1017648",
             "unit": "ns/iter"
           }
         ]
