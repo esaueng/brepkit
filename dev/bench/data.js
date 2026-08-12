@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786559814287,
+  "lastUpdate": 1786560138898,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9071,6 +9071,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14817855,
             "range": "± 112671",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "49737982a68e68c5a078f0b60d0a444dca149614",
+          "message": "Merge pull request #209 from esaueng/codex/fix-unbounded-cylinder-hole-tessellation-grid\n\nsecurity: bound cylinder-with-holes tessellation grid to prevent DoS",
+          "timestamp": "2026-08-12T14:39:53-04:00",
+          "tree_id": "2061ca820a9a6e78bf9de60ec1d1acddc44a9542",
+          "url": "https://github.com/esaueng/brepkit/commit/49737982a68e68c5a078f0b60d0a444dca149614"
+        },
+        "date": 1786560137563,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 728396,
+            "range": "± 66095",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 919915,
+            "range": "± 67002",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10929,
+            "range": "± 746",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 642138,
+            "range": "± 29134",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21482591,
+            "range": "± 1497793",
             "unit": "ns/iter"
           }
         ]
