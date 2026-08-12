@@ -146,6 +146,26 @@ fn compound_cut_disjoint_drills_matches_sequential() {
 }
 
 #[test]
+fn compound_cut_rejects_excessive_tool_count() {
+    let mut topo = Topology::new();
+    let target = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    let tool = crate::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+    let tools = vec![tool; super::MAX_COMPOUND_CUT_TOOLS + 1];
+    let err = compound_cut(
+        &mut topo,
+        target,
+        &tools,
+        BooleanOptions {
+            unify_faces: false,
+            ..BooleanOptions::default()
+        },
+    )
+    .unwrap_err();
+
+    assert!(err.to_string().contains("accepts at most 256 tools"));
+}
+
+#[test]
 fn compound_cut_overlapping_tools_match_union_cut_volume() {
     // Two tools that overlap EACH OTHER form ONE AABB cluster, so this exercises
     // the batched path — though the batch falls back to the sequential loop on
