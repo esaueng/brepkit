@@ -969,19 +969,20 @@ pub(crate) fn weld_coincident_free_edges(
         groups.entry(key).or_default().push((eid, sv, ev));
     }
 
-    // For each group, rewrite all wires to use the first edge.
+    // Only pairs can be stitched into a manifold edge. Collapsing a larger
+    // coincident group would make the kept edge belong to three or more
+    // faces, hiding the original boundaries behind a non-manifold edge.
     let mut replace: HashMap<EdgeId, (EdgeId, bool)> = HashMap::new();
     for members in groups.values() {
-        if members.len() < 2 {
+        if members.len() != 2 {
             continue;
         }
         let (keep, keep_sv, _) = members[0];
         let keep_sp = topo.vertex(keep_sv)?.point();
-        for &(dup, dup_sv, _) in &members[1..] {
-            let dup_sp = topo.vertex(dup_sv)?.point();
-            let same_dir = (dup_sp - keep_sp).length() < WELD;
-            replace.insert(dup, (keep, same_dir));
-        }
+        let (dup, dup_sv, _) = members[1];
+        let dup_sp = topo.vertex(dup_sv)?.point();
+        let same_dir = (dup_sp - keep_sp).length() < WELD;
+        replace.insert(dup, (keep, same_dir));
     }
     if replace.is_empty() {
         return Ok(());
@@ -1307,7 +1308,45 @@ pub(crate) fn propagate_orientation(
 
 #[cfg(test)]
 mod tests {
+    #![allow(clippy::expect_used)]
+
+    use std::collections::HashSet;
+
     use super::*;
+
+    #[test]
+    fn weld_does_not_collapse_three_coincident_free_edges() {
+        let mut topo = Topology::new();
+        let mut faces = Vec::new();
+
+        for _ in 0..3 {
+            let start = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 0.0), 1e-7));
+            let end = topo.add_vertex(Vertex::new(Point3::new(1.0, 0.0, 0.0), 1e-7));
+            let edge = topo.add_edge(Edge::new(start, end, EdgeCurve::Line));
+            let wire = topo.add_wire(
+                Wire::new(vec![OrientedEdge::new(edge, true)], false).expect("open wire"),
+            );
+            faces.push(topo.add_face(Face::new(
+                wire,
+                Vec::new(),
+                FaceSurface::Plane {
+                    normal: Vec3::new(0.0, 0.0, 1.0),
+                    d: 0.0,
+                },
+            )));
+        }
+
+        weld_coincident_free_edges(&mut topo, &faces).expect("weld pass");
+
+        let remaining: HashSet<_> = faces
+            .iter()
+            .map(|&face| {
+                let wire = topo.face(face).expect("face").outer_wire();
+                topo.wire(wire).expect("wire").edges()[0].edge()
+            })
+            .collect();
+        assert_eq!(remaining.len(), 3, "ambiguous weld group must stay open");
+    }
 
     #[test]
     fn near_pinch_outside_closure_tolerance_keeps_cross_edge() {
