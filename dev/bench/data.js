@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786569816957,
+  "lastUpdate": 1786570596644,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9665,6 +9665,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14917384,
             "range": "± 221739",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "f52f6580cf91eeb27387e1c754939c085679da43",
+          "message": "Merge pull request #216 from esaueng/codex/reconcile-periodic-rim-hardening\n\ntest(operations): cover bounded periodic rim reconciliation",
+          "timestamp": "2026-08-12T17:34:32-04:00",
+          "tree_id": "dffb84e7c32c2543342c42ac998065d588e2a5fb",
+          "url": "https://github.com/esaueng/brepkit/commit/f52f6580cf91eeb27387e1c754939c085679da43"
+        },
+        "date": 1786570595310,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 494327,
+            "range": "± 19610",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 612281,
+            "range": "± 27895",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6900,
+            "range": "± 90",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 474799,
+            "range": "± 10861",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14300890,
+            "range": "± 304835",
             "unit": "ns/iter"
           }
         ]
