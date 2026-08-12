@@ -28,7 +28,7 @@
 //! length-valued in it (some are `PRODUCT`/`COLOUR_RGB` only) still imports,
 //! as zero solids.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use brepkit_math::aabb::Aabb2;
 use brepkit_math::frame::Frame3;
@@ -749,11 +749,22 @@ impl<'a> StepBuilder<'a> {
     /// shells use.
     fn build_shell(
         &mut self,
-        shell_ref: u64,
-        flip: bool,
+        mut shell_ref: u64,
+        mut flip: bool,
     ) -> Result<brepkit_topology::shell::ShellId, IoError> {
-        let entity = self.get_entity(shell_ref)?;
-        if entity.entity_type == "ORIENTED_CLOSED_SHELL" {
+        let mut oriented_shells = HashSet::new();
+        let entity = loop {
+            let entity = self.get_entity(shell_ref)?;
+            if entity.entity_type != "ORIENTED_CLOSED_SHELL" {
+                break entity;
+            }
+            if !oriented_shells.insert(shell_ref) {
+                return Err(IoError::ParseError {
+                    reason: format!(
+                        "cyclic ORIENTED_CLOSED_SHELL reference involving #{shell_ref}"
+                    ),
+                });
+            }
             let attrs = entity.attrs.clone();
             let reversed = orientation_is_reversed(&attrs);
             let base = parse_refs(&attrs)
@@ -764,8 +775,9 @@ impl<'a> StepBuilder<'a> {
                         "ORIENTED_CLOSED_SHELL #{shell_ref} missing its closed shell reference"
                     ),
                 })?;
-            return self.build_shell(base, flip != reversed);
-        }
+            shell_ref = base;
+            flip = flip != reversed;
+        };
 
         let attrs = entity.attrs.clone();
         let face_refs = parse_list_refs(&attrs);
@@ -8091,6 +8103,37 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         for (f, r) in forward.iter().zip(flipped.iter()) {
             assert_ne!(f, r, "ORIENTED_CLOSED_SHELL .F. must invert each face");
         }
+    }
+
+    #[test]
+    fn cyclic_oriented_closed_shell_is_refused_not_overflowed() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+        let idx = step_str.rfind("ENDSEC;").unwrap();
+        let cyclic = format!(
+            "{}#90001 = ORIENTED_CLOSED_SHELL('',*,#90002,.T.);\n\
+             #90002 = ORIENTED_CLOSED_SHELL('',*,#90001,.F.);\n\
+             #90003 = MANIFOLD_SOLID_BREP('',#90001);\n{}",
+            &step_str[..idx],
+            &step_str[idx..]
+        );
+        let mut kept = String::new();
+        for line in cyclic
+            .lines()
+            .filter(|line| !line.contains("= MANIFOLD_SOLID_BREP(") || line.contains("#90001"))
+        {
+            let _ = writeln!(kept, "{line}");
+        }
+
+        let mut read_topo = Topology::new();
+        let err = read_step(&kept, &mut read_topo).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("cyclic ORIENTED_CLOSED_SHELL reference"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]
