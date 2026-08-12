@@ -110,7 +110,7 @@ pub fn filter_filletable_edges(
 /// outward normals are (anti)parallel at the edge midpoint, so there is no
 /// real dihedral to round. Returns `true` for the degenerate cases the fillet
 /// engine cannot blend.
-fn edge_is_tangent(
+pub(crate) fn edge_is_tangent(
     topo: &Topology,
     eid: EdgeId,
     faces: &HashSet<FaceId>,
@@ -122,7 +122,10 @@ fn edge_is_tangent(
     let edge = topo.edge(eid)?;
     let a = topo.vertex(edge.start())?.point();
     let b = topo.vertex(edge.end())?.point();
-    let mid = a + (b - a) * 0.5;
+    let (t0, t1) = edge.curve().domain_with_endpoints(a, b);
+    let mid = edge
+        .curve()
+        .evaluate_with_endpoints(f64::midpoint(t0, t1), a, b);
 
     let normal = |fid: FaceId| -> Option<brepkit_math::vec::Vec3> {
         let face = topo.face(fid).ok()?;
