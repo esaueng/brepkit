@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786555668757,
+  "lastUpdate": 1786555813396,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8153,6 +8153,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14989865,
             "range": "± 291886",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "e7df0b66c0611f591fc0ea9f8e57a5af3dd2d697",
+          "message": "Merge pull request #184 from esaueng/codex/fix-vulnerability-in-wasm-boolean-logic\n\noperations: reject intersecting boolean components with narrow-phase triangle test",
+          "timestamp": "2026-08-12T13:27:30-04:00",
+          "tree_id": "e305bec22f3107abd04fe470be48d8c784694462",
+          "url": "https://github.com/esaueng/brepkit/commit/e7df0b66c0611f591fc0ea9f8e57a5af3dd2d697"
+        },
+        "date": 1786555811915,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 566252,
+            "range": "± 12848",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 628478,
+            "range": "± 14652",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7571,
+            "range": "± 69",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 511593,
+            "range": "± 10000",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 16408808,
+            "range": "± 126672",
             "unit": "ns/iter"
           }
         ]
