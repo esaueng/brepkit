@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786553701224,
+  "lastUpdate": 1786553861018,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7775,6 +7775,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14676013,
             "range": "± 419194",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "727a4b906169d386e898737337cbcd746352b9af",
+          "message": "Merge pull request #172 from esaueng/codex/fix-quadratic-dos-in-compound_cut\n\nfix(operations): bound compound_cut batching to prevent quadratic DoS",
+          "timestamp": "2026-08-12T12:54:44-04:00",
+          "tree_id": "07917abd6c7018105466bc628704748a486bdbff",
+          "url": "https://github.com/esaueng/brepkit/commit/727a4b906169d386e898737337cbcd746352b9af"
+        },
+        "date": 1786553859705,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 635689,
+            "range": "± 12550",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 624549,
+            "range": "± 25485",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7660,
+            "range": "± 160",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 506649,
+            "range": "± 8572",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 15065457,
+            "range": "± 852132",
             "unit": "ns/iter"
           }
         ]
