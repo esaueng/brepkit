@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786568370736,
+  "lastUpdate": 1786569816957,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9611,6 +9611,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 18606056,
             "range": "± 1235824",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c80596f146f41cc1f8c3e179ac006f4ff636f584",
+          "message": "Merge pull request #182 from esaueng/codex/fix-topology-corruption-from-singular-transforms\n\nfix(operations): reject non-affine transforms atomically",
+          "timestamp": "2026-08-12T17:21:29-04:00",
+          "tree_id": "45bcd40ed22aa4a19d6cdce7742b8c7773a4791d",
+          "url": "https://github.com/esaueng/brepkit/commit/c80596f146f41cc1f8c3e179ac006f4ff636f584"
+        },
+        "date": 1786569815549,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 520072,
+            "range": "± 19354",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 570043,
+            "range": "± 5544",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7210,
+            "range": "± 187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 467481,
+            "range": "± 2044",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14917384,
+            "range": "± 221739",
             "unit": "ns/iter"
           }
         ]
