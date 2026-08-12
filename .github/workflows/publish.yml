@@ -344,6 +344,13 @@ jobs:
           fi
           echo "Publishing brepkit crates at $WS_VERSION"
 
+      # Verification compiles package contents and may execute third-party
+      # build scripts and proc macros. Keep it in a separate step before any
+      # crates.io credential exists in the job environment; the authenticated
+      # script below is deliberately upload-only (`cargo publish --no-verify`).
+      - name: Verify publishable packages without credentials
+        run: cargo publish --workspace --dry-run
+
       # Trusted publishing: mints a short-lived crates.io token from the
       # workflow's OIDC identity, so there is no long-lived registry secret to
       # rotate or leak. Configured on crates.io per crate under Settings ->
