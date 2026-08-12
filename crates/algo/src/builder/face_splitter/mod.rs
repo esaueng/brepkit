@@ -2658,6 +2658,16 @@ fn arrangement_regions_from_inputs(
                         ts.push((ct, None));
                     }
                 }
+                (false, true) => {
+                    // Boundary arcs are deliberately emitted whole: unlike a
+                    // section arc, they cannot be replaced by trimmed pieces
+                    // without changing the operand boundary.  A true crossing
+                    // away from the chord would therefore make the traced
+                    // chord subdivision disagree with the emitted wire.
+                    if !line_arc_crossings(a0, a1, j).is_empty() {
+                        return None;
+                    }
+                }
                 (true, false) if inputs[i].is_section => {
                     let cover = arc_sagitta(i) + tol * 100.0;
                     let truex = line_arc_crossings(b0, b1, i);
@@ -2680,6 +2690,21 @@ fn arrangement_regions_from_inputs(
                         && !covered_chord
                     {
                         ts.push((ct, None));
+                        inexact_arc_break = true;
+                    }
+                }
+                (true, false) => {
+                    // This is the boundary-arc side of the symmetric case
+                    // above.  Bail before topology is traced from the chord;
+                    // the existing curved-wire splitter can preserve the true
+                    // boundary geometry safely.
+                    if !line_arc_crossings(b0, b1, i).is_empty() {
+                        return None;
+                    }
+                    if let Some(t) = seg_cross_param(a0, a1, b0, b1)
+                        && chord_break_on_arc(i, a0 + d * t)
+                    {
+                        ts.push((t, None));
                         inexact_arc_break = true;
                     }
                 }
