@@ -100,8 +100,8 @@ jobs:
   # rebuilt it after a merge, so that directory drifted far behind the source
   # (2.126.20 committed vs 2.128.5 in Cargo.toml) and every consumer silently
   # ran a months-old kernel while main looked current.
-  sync-committed-package:
-    name: Refresh committed WASM package
+  build-committed-package:
+    name: Build committed WASM package
     runs-on: blacksmith-4vcpu-ubuntu-2404
     # Skip the bot's own commit so this cannot loop. `[skip ci]` in the commit
     # message already suppresses the re-run; this is the belt-and-braces half.
@@ -117,25 +117,10 @@ jobs:
           || (github.event_name == 'workflow_dispatch'
               && inputs.sync_package) }}
     permissions:
-      contents: write
-    env:
-      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
-      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+      contents: read
     steps:
-      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
-        id: app-token
-        if: ${{ env.APP_ID != '' && env.APP_PRIVATE_KEY != '' }}
-        with:
-          app-id: ${{ env.APP_ID }}
-          private-key: ${{ env.APP_PRIVATE_KEY }}
-
       - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
         with:
-          token: ${{ steps.app-token.outputs.token || github.token }}
-          # The build below compiles third-party crates' build scripts; do not
-          # leave a write token in .git/config where they could read it. The
-          # commit step authenticates with a token-embedded URL instead (same
-          # pattern as benchmark.yml).
           persist-credentials: false
 
       - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
@@ -165,6 +150,48 @@ jobs:
             repository.url=git+https://github.com/${GITHUB_REPOSITORY}.git \
             homepage=https://github.com/${GITHUB_REPOSITORY}
 
+      # Pass only the generated package to a fresh runner. The build above can
+      # execute third-party build scripts, so it must never share a process,
+      # workspace, or Git directory with a repository write token.
+      - name: Archive generated package
+        run: tar -czf committed-wasm-package.tar.gz crates/wasm/pkg
+
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: committed-wasm-package
+          path: committed-wasm-package.tar.gz
+          if-no-files-found: error
+
+  sync-committed-package:
+    name: Commit refreshed WASM package
+    needs: [build-committed-package]
+    runs-on: blacksmith-4vcpu-ubuntu-2404
+    permissions:
+      contents: write
+    env:
+      APP_ID: ${{ secrets.BREPKIT_BOT_APP_ID }}
+      APP_PRIVATE_KEY: ${{ secrets.BREPKIT_BOT_PRIVATE_KEY }}
+    steps:
+      - uses: actions/create-github-app-token@bcd2ba49218906704ab6c1aa796996da409d3eb1 # v3.2.0
+        id: app-token
+        if: ${{ env.APP_ID != '' && env.APP_PRIVATE_KEY != '' }}
+        with:
+          app-id: ${{ env.APP_ID }}
+          private-key: ${{ env.APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@9c091bb21b7c1c1d1991bb908d89e4e9dddfe3e0 # v7.0.0
+        with:
+          persist-credentials: false
+
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: committed-wasm-package
+
+      - name: Install generated package
+        run: |
+          rm -rf crates/wasm/pkg
+          tar -xzf committed-wasm-package.tar.gz
+
       - name: Commit refreshed package
         env:
           GH_TOKEN: ${{ steps.app-token.outputs.token || github.token }}
@@ -182,7 +209,7 @@ jobs:
             exit 0
           fi
           VERSION=$(jq -r .version crates/wasm/pkg/package.json)
-          git commit -m "chore(wasm): refresh committed package to v${VERSION} from ${GITHUB_SHA:0:7} [skip ci]"
+          git commit --no-verify -m "chore(wasm): refresh committed package to v${VERSION} from ${GITHUB_SHA:0:7} [skip ci]"
           # Land on top of anything that merged while the build was running.
           # Authenticate with a token-embedded URL: checkout ran with
           # persist-credentials: false, so origin carries no credentials.
