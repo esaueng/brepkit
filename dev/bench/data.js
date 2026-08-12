@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786553560771,
+  "lastUpdate": 1786553701224,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7721,6 +7721,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14069291,
             "range": "± 224517",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "25918fdc0bdcd1d9d960eaf76bf2058c352ffef1",
+          "message": "Merge pull request #170 from esaueng/codex/propose-fix-for-nested-wire-dos-vulnerability\n\nfix(operations): bound nested-wire classification to avoid quadratic DoS",
+          "timestamp": "2026-08-12T12:51:08-04:00",
+          "tree_id": "0348ff9c3337fed7ef7a2622a88d722cb34b738f",
+          "url": "https://github.com/esaueng/brepkit/commit/25918fdc0bdcd1d9d960eaf76bf2058c352ffef1"
+        },
+        "date": 1786553699899,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 497618,
+            "range": "± 16153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 528860,
+            "range": "± 14298",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7207,
+            "range": "± 271",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 545379,
+            "range": "± 28980",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14676013,
+            "range": "± 419194",
             "unit": "ns/iter"
           }
         ]
