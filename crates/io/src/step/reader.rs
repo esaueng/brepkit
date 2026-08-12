@@ -2827,8 +2827,10 @@ fn point_segment_distance_3d(point: Point3, start: Point3, end: Point3) -> f64 {
 
 /// Return a periodic parameter domain together with stable coordinate scales.
 ///
-/// Scaling turns a cylinder's angular coordinate into developed arc length and
-/// keeps the containment tolerance in millimetres.  For the other analytic
+/// Scaling turns angular coordinates into developed arc length and keeps the
+/// containment tolerance in millimetres. Cones are deliberately excluded:
+/// their angular metric varies with height, so no single scale can safely
+/// classify bounds using a fixed linear tolerance. For the other analytic
 /// surfaces the scale is a characteristic metric only; positive independent
 /// scaling of u and v does not change loop containment.  Periodic NURBS retain
 /// their native knot-domain coordinates and are accepted only when projection
@@ -2845,12 +2847,7 @@ fn periodic_uv_domain(surface: &FaceSurface) -> Option<PeriodicUvDomain> {
             u_scale: cylinder.radius().abs().max(tol),
             v_scale: 1.0,
         }),
-        FaceSurface::Cone(cone) => Some(PeriodicUvDomain {
-            u_period: Some(TAU),
-            v_period: None,
-            u_scale: cone.radius_at(1.0).abs().max(tol),
-            v_scale: 1.0,
-        }),
+        FaceSurface::Cone(_) => None,
         FaceSurface::Sphere(sphere) => Some(PeriodicUvDomain {
             u_period: Some(TAU),
             v_period: None,
@@ -7498,6 +7495,13 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
             panic!("expected a cone");
         };
         cone
+    }
+
+    #[test]
+    fn generic_cone_bound_classification_fails_closed() {
+        let cone = cone_geometry(&z_axis_cone("1000000.", "0.5404195002705842"));
+
+        assert!(periodic_uv_domain(&FaceSurface::Cone(cone)).is_none());
     }
 
     /// The radius the cone carries at axial distance `h` from its apex.
