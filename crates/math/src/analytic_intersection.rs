@@ -1981,7 +1981,11 @@ fn algebraic_parallel_cone_cylinder(
     v_range_cyl: Option<(f64, f64)>,
 ) -> Result<Option<Vec<IntersectionCurve>>, MathError> {
     let axis = cone.axis();
-    if axis.dot(cyl.axis()).abs() < 1.0 - 1e-10 {
+    // A dot-product comparison loses the first-order angular error near 1.0:
+    // an axis tilted by 1e-5 radians still has a dot product within 1e-10 of
+    // one.  This construction requires the axes themselves to be parallel, so
+    // classify their angular separation directly.
+    if axis.cross(cyl.axis()).length() > Tolerance::new().angular {
         return Ok(None); // Skew/oblique — general marcher.
     }
 
@@ -2724,6 +2728,30 @@ mod tests {
             algebraic_parallel_cone_cylinder(&cone, &cyl, None, None)
                 .unwrap()
                 .is_none()
+        );
+    }
+
+    #[test]
+    fn near_parallel_cone_cylinder_defers_to_other_paths() {
+        let cone = ConicalSurface::new(
+            Point3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            std::f64::consts::FRAC_PI_4,
+        )
+        .unwrap();
+        let tilt = 1e-5_f64;
+        let cyl = CylindricalSurface::new(
+            Point3::new(1000.0, 0.0, 0.0),
+            Vec3::new(tilt.sin(), 0.0, tilt.cos()),
+            5.0,
+        )
+        .unwrap();
+
+        assert!(
+            algebraic_parallel_cone_cylinder(&cone, &cyl, None, None)
+                .unwrap()
+                .is_none(),
+            "a tilted cylinder must use the general intersection path"
         );
     }
 
