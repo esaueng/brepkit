@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786556757074,
+  "lastUpdate": 1786556889413,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8585,6 +8585,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21193159,
             "range": "± 2164119",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "b4b5b50891c7226140658936e492c67c0a8e2960",
+          "message": "Merge pull request #194 from esaueng/codex/fix-nan-rim-angles-in-band-tessellation\n\nfix(operations): reject non-finite band parameters",
+          "timestamp": "2026-08-12T13:45:20-04:00",
+          "tree_id": "e6eeb8274880335bedf6538776d10c4799047112",
+          "url": "https://github.com/esaueng/brepkit/commit/b4b5b50891c7226140658936e492c67c0a8e2960"
+        },
+        "date": 1786556887936,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 494375,
+            "range": "± 7085",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 588402,
+            "range": "± 41455",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7200,
+            "range": "± 200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 462830,
+            "range": "± 7407",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14711908,
+            "range": "± 679323",
             "unit": "ns/iter"
           }
         ]
