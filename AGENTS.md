@@ -38,13 +38,13 @@ mdbook build book
 rustup run 1.88.0 cargo check --workspace --all-features  # needs the 1.88 toolchain installed locally
 ./scripts/check-versions.sh
 cargo check --manifest-path fuzz/Cargo.toml --bins
-cargo publish --workspace --dry-run  # uses crates.io; CI definition verified, not run in the agent-doc audit
+cargo publish --workspace --dry-run  # uses crates.io; this is validation, not a release
 
 # WASM API, bindings, build tooling, or package contents
 cargo test --manifest-path xtask/Cargo.toml
 cargo clippy -p brepkit-wasm --target wasm32-unknown-unknown --no-default-features -- -D warnings
 cargo test -p brepkit-wasm --no-default-features
-cargo xtask wasm-build --skip-opt  # needs wasm-pack + Node; rewrites crates/wasm/pkg; CI definition verified, not run in the agent-doc audit
+cargo xtask wasm-build --skip-opt  # needs wasm-pack + Node; rewrites crates/wasm/pkg
 cd crates/wasm/pkg && npm pack --dry-run
 ```
 
@@ -53,24 +53,26 @@ RustSec, cargo-machete, Taplo, secret scanning, fuzz-target compilation, and
 Linux/macOS/Windows tests. The SemVer Check is advisory and is deliberately
 excluded from `CI Pass`.
 
-CI baseline verified 2026-08-11: current `main` is red only because the Windows
-runner cannot list `brepkit-render::adapter_required` (`0xc0000135`, missing
-module); all other blocking jobs passed. Recheck untouched `main` before
-attributing that inherited runner failure to a change.
+A recurring Windows runner setup failure exits before test discovery with
+`0xc0000135` / missing module. Inspect the exact log and reproduce on untouched
+current `main` before attributing that runner failure to a change.
 
 ## Enforced workspace boundaries
 
 `scripts/check-boundaries.sh`, run by the `Layer Boundaries` CI job, checks
 normal `[dependencies]`; dev-dependencies are intentionally exempt.
 
-- L0: `math` and `sketch` have no workspace dependencies.
+- L0: `math` has no workspace dependencies.
 - L1: `geometry` and `topology` may depend on `math`.
 - L2: `algo`, `blend`, `heal`, `check`, and `offset` may depend on `math`,
-  `topology`, and `geometry`.
-- L3: `operations` composes the lower layers. `io` and `render` may depend on
-  `math`, `topology`, and `operations`.
-- L4: `wasm` may depend on every non-render workspace crate. `render` is a
-  leaf; no other regular workspace dependency may point to it.
+  `topology`, and `geometry`; `sketch` has no workspace dependencies.
+- L3: `operations` composes the lower layers; `io` may depend on `math`,
+  `topology`, and `operations`.
+- L4: `render` may depend on `math`, `topology`, and `operations`; `wasm` may
+  depend on every non-render workspace crate. `render` is a leaf.
+
+Dev-dependencies are exempt from the script, but do not add `operations` to
+`topology`; use the existing `test-utils` feature instead.
 
 ## Invariants that are easy to miss
 
