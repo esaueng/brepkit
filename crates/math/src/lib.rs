@@ -35,6 +35,17 @@ pub enum MathError {
         value: f64,
     },
 
+    /// A NURBS curve has too few control points for its degree.
+    #[error("invalid control point count: degree {degree} requires at least {minimum}, got {got}")]
+    InvalidControlPointCount {
+        /// Polynomial degree of the curve.
+        degree: usize,
+        /// Minimum number of control points required for the degree.
+        minimum: usize,
+        /// Actual number of control points.
+        got: usize,
+    },
+
     /// Control point grid dimensions are inconsistent.
     #[error(
         "invalid control point grid: expected {expected_rows}x{expected_cols}, got inconsistent dimensions"
