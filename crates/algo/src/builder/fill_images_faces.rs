@@ -3863,6 +3863,11 @@ fn presplit_sections_at_registry(
     // section when it lies on the section's curve within the weld band (the
     // two faces' copies of one FF curve agree to fit error). Dense sampling
     // pre-locates; a local ternary refine certifies the distance.
+    //
+    // Sections on curved faces arrive WITHOUT pave-block ids; those keep the
+    // historical geometric matching against every registered point — scoping
+    // them away drops real splits and un-pairs the emitted edges.
+    let all_points: Vec<brepkit_math::vec::Point3> = registry.values().flatten().copied().collect();
     let weld = tol * 100.0;
     let on_curve =
         |s: &crate::builder::split_types::SectionEdge, p: brepkit_math::vec::Point3| -> bool {
@@ -3902,10 +3907,11 @@ fn presplit_sections_at_registry(
         };
     let mut out = Vec::with_capacity(sections.len());
     for s in sections {
-        let Some(points) = s.pave_block_id.and_then(|pb_id| registry.get(&pb_id)) else {
-            out.push(s.clone());
-            continue;
-        };
+        let points: &Vec<brepkit_math::vec::Point3> =
+            match s.pave_block_id.and_then(|pb_id| registry.get(&pb_id)) {
+                Some(points) => points,
+                None => &all_points,
+            };
         let chord = s.end - s.start;
         let cl2 = chord.dot(chord);
         if cl2 <= tol * tol {
