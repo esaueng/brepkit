@@ -38,3 +38,13 @@ pub use projection::{
 };
 pub use surface::NurbsSurface;
 pub use surface_fitting::interpolate_surface;
+
+fn validate_knot_values(knots: &[f64]) -> Result<(), crate::MathError> {
+    for (index, &value) in knots.iter().enumerate() {
+        let is_decreasing = index > 0 && value < knots[index - 1];
+        if !value.is_finite() || is_decreasing {
+            return Err(crate::MathError::InvalidKnotValue { index, value });
+        }
+    }
+    Ok(())
+}
