@@ -794,7 +794,7 @@ pub fn make_convex_hull(
 /// over-approximation.
 ///
 /// The vertex sum is `O(|A|·|B|)` points, capped at
-/// [`MAX_MINKOWSKI_POINT_SUMS`] to bound memory and hull-construction work.
+/// `MAX_MINKOWSKI_POINT_SUMS` to bound memory and hull-construction work.
 ///
 /// # Errors
 ///
