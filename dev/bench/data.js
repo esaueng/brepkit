@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786553861018,
+  "lastUpdate": 1786554037222,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -7829,6 +7829,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 15065457,
             "range": "± 852132",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8c4305957adbd59fcd8fc26ddf83795e36ee13b9",
+          "message": "Merge pull request #174 from esaueng/codex/fix-workflow-credential-exposure-issue\n\nfix(ci): scope GitHub App credentials to token-minting step in publish workflow",
+          "timestamp": "2026-08-12T12:57:31-04:00",
+          "tree_id": "6a513b989fe00c9ef52ce6a79647d37a726b0050",
+          "url": "https://github.com/esaueng/brepkit/commit/8c4305957adbd59fcd8fc26ddf83795e36ee13b9"
+        },
+        "date": 1786554035873,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 520944,
+            "range": "± 7187",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 570960,
+            "range": "± 24006",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 7063,
+            "range": "± 365",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 443741,
+            "range": "± 16108",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14602183,
+            "range": "± 238649",
             "unit": "ns/iter"
           }
         ]
