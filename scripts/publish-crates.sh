@@ -9,7 +9,9 @@ set -euo pipefail
 #     via OIDC trusted publishing.
 #   - A human runs it once per crate name to bootstrap. crates.io only accepts
 #     a trusted-publisher config for a crate that already exists, so the FIRST
-#     version of each crate must be pushed manually with an API token:
+#     version of each crate must be pushed manually with an API token. Verify
+#     the packages before putting that token in the environment:
+#       cargo publish --workspace --dry-run
 #       CARGO_REGISTRY_TOKEN=<token> ./scripts/publish-crates.sh
 #
 # Skipping already-published crates is what makes a re-run after a partial
@@ -72,7 +74,12 @@ publish_one() {
     # bearing: a bare assignment from a failing command substitution trips
     # `set -e` before the status can be inspected.
     status=0
-    out=$(cargo publish -p "$crate" 2>&1) || status=$?
+    # Package verification must happen before a registry token is exported.
+    # Otherwise build scripts and proc macros run with publish credentials in
+    # their environment. The release workflow and bootstrap instructions both
+    # perform a token-free workspace dry run before reaching this upload-only
+    # path.
+    out=$(cargo publish --no-verify -p "$crate" 2>&1) || status=$?
     echo "$out"
     [ "$status" -eq 0 ] && return 0
 
