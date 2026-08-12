@@ -7027,6 +7027,30 @@ fn nested_pieces_are_not_disjoint() {
     );
 }
 
+/// Partially overlapping closed components must not pass the multi-region
+/// acceptance guard merely because neither AABB contains the other.
+#[test]
+fn overlapping_components_are_not_disjoint() {
+    use brepkit_math::mat::Mat4;
+    use brepkit_topology::explorer::solid_faces;
+
+    let mut topo = Topology::new();
+    let a = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    let b = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    crate::transform::transform_solid(&mut topo, b, &Mat4::translation(1.0, 0.0, 0.0)).unwrap();
+
+    let comps: Vec<Vec<FaceId>> = [a, b]
+        .iter()
+        .map(|&solid| solid_faces(&topo, solid).unwrap())
+        .collect();
+    assert!(super::is_closed_manifold(&topo, a).unwrap());
+    assert!(super::is_closed_manifold(&topo, b).unwrap());
+    assert!(
+        !super::components_are_disjoint_pieces(&topo, &comps),
+        "partially overlapping boxes must not count as a disjoint union"
+    );
+}
+
 /// Multi-region Euler acceptance must tolerate genus per piece.
 ///
 /// `euler_balanced` used to compare against a fixed bound of 2, i.e. it assumed

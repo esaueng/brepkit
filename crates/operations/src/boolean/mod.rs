@@ -2933,7 +2933,9 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
         })
         .collect();
 
-    // Reject NESTING, not mere AABB overlap.
+    // AABB separation proves disjointness. Overlap requires a narrow-phase
+    // surface test: neither containment nor topological validation rules out
+    // partially intersecting closed components.
     //
     // Nesting is the hazard worth rejecting (a blob sitting inside another
     // piece's cavity is not a disjoint union); side-by-side pieces are exactly
@@ -2948,15 +2950,6 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
     // available here; the ray-parity confirmation below earns the answer
     // instead of inferring it.
     //
-    // Overlap is the wrong predicate for that, because an AABB is only tight on
-    // axis-aligned geometry. Two ROTATED bars a clear distance apart each span
-    // the whole diagonal envelope, so their boxes interpenetrate and an
-    // overlap test calls them touching — which is why a kumiko lattice cut,
-    // whose members are diagonal, could never be accepted and fell back to the
-    // mesh path on every band (see
-    // `tests::rotated_separate_pieces_are_recognised_as_disjoint`). Containment
-    // is tight in the direction that matters: nesting implies it, and rotation
-    // does not manufacture it.
     let eps = COMPONENT_OVERLAP_MARGIN_MM;
     let contains = |(o_min, o_max): (Point3, Point3), (i_min, i_max): (Point3, Point3)| {
         o_min.x() - eps <= i_min.x()
@@ -2974,6 +2967,49 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
     // pair falls back to the conservative answer.
     for i in 0..aabbs.len() {
         for j in (i + 1)..aabbs.len() {
+            let (a_min, a_max) = aabbs[i];
+            let (b_min, b_max) = aabbs[j];
+            let overlaps = a_min.x() <= b_max.x() + eps
+                && a_max.x() + eps >= b_min.x()
+                && a_min.y() <= b_max.y() + eps
+                && a_max.y() + eps >= b_min.y()
+                && a_min.z() <= b_max.z() + eps
+                && a_max.z() + eps >= b_min.z();
+            if !overlaps {
+                continue;
+            }
+
+            let span = Point3::new(
+                a_max.x().max(b_max.x()) - a_min.x().min(b_min.x()),
+                a_max.y().max(b_max.y()) - a_min.y().min(b_min.y()),
+                a_max.z().max(b_max.z()) - a_min.z().min(b_min.z()),
+            );
+            let diagonal = (span.x().powi(2) + span.y().powi(2) + span.z().powi(2)).sqrt();
+            let deflection = (diagonal / 200.0).max(1e-4);
+            let mut meshes = [Vec::new(), Vec::new()];
+            for (slot, component) in [&components[i], &components[j]].into_iter().enumerate() {
+                for &fid in component {
+                    let Ok(mesh) = crate::tessellate::tessellate_with_uvs(topo, fid, deflection)
+                    else {
+                        return false;
+                    };
+                    for tri in mesh.mesh.indices.chunks_exact(3) {
+                        meshes[slot].push([
+                            mesh.mesh.positions[tri[0] as usize],
+                            mesh.mesh.positions[tri[1] as usize],
+                            mesh.mesh.positions[tri[2] as usize],
+                        ]);
+                    }
+                }
+            }
+            if meshes[0].iter().any(|&a| {
+                meshes[1]
+                    .iter()
+                    .any(|&b| crate::mesh_boolean::triangle_surfaces_intersect(a, b, eps))
+            }) {
+                return false;
+            }
+
             let (outer, inner) = if contains(aabbs[i], aabbs[j]) {
                 (i, j)
             } else if contains(aabbs[j], aabbs[i]) {
