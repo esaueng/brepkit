@@ -150,10 +150,21 @@ fn face_connectivity_components<V: std::ops::Deref<Target = [brepkit_topology::f
     let mut adjacency: HashMap<usize, HashSet<usize>> = HashMap::new();
     for adj_faces in edge_map.values() {
         let adj_faces: &[brepkit_topology::face::FaceId] = adj_faces;
-        for a in adj_faces {
-            for b in adj_faces {
-                if a.index() != b.index() {
-                    adjacency.entry(a.index()).or_default().insert(b.index());
+        if let Some(first) = adj_faces.first() {
+            // A star spans every face sharing this edge without materializing
+            // the complete O(n^2) pairwise relation. This is sufficient for
+            // connected-component discovery, including malformed edges with
+            // an attacker-controlled number of face uses.
+            for other in &adj_faces[1..] {
+                if first.index() != other.index() {
+                    adjacency
+                        .entry(first.index())
+                        .or_default()
+                        .insert(other.index());
+                    adjacency
+                        .entry(other.index())
+                        .or_default()
+                        .insert(first.index());
                 }
             }
         }

@@ -20,6 +20,20 @@ fn valid_cube() {
 }
 
 #[test]
+fn connectivity_handles_many_faces_on_one_edge_linearly() {
+    let mut topo = Topology::new();
+    let cube = make_unit_cube_manifold(&mut topo);
+    let faces = brepkit_topology::explorer::solid_faces(&topo, cube).unwrap();
+    let shared_edge_faces: Vec<_> = faces.iter().take(2).copied().cycle().take(10_000).collect();
+    let edge_map = std::collections::HashMap::from([(0, shared_edge_faces)]);
+
+    let components = face_connectivity_components(&faces[..2], &edge_map);
+
+    assert_eq!(components.len(), 1);
+    assert_eq!(components[0].len(), 2);
+}
+
+#[test]
 fn valid_box_primitive() {
     let mut topo = Topology::new();
     let solid = crate::primitives::make_box(&mut topo, 2.0, 3.0, 4.0).unwrap();
