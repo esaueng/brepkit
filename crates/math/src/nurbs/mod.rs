@@ -41,8 +41,17 @@ pub use surface_fitting::interpolate_surface;
 
 fn validate_knot_values(knots: &[f64]) -> Result<(), crate::MathError> {
     for (index, &value) in knots.iter().enumerate() {
-        let is_decreasing = index > 0 && value < knots[index - 1];
-        if !value.is_finite() || is_decreasing {
+        if !value.is_finite() {
+            return Err(crate::MathError::InvalidKnotValue { index, value });
+        }
+        // A wobble of a few ulps between adjacent knots is representation
+        // noise, not a malformed vector: `NurbsCurve::reversed` mirrors knots
+        // and clamps the endpoints back, which can leave the last interior
+        // knot one ulp above the clamped end. Only a decrease larger than
+        // that scale is rejected.
+        let prev = knots[index.saturating_sub(1)];
+        let wobble = 8.0 * f64::EPSILON * prev.abs().max(value.abs()).max(1.0);
+        if index > 0 && value < prev - wobble {
             return Err(crate::MathError::InvalidKnotValue { index, value });
         }
     }
