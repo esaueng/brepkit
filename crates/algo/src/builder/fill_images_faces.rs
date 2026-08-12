@@ -2960,8 +2960,13 @@ fn arc_segment_crossings(
             let _ = tol;
             let dir = line_end - line_start;
             let side = |p: Point3| (p - line_start).cross(dir).dot(n);
+            // Deriving a trimmed NURBS domain projects both edge endpoints
+            // onto the curve. Hoist that expensive work out of the sampling
+            // and bisection loops so each probe is only a curve evaluation.
+            let (t0, t1) = curve.domain_with_endpoints(edge_start, edge_end);
+            let span = t1 - t0;
             let eval =
-                |f: f64| super::pcurve_compute::evaluate_edge_at_t(curve, edge_start, edge_end, f);
+                |f: f64| curve.evaluate_with_endpoints(f.mul_add(span, t0), edge_start, edge_end);
             let mut hits = Vec::new();
             let mut prev_f = 0.0_f64;
             let mut prev_s = side(eval(0.0));
@@ -4053,6 +4058,8 @@ mod tests {
     use super::*;
     use brepkit_math::curves::Circle3D;
     use brepkit_math::curves2d::{Curve2D, Line2D};
+    use brepkit_math::nurbs::fitting::interpolate;
+    use brepkit_math::traits::ParametricCurve;
     use brepkit_math::vec::{Point2, Vec2, Vec3};
 
     #[test]
@@ -4109,5 +4116,33 @@ mod tests {
                 && xs.iter().any(|&x| (x - 7.0).abs() < 1e-6),
             "expected crossings at x=7 and x=13, got {xs:?}"
         );
+    }
+
+    #[test]
+    fn trimmed_nurbs_boundary_crossing_uses_true_curve_span() {
+        let points: Vec<Point3> = (0..=6)
+            .map(|k| {
+                let x = f64::from(k);
+                Point3::new(x, 0.1 * x * x, 0.0)
+            })
+            .collect();
+        let nurbs = interpolate(&points, 3).unwrap();
+        let edge_start = ParametricCurve::evaluate(&nurbs, 0.2);
+        let edge_end = ParametricCurve::evaluate(&nurbs, 0.8);
+        let expected = ParametricCurve::evaluate(&nurbs, 0.43);
+
+        let hits = arc_segment_crossings(
+            &EdgeCurve::NurbsCurve(nurbs),
+            edge_start,
+            edge_end,
+            false,
+            Point3::new(expected.x(), -10.0, 0.0),
+            Point3::new(expected.x(), 10.0, 0.0),
+            1e-7,
+            Some(Vec3::new(0.0, 0.0, 1.0)),
+        );
+
+        assert_eq!(hits.len(), 1);
+        assert!((hits[0].0 - expected).length() < 1e-7);
     }
 }

@@ -146,6 +146,26 @@ fn compound_cut_disjoint_drills_matches_sequential() {
 }
 
 #[test]
+fn compound_cut_rejects_excessive_tool_count() {
+    let mut topo = Topology::new();
+    let target = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+    let tool = crate::primitives::make_box(&mut topo, 1.0, 1.0, 1.0).unwrap();
+    let tools = vec![tool; super::MAX_COMPOUND_CUT_TOOLS + 1];
+    let err = compound_cut(
+        &mut topo,
+        target,
+        &tools,
+        BooleanOptions {
+            unify_faces: false,
+            ..BooleanOptions::default()
+        },
+    )
+    .unwrap_err();
+
+    assert!(err.to_string().contains("accepts at most 256 tools"));
+}
+
+#[test]
 fn compound_cut_overlapping_tools_match_union_cut_volume() {
     // Two tools that overlap EACH OTHER form ONE AABB cluster, so this exercises
     // the batched path — though the batch falls back to the sequential loop on
@@ -390,6 +410,36 @@ fn cut_disjoint_returns_a() {
 
     let result = boolean(&mut topo, BooleanOp::Cut, a, b).unwrap();
     assert_eq!(check_result(&topo, result), 6);
+}
+
+#[test]
+fn nurbs_component_is_not_provably_disjoint_from_sampled_box() {
+    use brepkit_math::nurbs::surface::NurbsSurface;
+
+    let mut topo = Topology::new();
+    let blank = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 0.0);
+    let face_id = brepkit_topology::explorer::solid_faces(&topo, blank).unwrap()[0];
+    let nurbs = NurbsSurface::new(
+        1,
+        1,
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![
+            vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 1.0, 0.0)],
+            vec![Point3::new(1.0, 0.0, 10.0), Point3::new(1.0, 1.0, 0.0)],
+        ],
+        vec![vec![1.0, 1.0], vec![1.0, 1.0]],
+    )
+    .unwrap();
+    topo.face_mut(face_id)
+        .unwrap()
+        .set_surface(FaceSurface::Nurbs(nurbs));
+
+    let tool = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 9.5);
+    assert!(
+        !solids_provably_disjoint(&topo, blank, tool, Tolerance::new().linear),
+        "a sampled NURBS AABB cannot prove that the solids are disjoint"
+    );
 }
 
 /// A two-piece accumulator whose overall box spans the tool: whole-solid
@@ -839,6 +889,33 @@ fn fuse_evolution_is_faithful() {
     assert_eq!(
         attributed, result_faces,
         "every result face should trace to an input face"
+    );
+}
+
+#[test]
+fn cut_evolution_rejects_untouched_gfa_blank() {
+    use brepkit_math::mat::Mat4;
+
+    // The cylinder crosses the plate's x=0 wall by 0.5 mm. GFA can lose the
+    // tool in this configuration and return the original six-face plate: a
+    // structurally valid solid, but not the requested difference.
+    let mut topo = Topology::new();
+    let plate = crate::primitives::make_box(&mut topo, 60.0, 40.0, 8.0).unwrap();
+    let tool = crate::primitives::make_cylinder(&mut topo, 10.0, 16.0).unwrap();
+    crate::transform::transform_solid(&mut topo, tool, &Mat4::translation(-9.5, 20.0, -4.0))
+        .unwrap();
+
+    let (result, evolution) =
+        boolean_with_evolution(&mut topo, BooleanOp::Cut, plate, tool).unwrap();
+    let volume = crate::measure::solid_volume(&topo, result, 0.1).unwrap();
+
+    assert!(
+        volume < 60.0 * 40.0 * 8.0,
+        "evolution cut returned the untouched plate ({volume})"
+    );
+    assert!(
+        !evolution.modified.is_empty(),
+        "accepted result must retain evolution data"
     );
 }
 
@@ -7024,6 +7101,30 @@ fn nested_pieces_are_not_disjoint() {
     assert!(
         !super::components_are_disjoint_pieces(&topo, &comps),
         "a piece nested inside another must not count as a disjoint union"
+    );
+}
+
+/// Partially overlapping closed components must not pass the multi-region
+/// acceptance guard merely because neither AABB contains the other.
+#[test]
+fn overlapping_components_are_not_disjoint() {
+    use brepkit_math::mat::Mat4;
+    use brepkit_topology::explorer::solid_faces;
+
+    let mut topo = Topology::new();
+    let a = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    let b = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+    crate::transform::transform_solid(&mut topo, b, &Mat4::translation(1.0, 0.0, 0.0)).unwrap();
+
+    let comps: Vec<Vec<FaceId>> = [a, b]
+        .iter()
+        .map(|&solid| solid_faces(&topo, solid).unwrap())
+        .collect();
+    assert!(super::is_closed_manifold(&topo, a).unwrap());
+    assert!(super::is_closed_manifold(&topo, b).unwrap());
+    assert!(
+        !super::components_are_disjoint_pieces(&topo, &comps),
+        "partially overlapping boxes must not count as a disjoint union"
     );
 }
 

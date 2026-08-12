@@ -910,7 +910,7 @@ pub fn fillet_variable(
     // engine on the ORIGINAL solid and adopt its result only when it is
     // closed with every edge blended — cases this path already handles
     // keep their existing output unchanged.
-    if solid_has_free_edges(topo, solid_id)? {
+    if solid_edge_use_issues(topo, solid_id)?.0 {
         let v2_laws: Vec<(EdgeId, brepkit_blend::radius_law::RadiusLaw)> = edge_laws
             .iter()
             .map(|(eid, law)| {
@@ -936,12 +936,15 @@ pub fn fillet_variable(
             .collect();
         match crate::blend_ops::fillet_v2_variable(topo, solid, v2_laws) {
             Ok(v2) => {
-                let open = solid_has_free_edges(topo, v2.solid)?;
+                let (open, over_shared) = solid_edge_use_issues(topo, v2.solid)?;
                 log::debug!(
-                    "fillet_variable v2 retry: failed_edges={} open={open}",
+                    "fillet_variable v2 retry: failed_edges={} open={open} over_shared={over_shared}",
                     v2.failed.len()
                 );
-                if v2.failed.is_empty() && (!open || std::env::var("BK_FORCE_V2").is_ok()) {
+                if v2.failed.is_empty()
+                    && !over_shared
+                    && (!open || std::env::var("BK_FORCE_V2").is_ok())
+                {
                     return Ok(v2.solid);
                 }
             }
@@ -952,7 +955,11 @@ pub fn fillet_variable(
     Ok(solid_id)
 }
 
-fn solid_has_free_edges(topo: &Topology, solid: SolidId) -> Result<bool, crate::OperationsError> {
+/// Returns `(has_free_edges, has_over_shared_edges)` for all shells.
+fn solid_edge_use_issues(
+    topo: &Topology,
+    solid: SolidId,
+) -> Result<(bool, bool), crate::OperationsError> {
     let mut uses: HashMap<usize, usize> = HashMap::new();
     for fid in brepkit_topology::explorer::solid_faces(topo, solid)? {
         let face = topo.face(fid)?;
@@ -964,5 +971,8 @@ fn solid_has_free_edges(topo: &Topology, solid: SolidId) -> Result<bool, crate::
             }
         }
     }
-    Ok(uses.values().any(|&c| c == 1))
+    Ok((
+        uses.values().any(|&c| c == 1),
+        uses.values().any(|&c| c > 2),
+    ))
 }
