@@ -402,6 +402,11 @@ fn intersect_triangles(
     }]
 }
 
+/// Returns whether two tessellated triangles have a non-empty intersection.
+pub(crate) fn triangles_intersect(a: [Point3; 3], b: [Point3; 3], tolerance: f64) -> bool {
+    !intersect_triangles(a[0], a[1], a[2], b[0], b[1], b[2], tolerance).is_empty()
+}
+
 /// Return whether two triangles share a segment with non-zero length.
 ///
 /// This is exposed within the crate so boolean acceptance guards can use the

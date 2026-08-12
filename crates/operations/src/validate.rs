@@ -280,6 +280,11 @@ fn outer_components_materially_overlap(
             && o.max.y() + eps >= i.max.y()
             && o.max.z() + eps >= i.max.z()
     };
+    let materially_intersects = |a: &brepkit_math::aabb::Aabb3, b: &brepkit_math::aabb::Aabb3| {
+        a.max.x().min(b.max.x()) - a.min.x().max(b.min.x()) > eps
+            && a.max.y().min(b.max.y()) - a.min.y().max(b.min.y()) > eps
+            && a.max.z().min(b.max.z()) - a.min.z().max(b.min.z()) > eps
+    };
 
     let mut pair_checks = 0usize;
     for (i, (ci_a, a, ga)) in boxes.iter().enumerate() {
@@ -291,13 +296,68 @@ fn outer_components_materially_overlap(
             if *ga > 0 || *gb > 0 {
                 continue; // higher-genus containment is a cavity wall, not debris
             }
-            // Pre-filter: only a pair where one box encloses the other can be
-            // nested. A diagonal stand-off fails this and is left alone.
+            // Containment is the nesting case. For partial AABB overlap, test
+            // every boundary vertex in both directions: accepting the pair
+            // solely because neither box contains the other would let ordinary
+            // interpenetrating components bypass validation.
             let (outer_ci, outer_box, inner_ci) = if contains(a, b) {
                 (*ci_a, a, *ci_b)
             } else if contains(b, a) {
                 (*ci_b, b, *ci_a)
             } else {
+                if !materially_intersects(a, b) {
+                    continue;
+                }
+                let mut triangles = [Vec::new(), Vec::new()];
+                for (slot, (ci, bbox)) in triangles.iter_mut().zip([(*ci_a, a), (*ci_b, b)]) {
+                    let diag = (bbox.max - bbox.min).length();
+                    let deflection = (diag / 200.0).max(1e-4);
+                    for &fid in &components[ci] {
+                        let mesh = crate::tessellate::tessellate_with_uvs(topo, fid, deflection)?;
+                        for tri in mesh.mesh.indices.chunks_exact(3) {
+                            slot.push([
+                                mesh.mesh.positions[tri[0] as usize],
+                                mesh.mesh.positions[tri[1] as usize],
+                                mesh.mesh.positions[tri[2] as usize],
+                            ]);
+                        }
+                    }
+                }
+                if triangles[0].iter().any(|&ta| {
+                    triangles[1]
+                        .iter()
+                        .any(|&tb| crate::mesh_boolean::triangles_intersect(ta, tb, eps))
+                }) {
+                    return Ok(true);
+                }
+                for (probe_ci, surface_ci, surface_box) in [(*ci_a, *ci_b, b), (*ci_b, *ci_a, a)] {
+                    let diag = (surface_box.max - surface_box.min).length();
+                    let deflection = (diag / 200.0).max(1e-4);
+                    let mut probes = Vec::new();
+                    for &fid in &components[probe_ci] {
+                        let face = topo.face(fid)?;
+                        for wid in std::iter::once(face.outer_wire())
+                            .chain(face.inner_wires().iter().copied())
+                        {
+                            for oe in topo.wire(wid)?.edges() {
+                                probes.push(topo.vertex(topo.edge(oe.edge())?.start())?.point());
+                            }
+                        }
+                    }
+                    if probes.is_empty() {
+                        return Ok(true);
+                    }
+                    match crate::boolean::component_encloses_any_point(
+                        topo,
+                        &components[surface_ci],
+                        &probes,
+                        deflection,
+                    ) {
+                        Some(true) => return Ok(true),
+                        Some(false) => {}
+                        None => return Ok(true),
+                    }
+                }
                 continue;
             };
             // Confirm with ray parity against the enclosing candidate's own
