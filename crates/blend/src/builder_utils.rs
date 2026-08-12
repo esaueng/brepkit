@@ -28,6 +28,19 @@ pub fn sample_nurbs_endpoints(curve: &NurbsCurve) -> Vec<Point3> {
     vec![curve.evaluate(t0), curve.evaluate(t1)]
 }
 
+fn contact_midpoint_matches(
+    edge_curve: &EdgeCurve,
+    edge_start: Point3,
+    edge_end: Point3,
+    want_curve: &NurbsCurve,
+    tolerance: f64,
+) -> bool {
+    let (t0, t1) = want_curve.domain();
+    let want_mid = want_curve.evaluate((t0 + t1) * 0.5);
+    let edge_mid = edge_curve.evaluate_with_endpoints(0.5, edge_start, edge_end);
+    (edge_mid - want_mid).length() <= tolerance
+}
+
 /// Create a blend face from a stripe's surface and contact curves.
 ///
 /// Builds a minimal quadrilateral wire from the four contact-curve endpoints
@@ -40,9 +53,9 @@ pub fn sample_nurbs_endpoints(curve: &NurbsCurve) -> Vec<Point3> {
 /// span the same contacts. Minting fresh edges for curves the trimmed
 /// neighbours already carry leaves two edge entities per contact — each used
 /// by one face — opening the shell along every blend flank. A trimmer edge
-/// is adopted (with its vertices) when its endpoints match the stripe's
-/// contact endpoints within the weld band, in either orientation; otherwise
-/// that side falls back to a fresh edge.
+/// is adopted (with its vertices) when its endpoints and midpoint match the
+/// stripe's contact curve within the weld band, in either orientation;
+/// otherwise that side falls back to a fresh edge.
 pub fn create_blend_face_with_contacts(
     topo: &mut Topology,
     stripe: &Stripe,
@@ -64,13 +77,17 @@ pub fn create_blend_face_with_contacts(
     let adopt = |topo: &Topology,
                  eid: Option<brepkit_topology::edge::EdgeId>,
                  want_s: Point3,
-                 want_e: Point3|
+                 want_e: Point3,
+                 want_curve: &NurbsCurve|
      -> Option<(brepkit_topology::edge::EdgeId, bool, VertexId, VertexId)> {
         let eid = eid?;
         let e = topo.edge(eid).ok()?;
         let (sv, ev) = (e.start(), e.end());
         let sp = topo.vertex(sv).ok()?.point();
         let ep = topo.vertex(ev).ok()?.point();
+        if !contact_midpoint_matches(e.curve(), sp, ep, want_curve, WELD) {
+            return None;
+        }
         if (sp - want_s).length() <= WELD && (ep - want_e).length() <= WELD {
             Some((eid, true, sv, ev))
         } else if (sp - want_e).length() <= WELD && (ep - want_s).length() <= WELD {
@@ -79,9 +96,9 @@ pub fn create_blend_face_with_contacts(
             None
         }
     };
-    let adopt1 = adopt(topo, contact1_edge, p1_start, p1_end);
+    let adopt1 = adopt(topo, contact1_edge, p1_start, p1_end, &stripe.contact1);
     // Contact 2 traverses end -> start in the quad below.
-    let adopt2 = adopt(topo, contact2_edge, p2_end, p2_start);
+    let adopt2 = adopt(topo, contact2_edge, p2_end, p2_start, &stripe.contact2);
 
     // A variable-radius stripe can pinch to a point at an end: both
     // contact curves land on the same position. Detect it up front so the
@@ -1290,8 +1307,7 @@ pub(crate) fn propagate_orientation(
 
 #[cfg(test)]
 mod tests {
-    use super::is_pinched;
-    use brepkit_math::vec::Point3;
+    use super::*;
 
     #[test]
     fn near_pinch_outside_closure_tolerance_keeps_cross_edge() {
@@ -1299,5 +1315,27 @@ mod tests {
 
         assert!(is_pinched(origin, Point3::new(5e-8, 0.0, 0.0)));
         assert!(!is_pinched(origin, Point3::new(5e-6, 0.0, 0.0)));
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn straight_contact_edge_does_not_match_curved_stripe_contact() {
+        let start = Point3::new(0.0, 0.0, 0.0);
+        let end = Point3::new(1.0, 0.0, 0.0);
+        let curved = NurbsCurve::new(
+            2,
+            vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+            vec![start, Point3::new(0.5, 0.5, 0.0), end],
+            vec![1.0, 1.0, 1.0],
+        )
+        .expect("valid quadratic NURBS");
+
+        assert!(!contact_midpoint_matches(
+            &EdgeCurve::Line,
+            start,
+            end,
+            &curved,
+            1e-5,
+        ));
     }
 }
