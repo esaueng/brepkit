@@ -146,15 +146,26 @@ fn face_connectivity_components<V: std::ops::Deref<Target = [brepkit_topology::f
 ) -> Vec<Vec<brepkit_topology::face::FaceId>> {
     use std::collections::{HashMap, HashSet, VecDeque};
 
-    // face index -> neighbor face indices via shared edges
+    // Face index -> neighbor face indices via shared edges. A shared edge only
+    // needs a spanning star to connect all of its incident faces; materializing
+    // the complete clique would make this quadratic for malformed,
+    // high-fanout edges that validation is expected to reject.
     let mut adjacency: HashMap<usize, HashSet<usize>> = HashMap::new();
     for adj_faces in edge_map.values() {
         let adj_faces: &[brepkit_topology::face::FaceId] = adj_faces;
-        for a in adj_faces {
-            for b in adj_faces {
-                if a.index() != b.index() {
-                    adjacency.entry(a.index()).or_default().insert(b.index());
-                }
+        let Some((first, rest)) = adj_faces.split_first() else {
+            continue;
+        };
+        for face in rest {
+            if first.index() != face.index() {
+                adjacency
+                    .entry(first.index())
+                    .or_default()
+                    .insert(face.index());
+                adjacency
+                    .entry(face.index())
+                    .or_default()
+                    .insert(first.index());
             }
         }
     }

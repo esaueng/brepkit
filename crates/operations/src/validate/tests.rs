@@ -6,6 +6,23 @@ use brepkit_topology::test_utils::make_unit_cube_manifold;
 use super::*;
 
 #[test]
+fn high_fanout_edge_connectivity_uses_all_incident_faces() {
+    let mut topo = Topology::new();
+    let cube = make_unit_cube_manifold(&mut topo);
+    let faces = brepkit_topology::explorer::solid_faces(&topo, cube).unwrap();
+
+    // Model a malformed edge referenced by a large number of faces. Repeating
+    // the cube faces keeps the fixture small while exercising the high-fanout
+    // input that must be handled linearly before validation rejects it.
+    let incident_faces: Vec<_> = faces.iter().copied().cycle().take(10_000).collect();
+    let edge_map = std::collections::HashMap::from([(0, incident_faces)]);
+
+    let components = face_connectivity_components(&faces, &edge_map);
+    assert_eq!(components.len(), 1);
+    assert_eq!(components[0].len(), faces.len());
+}
+
+#[test]
 fn valid_cube() {
     let mut topo = Topology::new();
     let cube = make_unit_cube_manifold(&mut topo);
