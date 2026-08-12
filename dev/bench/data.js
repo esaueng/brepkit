@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786558093338,
+  "lastUpdate": 1786558619343,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -8909,6 +8909,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14048251,
             "range": "± 14047",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "8ed82bca43cd0e0b0dcb9655fb9808ed74cbba22",
+          "message": "Merge pull request #208 from esaueng/codex/fix-crates-token-exposure-vulnerability\n\nfix(release): isolate crates.io publish token from build-time verification",
+          "timestamp": "2026-08-12T14:14:43-04:00",
+          "tree_id": "61b02af4389de1efed51a3015a01194e9be83a80",
+          "url": "https://github.com/esaueng/brepkit/commit/8ed82bca43cd0e0b0dcb9655fb9808ed74cbba22"
+        },
+        "date": 1786558618012,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 838818,
+            "range": "± 139797",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1118003,
+            "range": "± 155034",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12672,
+            "range": "± 1130",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 720118,
+            "range": "± 134019",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 20572710,
+            "range": "± 3022183",
             "unit": "ns/iter"
           }
         ]
