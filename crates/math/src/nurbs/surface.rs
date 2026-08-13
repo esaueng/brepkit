@@ -75,6 +75,7 @@ impl NurbsSurface {
             });
         }
         super::validate_knot_values(&knots_u)?;
+        super::validate_knot_domain(&knots_u, degree_u, n_rows)?;
 
         let expected_knots_v = n_cols + degree_v + 1;
         if knots_v.len() != expected_knots_v {
@@ -84,6 +85,7 @@ impl NurbsSurface {
             });
         }
         super::validate_knot_values(&knots_v)?;
+        super::validate_knot_domain(&knots_v, degree_v, n_cols)?;
 
         // Validate weights grid dimensions.
         if weights.len() != n_rows {
