@@ -29,6 +29,17 @@ pub enum MathError {
         got: usize,
     },
 
+    /// A NURBS knot is non-finite or occurs before its predecessor.
+    #[error(
+        "invalid NURBS knot at index {index}: expected a finite value not less than the previous knot, got {value}"
+    )]
+    InvalidKnotValue {
+        /// Index of the invalid knot.
+        index: usize,
+        /// Invalid knot value.
+        value: f64,
+    },
+
     /// Weights vector length does not match control points.
     #[error("invalid weights: expected {expected} weights, got {got}")]
     InvalidWeights {
