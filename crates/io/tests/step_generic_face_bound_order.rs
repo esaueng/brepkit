@@ -2,8 +2,9 @@
 //! optional `FACE_OUTER_BOUND` subtype must therefore import identically no
 //! matter where its perimeter loop appears in an `ADVANCED_FACE` bound list.
 //!
-//! The fixture is generated from an exact two-bore plate and then rewritten
-//! in memory.  No customer geometry is redistributed.
+//! The fixtures are generated from an exact two-bore plate and an exact
+//! cross-drilled shaft, then rewritten in memory.  No customer geometry is
+//! redistributed.
 
 #![allow(clippy::expect_used, clippy::panic, clippy::unwrap_used)]
 
@@ -147,6 +148,81 @@ fn reorder_face_bounds(step: &str, outer_position: OuterPosition, make_generic: 
     out
 }
 
+/// Reorder the first multi-bound face on `surface_type`, optionally erasing
+/// only that face's explicit outer subtype.  Other faces remain byte-for-byte
+/// equivalent so this isolates periodic outer-role inference.
+fn reorder_surface_face_bounds(
+    step: &str,
+    surface_type: &str,
+    outer_position: OuterPosition,
+    make_generic: bool,
+) -> String {
+    let types = entity_types(step);
+    let (face_id, outer_bound) = step
+        .lines()
+        .find_map(|line| {
+            if !line.contains("= ADVANCED_FACE(") {
+                return None;
+            }
+            let list_start = line.find("(#")?;
+            let list_end = line[list_start..].find(')')? + list_start;
+            let bounds = refs_in(&line[list_start..list_end]);
+            let all_refs = refs_in(line);
+            let surface = all_refs.iter().rev().find(|id| !bounds.contains(id))?;
+            let outer = bounds
+                .iter()
+                .find(|id| types.get(id) == Some(&"FACE_OUTER_BOUND"))?;
+            (bounds.len() > 1 && types.get(surface) == Some(&surface_type))
+                .then_some((entity_id(line)?, *outer))
+        })
+        .unwrap_or_else(|| panic!("fixture needs a multi-bound {surface_type} face"));
+
+    let mut rewritten_face = false;
+    let mut rewritten_outer = !make_generic;
+    let out = step
+        .lines()
+        .map(|source_line| {
+            let mut line = source_line.to_string();
+            if entity_id(&line) == Some(face_id) {
+                let list_start = line.find("(#").expect("bound list");
+                let list_end = line[list_start..].find(')').expect("bound list end") + list_start;
+                let mut bounds = refs_in(&line[list_start..list_end]);
+                let outer_index = bounds
+                    .iter()
+                    .position(|&id| id == outer_bound)
+                    .expect("target outer bound");
+                let outer = bounds.remove(outer_index);
+                let target = match outer_position {
+                    OuterPosition::First => 0,
+                    OuterPosition::Middle => bounds.len().div_ceil(2),
+                    OuterPosition::Last => bounds.len(),
+                };
+                bounds.insert(target, outer);
+                let replacement = format!(
+                    "({})",
+                    bounds
+                        .iter()
+                        .map(|id| format!("#{id}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                line.replace_range(list_start..=list_end, &replacement);
+                rewritten_face = true;
+            }
+            if make_generic && entity_id(&line) == Some(outer_bound) {
+                line = line.replace("FACE_OUTER_BOUND", "FACE_BOUND");
+                rewritten_outer = true;
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n";
+    assert!(rewritten_face, "target ADVANCED_FACE was not rewritten");
+    assert!(rewritten_outer, "target FACE_OUTER_BOUND was not rewritten");
+    out
+}
+
 /// Express every bound in the equivalent `.F.` form: reverse its EDGE_LOOP
 /// and then declare the bound orientation false, which reverses it back.
 fn reverse_bound_formulations(step: &str) -> String {
@@ -275,7 +351,7 @@ fn without_enclosing_bound(step: &str) -> String {
     rewritten
 }
 
-fn with_generic_multi_bound_cylinder(step: &str) -> String {
+fn with_duplicate_generic_cylinder_bound(step: &str) -> String {
     let types = entity_types(step);
     let target_bound = step
         .lines()
@@ -317,6 +393,55 @@ fn with_generic_multi_bound_cylinder(step: &str) -> String {
         + "\n"
 }
 
+fn without_periodic_enclosing_bound(step: &str, surface_type: &str) -> String {
+    let types = entity_types(step);
+    let face_id = step
+        .lines()
+        .find_map(|line| {
+            if !line.contains("= ADVANCED_FACE(") {
+                return None;
+            }
+            let list_start = line.find("(#")?;
+            let list_end = line[list_start..].find(')')? + list_start;
+            let bounds = refs_in(&line[list_start..list_end]);
+            let all_refs = refs_in(line);
+            let surface = all_refs.iter().rev().find(|id| !bounds.contains(id))?;
+            let generic_count = bounds
+                .iter()
+                .filter(|id| types.get(id) == Some(&"FACE_BOUND"))
+                .count();
+            (generic_count >= 2 && types.get(surface) == Some(&surface_type))
+                .then(|| entity_id(line))?
+        })
+        .unwrap_or_else(|| panic!("fixture needs a holed {surface_type} face"));
+
+    step.lines()
+        .map(|source_line| {
+            let mut line = source_line.to_string();
+            if entity_id(&line) == Some(face_id) {
+                let list_start = line.find("(#").expect("bound list");
+                let list_end = line[list_start..].find(')').expect("bound list end") + list_start;
+                let inner: Vec<_> = refs_in(&line[list_start..list_end])
+                    .into_iter()
+                    .filter(|id| types.get(id) == Some(&"FACE_BOUND"))
+                    .collect();
+                let replacement = format!(
+                    "({})",
+                    inner
+                        .iter()
+                        .map(|id| format!("#{id}"))
+                        .collect::<Vec<_>>()
+                        .join(", ")
+                );
+                line.replace_range(list_start..=list_end, &replacement);
+            }
+            line
+        })
+        .collect::<Vec<_>>()
+        .join("\n")
+        + "\n"
+}
+
 fn cylinder_at(topo: &mut Topology, radius: f64, x: f64, y: f64) -> SolidId {
     let cylinder = make_cylinder(topo, radius, 10.0).expect("cylinder");
     transform_solid(topo, cylinder, &Mat4::translation(x, y, -2.0)).expect("place cylinder");
@@ -331,6 +456,27 @@ fn two_bore_plate() -> (Topology, SolidId) {
     let one_bore = boolean(&mut topo, BooleanOp::Cut, plate, left).expect("left bore");
     let two_bores = boolean(&mut topo, BooleanOp::Cut, one_bore, right).expect("right bore");
     (topo, two_bores)
+}
+
+fn cross_drilled_shaft() -> (Topology, SolidId) {
+    let mut topo = Topology::new();
+    let shaft = make_cylinder(&mut topo, 3.0, 30.0).expect("shaft");
+    let length = 42.0;
+    let bore = make_cylinder(&mut topo, 2.0, length).expect("bore");
+    transform_solid(
+        &mut topo,
+        bore,
+        &Mat4::rotation_y(std::f64::consts::FRAC_PI_2),
+    )
+    .expect("rotate bore");
+    transform_solid(
+        &mut topo,
+        bore,
+        &Mat4::translation(-length / 2.0, 0.0, 15.0),
+    )
+    .expect("place bore");
+    let drilled = boolean(&mut topo, BooleanOp::Cut, shaft, bore).expect("cross drill");
+    (topo, drilled)
 }
 
 fn import_one(step: &str) -> (Topology, SolidId) {
@@ -352,6 +498,15 @@ fn import_one(step: &str) -> (Topology, SolidId) {
         relaxed.issues
     );
     (topo, solid)
+}
+
+/// Import for regressions whose exact manifold, winding, and geometry contract
+/// is audited by `snapshot` immediately after this helper returns.
+fn import_one_manifold(step: &str) -> (Topology, SolidId) {
+    let mut topo = Topology::new();
+    let solids = read_step(step, &mut topo).expect("import rewritten STEP");
+    assert_eq!(solids.len(), 1, "fixture must contain one solid");
+    (topo, solids[0])
 }
 
 #[derive(Debug)]
@@ -409,6 +564,11 @@ fn snapshot(topo: &Topology, solid: SolidId) -> Snapshot {
     let quality = welded_mesh_quality(&mesh);
     assert_eq!(quality.boundary_edges, 0, "mesh must be closed");
     assert_eq!(quality.non_manifold_edges, 0, "mesh must be manifold");
+    let mesh_signed_volume = signed_mesh_volume(&mesh);
+    assert!(
+        mesh_signed_volume > 0.0,
+        "mesh must keep outward-positive winding"
+    );
 
     Snapshot {
         counts: (
@@ -422,7 +582,7 @@ fn snapshot(topo: &Topology, solid: SolidId) -> Snapshot {
         volume: solid_volume(topo, solid, DEFLECTION).expect("volume"),
         triangle_count: mesh.indices.len() / 3,
         mesh_bounds: Aabb3::try_from_points(mesh.positions.iter().copied()).expect("mesh bounds"),
-        mesh_signed_volume: signed_mesh_volume(&mesh),
+        mesh_signed_volume,
     }
 }
 
@@ -562,14 +722,109 @@ fn disconnected_generic_bounds_fail_with_stable_diagnostic() {
 }
 
 #[test]
-fn nonplanar_generic_multi_bounds_fail_closed() {
+fn generic_cylindrical_bounds_are_order_independent_and_round_trip_exactly() {
+    let (source_topo, source_solid) = cross_drilled_shaft();
+    let canonical_step = write_step(&source_topo, &[source_solid]).expect("write fixture");
+    let (canonical_topo, canonical_solid) = import_one_manifold(&canonical_step);
+    let expected = snapshot(&canonical_topo, canonical_solid);
+
+    for position in [
+        OuterPosition::First,
+        OuterPosition::Middle,
+        OuterPosition::Last,
+    ] {
+        let rewritten =
+            reorder_surface_face_bounds(&canonical_step, "CYLINDRICAL_SURFACE", position, true);
+        let (topo, solid) = import_one_manifold(&rewritten);
+        assert_same_geometry(
+            &snapshot(&topo, solid),
+            &expected,
+            &format!("generic cylinder {position:?}"),
+        );
+
+        let round_trip = write_step(&topo, &[solid]).expect("round-trip export");
+        assert!(
+            round_trip.contains("FACE_OUTER_BOUND"),
+            "writer must restore the explicit outer subtype"
+        );
+        let (round_topo, round_solid) = import_one_manifold(&round_trip);
+        assert_same_geometry(
+            &snapshot(&round_topo, round_solid),
+            &expected,
+            &format!("generic cylinder {position:?} round trip"),
+        );
+    }
+}
+
+#[test]
+fn explicit_outer_bound_keeps_precedence_on_periodic_face() {
+    let (source_topo, source_solid) = cross_drilled_shaft();
+    let canonical_step = write_step(&source_topo, &[source_solid]).expect("write fixture");
+    let (canonical_topo, canonical_solid) = import_one_manifold(&canonical_step);
+    let expected = snapshot(&canonical_topo, canonical_solid);
+
+    let reordered = reorder_surface_face_bounds(
+        &canonical_step,
+        "CYLINDRICAL_SURFACE",
+        OuterPosition::Last,
+        false,
+    );
+    let (topo, solid) = import_one_manifold(&reordered);
+    assert_same_geometry(
+        &snapshot(&topo, solid),
+        &expected,
+        "explicit periodic outer last",
+    );
+}
+
+#[test]
+fn false_bound_orientation_is_preserved_for_generic_periodic_face() {
+    let (source_topo, source_solid) = cross_drilled_shaft();
+    let canonical_step = write_step(&source_topo, &[source_solid]).expect("write fixture");
+    let (canonical_topo, canonical_solid) = import_one_manifold(&canonical_step);
+    let expected = snapshot(&canonical_topo, canonical_solid);
+
+    let false_form = reverse_bound_formulations(&canonical_step);
+    let generic = reorder_surface_face_bounds(
+        &false_form,
+        "CYLINDRICAL_SURFACE",
+        OuterPosition::Middle,
+        true,
+    );
+    let (topo, solid) = import_one_manifold(&generic);
+    assert_same_geometry(
+        &snapshot(&topo, solid),
+        &expected,
+        "generic periodic false-orientation bounds",
+    );
+}
+
+#[test]
+fn disconnected_generic_periodic_bounds_fail_closed() {
+    let (source_topo, source_solid) = cross_drilled_shaft();
+    let canonical_step = write_step(&source_topo, &[source_solid]).expect("write fixture");
+    let malformed = without_periodic_enclosing_bound(&canonical_step, "CYLINDRICAL_SURFACE");
+    let error = read_step(&malformed, &mut Topology::new())
+        .expect_err("two breakout loops have no enclosing periodic perimeter");
+    assert!(
+        error.to_string().contains(
+            "do not have one enclosing outer boundary in the unwrapped cylinder UV domain"
+        ),
+        "unexpected diagnostic: {error}"
+    );
+}
+
+#[test]
+fn duplicate_generic_periodic_bounds_fail_closed() {
     let (source_topo, source_solid) = two_bore_plate();
     let canonical_step = write_step(&source_topo, &[source_solid]).expect("write fixture");
-    let malformed = with_generic_multi_bound_cylinder(&canonical_step);
+    let malformed = with_duplicate_generic_cylinder_bound(&canonical_step);
     let error = read_step(&malformed, &mut Topology::new())
-        .expect_err("generic multi-bound cylinder needs a UV resolver");
+        .expect_err("duplicate generic periodic loops have no unique outer");
     assert!(
-        error.to_string().contains("unsupported cylinder surface"),
+        error.to_string().contains(
+            "do not have one enclosing outer boundary in the unwrapped cylinder UV domain"
+        ),
         "unexpected diagnostic: {error}"
     );
 }
