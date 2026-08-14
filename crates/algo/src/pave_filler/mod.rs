@@ -191,10 +191,24 @@ pub fn run_pave_filler_n(
     tol: Tolerance,
     arena: &mut GfaArena,
 ) -> Result<(), AlgoError> {
+    const MAX_SOURCE_PAIRS: usize = 4_096;
+
     if sources.is_empty() {
         return Err(AlgoError::AssemblyFailed(
             "N-way pave filler needs at least one source solid".into(),
         ));
+    }
+    let pair_count = sources
+        .len()
+        .checked_mul(sources.len().saturating_sub(1))
+        .and_then(|count| count.checked_div(2))
+        .ok_or_else(|| {
+            AlgoError::AssemblyFailed("N-way pave filler source count overflows".into())
+        })?;
+    if pair_count > MAX_SOURCE_PAIRS {
+        return Err(AlgoError::AssemblyFailed(format!(
+            "N-way pave filler needs {pair_count} source pairs; limit is {MAX_SOURCE_PAIRS}"
+        )));
     }
 
     // Stage 1: Intersection over every source pair, accumulating into one arena.

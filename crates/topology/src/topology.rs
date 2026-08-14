@@ -131,6 +131,24 @@ impl Topology {
         Self::default()
     }
 
+    /// Total arena slots, including retired slots reserved to prevent stale
+    /// numeric handles from aliasing later entities.
+    #[must_use]
+    pub fn allocated_slot_count(&self) -> usize {
+        [
+            self.vertices.slot_len(),
+            self.edges.slot_len(),
+            self.wires.slot_len(),
+            self.faces.slot_len(),
+            self.shells.slot_len(),
+            self.solids.slot_len(),
+            self.compounds.slot_len(),
+            self.compsolids.slot_len(),
+        ]
+        .into_iter()
+        .fold(0usize, usize::saturating_add)
+    }
+
     /// Restore a topology snapshot while permanently retiring arena slots
     /// allocated after that snapshot.
     ///

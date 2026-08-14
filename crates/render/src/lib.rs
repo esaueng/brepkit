@@ -68,6 +68,15 @@ use brepkit_topology::solid::SolidId;
 
 /// Default linear chord tolerance used when [`RenderOpts`] does not override it.
 pub const DEFAULT_DEFLECTION: f64 = 0.05;
+const MAX_OFFSCREEN_PIXELS: u64 = 16_777_216;
+
+fn validate_offscreen_size(width: u32, height: u32) -> Result<(), RenderError> {
+    let pixels = u64::from(width) * u64::from(height);
+    if width == 0 || height == 0 || pixels > MAX_OFFSCREEN_PIXELS {
+        return Err(RenderError::InvalidSize { width, height });
+    }
+    Ok(())
+}
 
 /// Options controlling an offscreen render.
 #[derive(Debug, Clone, Copy)]
@@ -152,12 +161,7 @@ pub fn render_solid_offscreen(
     cam: &Camera,
     opts: &RenderOpts,
 ) -> Result<RenderOutput, RenderError> {
-    if opts.width == 0 || opts.height == 0 {
-        return Err(RenderError::InvalidSize {
-            width: opts.width,
-            height: opts.height,
-        });
-    }
+    validate_offscreen_size(opts.width, opts.height)?;
     let render_mesh = mesh::RenderMesh::build(topo, solid, opts.deflection)?;
     pipeline::render(&render_mesh, cam, opts)
 }
