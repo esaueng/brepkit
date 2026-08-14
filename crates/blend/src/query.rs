@@ -28,8 +28,8 @@ pub enum GeometricSpine {
 
 /// Re-derive only the analytic carrier surface for a fillet candidate.
 ///
-/// This deliberately hides the construction-only [`crate::stripe::Stripe`]
-/// topology recipe. Direct-edit recognition can compare the returned carrier
+/// This deliberately hides the construction-only `Stripe` topology recipe.
+/// Direct-edit recognition can compare the returned carrier
 /// with an existing face without depending on the builder's private assembly
 /// types. Face surfaces are oriented toward the material exactly as they are
 /// by the fillet builder.
