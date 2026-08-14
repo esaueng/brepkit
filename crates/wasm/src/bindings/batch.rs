@@ -66,6 +66,117 @@ enum BatchContract {
 
 type BatchItemResult = Result<serde_json::Value, StructuredWasmError>;
 
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BatchOpKind {
+    ReadOnly,
+    Mutating,
+}
+
+/// Classify operations before doing any work that scales with topology size.
+///
+/// Keeping unknown operations out of the mutating fallback is important: an
+/// attacker must not be able to trigger a full topology snapshot with an
+/// arbitrary operation name.
+fn batch_op_kind(op: &str) -> Option<BatchOpKind> {
+    match op {
+        "meshFallbackCount"
+        | "detectCoincidentFaces"
+        | "volume"
+        | "validateSolid"
+        | "surfaceArea"
+        | "boundingBox"
+        | "centerOfMass"
+        | "massProperties"
+        | "meshQuality"
+        | "solidEdges"
+        | "solidToSolidDistance"
+        | "classifyPoint"
+        | "polygonUnion2d"
+        | "polygonBoolean2d"
+        | "fillet2d"
+        | "chamfer2d"
+        | "getNurbsCurveData"
+        | "getNurbsSurfaceData"
+        | "getNurbsSurfaceDataParity" => Some(BatchOpKind::ReadOnly),
+        "makeBox"
+        | "makeCylinder"
+        | "makeSphere"
+        | "makeCone"
+        | "makeTorus"
+        | "makeEllipsoid"
+        | "fuse"
+        | "cut"
+        | "intersect"
+        | "fuseWithOptions"
+        | "cutWithOptions"
+        | "intersectWithOptions"
+        | "fuseWithEvolution"
+        | "cutWithEvolution"
+        | "intersectWithEvolution"
+        | "compoundCut"
+        | "fuseAll"
+        | "transform"
+        | "copySolid"
+        | "copyAndTransformSolid"
+        | "pushPullFace"
+        | "resizeCylindricalFace"
+        | "extrude"
+        | "revolve"
+        | "sweep"
+        | "sweepWithOptions"
+        | "helicalSweep"
+        | "multiSectionSweep"
+        | "guidedSweep"
+        | "minkowskiSum"
+        | "projectEdges"
+        | "chamfer"
+        | "fillet"
+        | "filletVariable"
+        | "filletV2"
+        | "chamferV2"
+        | "chamferDistanceAngle"
+        | "shell"
+        | "mirror"
+        | "unifyFaces"
+        | "convertToBspline"
+        | "convertToElementary"
+        | "healSolid"
+        | "repairSolid"
+        | "loft"
+        | "loftWithOptions"
+        | "loftSmooth"
+        | "circularPattern"
+        | "gridPattern"
+        | "defeature"
+        | "copyWire"
+        | "copyFace"
+        | "transformWire"
+        | "transformFace"
+        | "offsetFace"
+        | "offsetSolid"
+        | "offsetSolidV2"
+        | "section"
+        | "split"
+        | "sewFaces"
+        | "thicken"
+        | "pipe"
+        | "linearPattern"
+        | "draft"
+        | "makeTangentArc3d"
+        | "liftCurve2dToPlane"
+        | "offsetWire"
+        | "offsetWireWithJoinType"
+        | "offsetWire2DWithJoin"
+        | "makeLineEdge"
+        | "makeNurbsEdge"
+        | "makeWire"
+        | "makePlanarFaceFromWire"
+        | "makeFaceFromWires"
+        | "addHolesToFace" => Some(BatchOpKind::Mutating),
+        _ => None,
+    }
+}
+
 #[wasm_bindgen]
 impl BrepKernel {
     // ── Batch execution ──────────────────────────────────────────
@@ -170,12 +281,23 @@ impl BrepKernel {
                     }
                 };
                 let args = &entry["args"];
-                let snapshot = self.topo().clone();
-                let result = self.dispatch_op(op, args);
-                if result.is_err() {
+                let kind = match batch_op_kind(op) {
+                    Some(kind) => kind,
+                    None => {
+                        return Err(StructuredWasmError::unknown_operation(op)
+                            .with_operation_context(operation_index, op));
+                    }
+                };
+                let snapshot = (kind == BatchOpKind::Mutating).then(|| self.topo().clone());
+                let result = self
+                    .dispatch_op(op, args)
+                    .map_err(|error| error.with_operation_context(operation_index, op));
+                if result.is_err()
+                    && let Some(snapshot) = snapshot
+                {
                     self.topo_mut().restore_preserving_handle_slots(&snapshot);
                 }
-                result.map_err(|error| error.with_operation_context(operation_index, op))
+                result
             })
             .collect()
     }
@@ -1997,6 +2119,14 @@ mod batch_contract_tests {
 
     fn v2_error(kernel: &mut BrepKernel, input: &str) -> serde_json::Value {
         parse(&kernel.execute_batch_v2(input))[0]["error"].clone()
+    }
+
+    #[test]
+    fn classifies_operations_before_topology_snapshotting() {
+        assert_eq!(batch_op_kind("volume"), Some(BatchOpKind::ReadOnly));
+        assert_eq!(batch_op_kind("boundingBox"), Some(BatchOpKind::ReadOnly));
+        assert_eq!(batch_op_kind("makeBox"), Some(BatchOpKind::Mutating));
+        assert_eq!(batch_op_kind("notAnOperation"), None);
     }
 
     #[test]
