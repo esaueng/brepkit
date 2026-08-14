@@ -2773,13 +2773,26 @@ pub(crate) fn component_encloses_point(
     p: Point3,
     deflection: f64,
 ) -> Option<bool> {
+    component_encloses_any_point(topo, faces, &[p], deflection)
+}
+
+/// Does the closed surface made of `faces` enclose any of `points`?
+///
+/// Tessellates the component only once, which keeps multi-probe validation from
+/// repeating the expensive face tessellation for every boundary vertex.
+pub(crate) fn component_encloses_any_point(
+    topo: &Topology,
+    faces: &[FaceId],
+    points: &[Point3],
+    deflection: f64,
+) -> Option<bool> {
     // A sqrt-prime direction: irrational in every component, so the ray cannot
     // lie in a face plane or run along an edge — the same generic-direction
     // escape the ray-cast classifier uses for degenerate probes.
     let dir = Vec3::new(2.0_f64.sqrt(), 3.0_f64.sqrt(), 5.0_f64.sqrt())
         .normalize()
         .ok()?;
-    let mut crossings = 0usize;
+    let mut crossings = vec![0usize; points.len()];
     let mut any_triangle = false;
     for &fid in faces {
         let mesh = crate::tessellate::tessellate_with_uvs(topo, fid, deflection).ok()?;
@@ -2791,15 +2804,17 @@ pub(crate) fn component_encloses_point(
                 pos[tri[2] as usize],
             );
             any_triangle = true;
-            if let Some(hit) =
-                brepkit_math::ray_triangle::watertight_ray_triangle_intersect(p, dir, a, b, c)
-                && hit.t > 1e-9
-            {
-                crossings += 1;
+            for (&point, count) in points.iter().zip(&mut crossings) {
+                if let Some(hit) = brepkit_math::ray_triangle::watertight_ray_triangle_intersect(
+                    point, dir, a, b, c,
+                ) && hit.t > 1e-9
+                {
+                    *count += 1;
+                }
             }
         }
     }
-    any_triangle.then_some(crossings % 2 == 1)
+    any_triangle.then_some(crossings.into_iter().any(|count| count % 2 == 1))
 }
 
 /// Any vertex position on `faces`, for use as a probe point.
