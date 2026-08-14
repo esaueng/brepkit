@@ -3259,12 +3259,12 @@ export function clearLastPanicMessage(): void;
 export function decodeEvolutionPayload(json: string): FaceEvolutionPayloadV1;
 
 /**
- * Returns the message and source location of the most recent panic inside
- * the kernel, or `undefined` if none has occurred.
+ * Returns a non-sensitive marker when any kernel in this module panicked, or
+ * `undefined` if none has occurred.
  *
  * After a panic the kernel object is unusable (every method throws
  * "recursive use of an object"); this free function remains callable and
- * carries the root-cause text for the failed call.
+ * avoids exposing one kernel's diagnostics to another kernel instance.
  */
 export function lastPanicMessage(): string | undefined;
 

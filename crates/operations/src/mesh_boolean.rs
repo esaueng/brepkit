@@ -1435,7 +1435,7 @@ fn classify_split_triangles(
     // Must not exceed the contact/co-refinement tolerance: faces farther
     // apart than `tolerance` are never co-refined, so classifying them
     // OnSame/OnOpp would drop them in assembly and open the result.
-    let eps_on = tolerance.max(1e-9);
+    let eps_on = tolerance;
     split
         .triangles
         .iter()

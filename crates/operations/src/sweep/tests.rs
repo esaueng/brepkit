@@ -2315,7 +2315,7 @@ fn analytic_lip_ring_fuses_onto_hollow_box() {
 }
 
 #[test]
-fn exact_coincident_lip_fuse_stays_analytic() {
+fn ambiguous_partial_sd_overlap_does_not_accept_corrupt_analytic_fuse() {
     let mut topo = Topology::new();
     let spine_for_face = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
     let base_wire = Wire::new(
@@ -2367,10 +2367,19 @@ fn exact_coincident_lip_fuse_stays_analytic() {
         .iter()
         .filter(|&&fid| !matches!(topo.face(fid).unwrap().surface(), FaceSurface::Plane { .. }))
         .count();
+    // The old partial-overlap SD shortcut deleted a real adjacent corner cap
+    // and happened to produce a closed analytic shell. Refusing that unsafe
+    // whole-face deletion must route this unresolved partition through the
+    // validated fallback rather than accept the corrupt analytic result.
     assert!(
-        faces.len() < 200 && curved > 0,
-        "exact-coincidence fuse must stay analytic, got {} faces ({curved} curved)",
+        faces.len() >= 200 && curved == 0,
+        "unsafe partial-overlap result was accepted analytically: {} faces ({curved} curved)",
         faces.len()
+    );
+    let report = crate::validate::validate_solid(&topo, fused).unwrap();
+    assert!(
+        report.is_valid(),
+        "fallback result must remain valid: {report:?}"
     );
 }
 

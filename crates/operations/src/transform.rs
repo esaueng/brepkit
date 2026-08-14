@@ -46,21 +46,18 @@ const DEGENERATE_SHAPE_RATIO: f64 = 1e-12;
 /// Returns [`crate::OperationsError::InvalidInput`] when the matrix is not
 /// affine, a linear column is zero or non-finite, or the Hadamard ratio is at
 /// or below [`DEGENERATE_SHAPE_RATIO`].
+#[allow(clippy::float_cmp)]
 pub(crate) fn reject_degenerate_transform(matrix: &Mat4) -> Result<(), crate::OperationsError> {
     let degenerate = |reason: &str| crate::OperationsError::InvalidInput {
         reason: format!("transform matrix is degenerate ({reason})"),
     };
 
     let m = &matrix.0;
-    // Ulp-scale tolerance, not an exact comparison: inverting a rigid frame
-    // matrix through the adjugate legitimately yields entries like -0.0 or
-    // 1.0000000000000002 in this row. A genuinely projective row is far
-    // outside this band.
-    let affine_wobble = 8.0 * f64::EPSILON;
-    if m[3][0].abs() > affine_wobble
-        || m[3][1].abs() > affine_wobble
-        || m[3][2].abs() > affine_wobble
-        || (m[3][3] - 1.0).abs() > affine_wobble
+    if m.iter().flatten().any(|value| !value.is_finite())
+        || m[3][0] != 0.0
+        || m[3][1] != 0.0
+        || m[3][2] != 0.0
+        || m[3][3] != 1.0
     {
         return Err(degenerate("the bottom row is not affine"));
     }
