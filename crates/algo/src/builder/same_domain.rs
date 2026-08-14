@@ -843,12 +843,31 @@ fn compute_edge_set_quantized(
         // parameterization starts or which way it runs. Combined with the
         // shared endpoint (which fixes the radius) it discriminates as well
         // as the midpoint did, and it is canonical.
-        let disc =
-            if qs == qe && matches!(edge.curve(), brepkit_topology::edge::EdgeCurve::Circle(_)) {
-                closed_edge_centroid(edge.curve(), sp, ep)
-            } else {
-                crate::builder::pcurve_compute::evaluate_edge_at_t(edge.curve(), sp, ep, 0.5)
-            };
+        //
+        // Circle AND Ellipse qualify: both evaluate as
+        // `centre + a·cos(t)·u + b·sin(t)·v` over the full `[0, 2π]` domain,
+        // so uniform `t` is uniform angle and the sampled offsets cancel for
+        // any stored frame. Two coincident ellipses may store opposed major
+        // axes (or opposed normals), which moves the t=0.5 midpoint by `2a`
+        // while leaving the centroid on the centre.
+        //
+        // A closed NURBS edge is deliberately excluded. Uniform `t` walks the
+        // knot span, so two instances of one curve carrying different knots or
+        // a different seam sample different points and the centroid is not
+        // invariant. Resampling by arc length would remove the knot dependence
+        // but not the seam dependence — only the arc-length-weighted integral
+        // `∮p ds / ∮ds` is seam-independent, and a finite-sample estimate of it
+        // has no error bound below this key's quantization bucket, so it could
+        // still split true duplicates. A closed NURBS therefore keeps the
+        // stored-order midpoint: stable per instance, not canonical across
+        // instances.
+        let closed_uniform_angle =
+            qs == qe && matches!(edge.curve(), EdgeCurve::Circle(_) | EdgeCurve::Ellipse(_));
+        let disc = if closed_uniform_angle {
+            closed_edge_centroid(edge.curve(), sp, ep)
+        } else {
+            crate::builder::pcurve_compute::evaluate_edge_at_t(edge.curve(), sp, ep, 0.5)
+        };
         // quantize_point MULTIPLIES by the scale, so the 100x-coarser
         // discriminator bucket (fit-error tolerance for marched geometry)
         // needs scale / 100, not scale * 100.
@@ -933,18 +952,21 @@ fn opposite_boundary_traversal(a: &DirectedBoundary, b: &DirectedBoundary) -> bo
 
 /// Number of samples used for the closed-edge centroid discriminator.
 ///
-/// Any `N >= 2` makes the equally-spaced offsets of a circle cancel exactly;
-/// 16 keeps the estimate stable for non-circular closed curves too.
+/// Any `N >= 2` makes the equally-spaced angular offsets of a circle or an
+/// ellipse cancel exactly; 16 keeps the residue well inside the discriminator
+/// bucket even for large radii.
 const CLOSED_EDGE_SAMPLES: usize = 16;
 
 /// Parameterization-independent point identifying a CLOSED edge.
 ///
 /// Samples uniformly over the whole period and averages. The endpoint is
 /// deliberately excluded (it duplicates the start on a closed curve and
-/// would bias the average toward it). For a circle the sampled offsets sum
-/// to zero whatever the start angle or direction, so this returns the exact
-/// centre — which is what makes two differently-parameterized instances of
-/// one circle hash together.
+/// would bias the average toward it). For a circle or an ellipse — both
+/// parameterized by a uniform angle over `[0, 2π]` — the sampled offsets sum
+/// to zero whatever the stored frame or direction, so this returns the exact
+/// centre, which is what makes two differently-parameterized instances of one
+/// curve hash together. Callers must not hand it a closed NURBS: uniform `t`
+/// walks the knot span there and the average is not invariant.
 fn closed_edge_centroid(
     curve: &brepkit_topology::edge::EdgeCurve,
     sp: brepkit_math::vec::Point3,
