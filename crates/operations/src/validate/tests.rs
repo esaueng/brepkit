@@ -1166,6 +1166,50 @@ fn ambiguous_circle_arc_diagnostics_are_bounded_per_wire() {
 }
 
 #[test]
+fn ambiguous_circle_arc_comparisons_stop_at_the_budget() {
+    use brepkit_math::curves::Circle3D;
+    use brepkit_math::vec::{Point3, Vec3};
+    use brepkit_topology::edge::{Edge, EdgeCurve};
+    use brepkit_topology::face::{Face, FaceSurface};
+    use brepkit_topology::vertex::Vertex;
+    use brepkit_topology::wire::{OrientedEdge, Wire};
+
+    let mut edge_count = 2_usize;
+    while edge_count.saturating_mul(edge_count - 1) / 2 <= MAX_AMBIGUOUS_CIRCLE_ARC_COMPARISONS {
+        edge_count += 1;
+    }
+
+    let mut topo = Topology::new();
+    let normal = Vec3::new(0.0, 0.0, 1.0);
+    let reference = Circle3D::new(Point3::new(0.0, 0.0, 0.0), normal, 2.0).unwrap();
+    let a = topo.add_vertex(Vertex::new(reference.evaluate(0.0), 1e-7));
+    let b = topo.add_vertex(Vertex::new(reference.evaluate(std::f64::consts::PI), 1e-7));
+    let mut radius = 2.0;
+    let edges = (0..edge_count)
+        .map(|_| {
+            let circle = Circle3D::new(Point3::new(0.0, 0.0, 0.0), normal, radius).unwrap();
+            radius += 1.0;
+            let edge = topo.add_edge(Edge::new(a, b, EdgeCurve::Circle(circle)));
+            OrientedEdge::new(edge, true)
+        })
+        .collect();
+    let wire = topo.add_wire(Wire::new(edges, true).unwrap());
+    let face = topo.add_face(Face::new(
+        wire,
+        Vec::new(),
+        FaceSurface::Plane { normal, d: 0.0 },
+    ));
+
+    let warnings = ambiguous_circle_arc_warnings(&topo, face, wire, Tolerance::new()).unwrap();
+    assert_eq!(warnings.len(), 1);
+    assert!(
+        warnings[0]
+            .description
+            .contains("too many same-endpoint circle arcs to check individually")
+    );
+}
+
+#[test]
 fn incomplete_periodic_rim_chain_is_reported_as_a_warning() {
     use brepkit_math::curves::Circle3D;
     use brepkit_math::surfaces::CylindricalSurface;
