@@ -48,6 +48,24 @@ use brepkit_topology::edge::EdgeCurve;
 use brepkit_topology::face::{FaceId, FaceSurface};
 use brepkit_topology::solid::SolidId;
 
+thread_local! {
+    /// How often the flatten pre-pass's recursion guard has had to abandon the
+    /// analytic-recognition pass because the pass left its own gate satisfied.
+    /// Zero on every input the pass handles as designed, so tests assert on it
+    /// to catch a silent loss of the optimisation.
+    #[cfg(test)]
+    static THREAD_FLATTEN_GUARD_TRIPS: std::cell::Cell<u64> = const { std::cell::Cell::new(0) };
+}
+
+#[cfg(test)]
+fn thread_flatten_guard_trips() -> u64 {
+    THREAD_FLATTEN_GUARD_TRIPS.with(std::cell::Cell::get)
+}
+
+fn note_flatten_guard_trip() {
+    #[cfg(test)]
+    THREAD_FLATTEN_GUARD_TRIPS.with(|count| count.set(count.get() + 1));
+}
 /// Perform a boolean operation on two solids.
 ///
 /// Uses the GFA pipeline as the primary engine, with mesh boolean
@@ -473,9 +491,28 @@ pub fn boolean(
     let flatten_b = solid_has_flattenable_nurbs(topo, b, tol.linear)?;
     if flatten_a || flatten_b {
         let mut working = topo.clone();
+        // The recursion below re-enters this same gate. What bounds it is the
+        // fixpoint: `flatten_planar_nurbs_faces` is expected to clear
+        // `solid_has_flattenable_nurbs` for every operand it rewrites, so the
+        // recursive call finds nothing to flatten and drops through to the
+        // engine. That fixpoint holds only while the gate and the pass apply
+        // the identical recognizer at the identical tolerance over the identical
+        // face set — an unenforced invariant whose failure mode is unbounded
+        // recursion, deep-cloning the whole arena at every level, on
+        // attacker-supplied import geometry. So verify it per operand instead of
+        // trusting it, and recurse only once it is established: with both gates
+        // observed false, the recursive call cannot re-enter this block at all,
+        // which bounds the depth at one.
+        //
+        // The verification is the gate itself, not the pass's return value: that
+        // return counts flattened FACES only, so a solid whose only flattenable
+        // geometry is straight NURBS EDGES reports zero while the gate stays
+        // true, and a change-count test would wrongly abandon that case.
+        let mut flatten_settled = true;
         let working_a = if flatten_a {
             let copy = crate::copy::copy_solid(&mut working, a)?;
             let _ = flatten_planar_nurbs_faces(&mut working, copy, tol.linear)?;
+            flatten_settled &= !solid_has_flattenable_nurbs(&working, copy, tol.linear)?;
             copy
         } else {
             a
@@ -483,12 +520,25 @@ pub fn boolean(
         let working_b = if flatten_b {
             let copy = crate::copy::copy_solid(&mut working, b)?;
             let _ = flatten_planar_nurbs_faces(&mut working, copy, tol.linear)?;
+            flatten_settled &= !solid_has_flattenable_nurbs(&working, copy, tol.linear)?;
             copy
         } else {
             b
         };
-        let working_result = boolean(&mut working, op, working_a, working_b)?;
-        return crate::copy::copy_solid_between(&working, topo, working_result);
+        if flatten_settled {
+            let working_result = boolean(&mut working, op, working_a, working_b)?;
+            return crate::copy::copy_solid_between(&working, topo, working_result);
+        }
+        // Recognising flat NURBS as analytic is an optimisation, not a
+        // correctness requirement, so degrade to the unflattened engine path
+        // below. Erroring here would convert a latent hang into a user-visible
+        // failure on geometry the engine can still process. The arena clone is
+        // released with this block, before the engine runs.
+        note_flatten_guard_trip();
+        log::warn!(
+            "flatten pre-pass left flattenable NURBS on an operand; \
+             running the boolean without the analytic-recognition pre-pass"
+        );
     }
     let (gfa_a, gfa_b) = (a, b);
     let gfa_start = timer_now();
