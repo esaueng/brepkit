@@ -68,41 +68,118 @@ enum BatchContract {
 
 type BatchItemResult = Result<serde_json::Value, StructuredWasmError>;
 
-/// Whether a batch operation only reads topology.
+#[derive(Clone, Copy, Debug, Eq, PartialEq)]
+enum BatchOpKind {
+    ReadOnly,
+    Mutating,
+}
+
+/// Classify operations before doing any work that scales with topology size.
 ///
-/// This is a **performance hint, never a correctness claim**. A read-only op
-/// takes an `Rc` share of the topology instead of a deep copy; if a listed op
-/// does mutate after all, `Rc::make_mut` inside `BrepKernel::topo_mut` still
-/// materialises the pre-op state, so rollback stays exact. A stale entry here
-/// costs one deep copy — it can never produce a wrong rollback.
+/// Keeping unknown operations out of the mutating fallback is important: an
+/// attacker must not be able to trigger a full topology snapshot with an
+/// arbitrary operation name.
 ///
-/// Mutating ops deliberately keep the deep copy. Sharing the `Rc` for them
-/// would push the copy into `Rc::make_mut`, which rebuilds every arena at
-/// exact capacity so the operation's first `push` immediately reallocates —
-/// measured 2-4x slower than copying aside and mutating in place.
-fn is_read_only_op(op: &str) -> bool {
-    matches!(
-        op,
+/// `ReadOnly` is a performance hint, never a correctness claim. Those ops take
+/// an `Rc` share of the topology instead of a deep copy; if one does mutate,
+/// `Rc::make_mut` still materialises the pre-op state, so rollback stays exact.
+fn batch_op_kind(op: &str) -> Option<BatchOpKind> {
+    match op {
         "boundingBox"
-            | "centerOfMass"
-            | "chamfer2d"
-            | "classifyPoint"
-            | "detectCoincidentFaces"
-            | "fillet2d"
-            | "getNurbsCurveData"
-            | "getNurbsSurfaceData"
-            | "getNurbsSurfaceDataParity"
-            | "massProperties"
-            | "meshQuality"
-            | "polygonBoolean2d"
-            | "polygonUnion2d"
-            | "projectEdges"
-            | "solidEdges"
-            | "solidToSolidDistance"
-            | "surfaceArea"
-            | "validateSolid"
-            | "volume"
-    )
+        | "centerOfMass"
+        | "chamfer2d"
+        | "classifyPoint"
+        | "detectCoincidentFaces"
+        | "fillet2d"
+        | "getNurbsCurveData"
+        | "getNurbsSurfaceData"
+        | "getNurbsSurfaceDataParity"
+        | "massProperties"
+        | "meshQuality"
+        | "polygonBoolean2d"
+        | "polygonUnion2d"
+        | "projectEdges"
+        | "solidEdges"
+        | "solidToSolidDistance"
+        | "surfaceArea"
+        | "validateSolid"
+        | "volume" => Some(BatchOpKind::ReadOnly),
+        "makeBox"
+        | "makeCylinder"
+        | "makeSphere"
+        | "makeCone"
+        | "makeTorus"
+        | "makeEllipsoid"
+        | "fuse"
+        | "cut"
+        | "intersect"
+        | "fuseWithOptions"
+        | "cutWithOptions"
+        | "intersectWithOptions"
+        | "fuseWithEvolution"
+        | "cutWithEvolution"
+        | "intersectWithEvolution"
+        | "compoundCut"
+        | "fuseAll"
+        | "transform"
+        | "copySolid"
+        | "copyAndTransformSolid"
+        | "pushPullFace"
+        | "resizeCylindricalFace"
+        | "extrude"
+        | "revolve"
+        | "sweep"
+        | "sweepWithOptions"
+        | "helicalSweep"
+        | "multiSectionSweep"
+        | "guidedSweep"
+        | "minkowskiSum"
+        | "chamfer"
+        | "fillet"
+        | "filletVariable"
+        | "filletV2"
+        | "chamferV2"
+        | "chamferDistanceAngle"
+        | "shell"
+        | "mirror"
+        | "unifyFaces"
+        | "convertToBspline"
+        | "convertToElementary"
+        | "healSolid"
+        | "repairSolid"
+        | "loft"
+        | "loftWithOptions"
+        | "loftSmooth"
+        | "circularPattern"
+        | "gridPattern"
+        | "defeature"
+        | "copyWire"
+        | "copyFace"
+        | "transformWire"
+        | "transformFace"
+        | "offsetFace"
+        | "offsetSolid"
+        | "offsetSolidV2"
+        | "section"
+        | "split"
+        | "sewFaces"
+        | "thicken"
+        | "pipe"
+        | "linearPattern"
+        | "draft"
+        | "makeTangentArc3d"
+        | "liftCurve2dToPlane"
+        | "offsetWire"
+        | "offsetWireWithJoinType"
+        | "offsetWire2DWithJoin"
+        | "makeLineEdge"
+        | "makeNurbsEdge"
+        | "makeWire"
+        | "makePlanarFaceFromWire"
+        | "makeFaceFromWires"
+        | "addHolesToFace" => Some(BatchOpKind::Mutating),
+        _ => None,
+    }
 }
 
 #[wasm_bindgen]
@@ -209,7 +286,14 @@ impl BrepKernel {
                     }
                 };
                 let args = &entry["args"];
-                self.dispatch_with_rollback(op, args)
+                let kind = match batch_op_kind(op) {
+                    Some(kind) => kind,
+                    None => {
+                        return Err(StructuredWasmError::unknown_operation(op)
+                            .with_operation_context(operation_index, op));
+                    }
+                };
+                self.dispatch_with_rollback(kind, op, args)
                     .map_err(|error| error.with_operation_context(operation_index, op))
             })
             .collect()
@@ -218,9 +302,14 @@ impl BrepKernel {
     /// Runs one batch operation, undoing its topology changes if it fails.
     ///
     /// The two arms differ only in what taking the rollback snapshot costs;
-    /// both restore the exact pre-operation state. See [`is_read_only_op`].
-    fn dispatch_with_rollback(&mut self, op: &str, args: &serde_json::Value) -> BatchItemResult {
-        if is_read_only_op(op) {
+    /// both restore the exact pre-operation state. See [`batch_op_kind`].
+    fn dispatch_with_rollback(
+        &mut self,
+        kind: BatchOpKind,
+        op: &str,
+        args: &serde_json::Value,
+    ) -> BatchItemResult {
+        if kind == BatchOpKind::ReadOnly {
             // O(1). Still correct if the op does mutate: `Rc::make_mut` in
             // `topo_mut` sees the extra reference and copies the pre-op arenas
             // aside before the first mutation lands.
@@ -2052,6 +2141,14 @@ mod batch_contract_tests {
 
     fn v2_error(kernel: &mut BrepKernel, input: &str) -> serde_json::Value {
         parse(&kernel.execute_batch_v2(input))[0]["error"].clone()
+    }
+
+    #[test]
+    fn classifies_operations_before_topology_snapshotting() {
+        assert_eq!(batch_op_kind("volume"), Some(BatchOpKind::ReadOnly));
+        assert_eq!(batch_op_kind("projectEdges"), Some(BatchOpKind::ReadOnly));
+        assert_eq!(batch_op_kind("makeBox"), Some(BatchOpKind::Mutating));
+        assert_eq!(batch_op_kind("notAnOperation"), None);
     }
 
     #[test]
