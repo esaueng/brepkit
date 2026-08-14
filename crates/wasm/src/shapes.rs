@@ -386,10 +386,16 @@ mod tests {
     #[test]
     fn grouped_mesh_rejects_f32_overflow() {
         let mesh = TriangleMesh {
-            positions: vec![Point3::new(f64::MAX, 0.0, 0.0)],
+            positions: vec![Point3::new(f64::from(f32::MAX) * 2.0, 0.0, 0.0)],
             normals: vec![Vec3::new(0.0, 0.0, 1.0)],
             indices: Vec::new(),
         };
-        assert!(JsGroupedMesh::new(mesh, vec![0]).is_err());
+
+        let error = JsGroupedMesh::new(mesh, vec![0]).unwrap_err();
+        assert!(
+            error
+                .to_string()
+                .contains("cannot be represented as a finite f32")
+        );
     }
 }
