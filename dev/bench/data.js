@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786722104037,
+  "lastUpdate": 1786724595947,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10421,6 +10421,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 40580354,
             "range": "± 53968",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "19d694775afd788e21c9991996eec25cb508e282",
+          "message": "Merge pull request #234 from esaueng/fix/fillet-seed-limits\n\nfix(blend): accept whole-part and duplicated fillet selections",
+          "timestamp": "2026-08-14T12:01:28-04:00",
+          "tree_id": "0905efdeb565feaeed4771cad96fc7b1e9a44ead",
+          "url": "https://github.com/esaueng/brepkit/commit/19d694775afd788e21c9991996eec25cb508e282"
+        },
+        "date": 1786724594444,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1071441,
+            "range": "± 22114",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1098389,
+            "range": "± 1648",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11099,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 782402,
+            "range": "± 2957",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 31492060,
+            "range": "± 202077",
             "unit": "ns/iter"
           }
         ]
