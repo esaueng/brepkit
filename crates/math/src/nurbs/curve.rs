@@ -60,6 +60,7 @@ impl NurbsCurve {
             });
         }
         super::validate_knot_values(&knots)?;
+        super::validate_knot_domain(&knots, degree, n)?;
         if weights.len() != n {
             return Err(MathError::InvalidWeights {
                 expected: n,
@@ -447,6 +448,40 @@ mod tests {
                 make(knots),
                 Err(MathError::InvalidKnotValue { .. })
             ));
+        }
+    }
+
+    #[test]
+    fn rejects_tolerated_decreases_that_reverse_the_domain() {
+        let epsilon = f64::EPSILON;
+        for knots in [
+            vec![
+                1.0,
+                1.0,
+                1.0 - 4.0 * epsilon,
+                1.0 - 8.0 * epsilon,
+                1.0 - 12.0 * epsilon,
+            ],
+            vec![
+                1.0,
+                1.0,
+                1.0 - 4.0 * epsilon,
+                1.0 - 4.0 * epsilon,
+                1.0 - 4.0 * epsilon,
+            ],
+        ] {
+            let curve = NurbsCurve::new(
+                1,
+                knots,
+                vec![
+                    Point3::new(0.0, 0.0, 0.0),
+                    Point3::new(1.0, 0.0, 0.0),
+                    Point3::new(2.0, 0.0, 0.0),
+                ],
+                vec![1.0; 3],
+            );
+
+            assert!(matches!(curve, Err(MathError::InvalidKnotValue { .. })));
         }
     }
 
