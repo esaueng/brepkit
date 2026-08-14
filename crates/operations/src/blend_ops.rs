@@ -40,6 +40,50 @@ fn transactional<T>(
     }
 }
 
+/// Collapse repeated seed edges, keeping the caller's order.
+///
+/// Selections are routinely assembled from face adjacency, where every shared
+/// edge is named once per face; a repeat carries no extra information about the
+/// geometry, so it is dropped rather than refused. First occurrence wins
+/// because blend results depend on the order the seeds are walked in.
+fn dedup_seed_edges(edges: &[EdgeId]) -> Vec<EdgeId> {
+    let mut seen = std::collections::HashSet::with_capacity(edges.len());
+    let mut unique = Vec::with_capacity(edges.len());
+    for &edge in edges {
+        if seen.insert(edge) {
+            unique.push(edge);
+        }
+    }
+    unique
+}
+
+/// Reject a seed selection that names more distinct edges than the solid has.
+///
+/// The only defensible ceiling on a blend selection is the body itself.
+/// "Blend every edge" is everyday work — baseplates, heat sinks, lattices run
+/// to hundreds or thousands of edges — so it must be admissible by
+/// construction, while a de-duplicated selection larger than the solid's own
+/// edge count cannot be naming its geometry and is bounded input abuse.
+///
+/// Call with an already de-duplicated selection.
+fn reject_seed_selection_larger_than_solid(
+    topo: &Topology,
+    solid: SolidId,
+    operation: &str,
+    edges: &[EdgeId],
+) -> Result<(), OperationsError> {
+    let available = brepkit_topology::explorer::solid_edges(topo, solid)?.len();
+    if edges.len() > available {
+        return Err(OperationsError::InvalidInput {
+            reason: format!(
+                "{operation} selection names {} distinct edges but the solid has {available}",
+                edges.len()
+            ),
+        });
+    }
+    Ok(())
+}
+
 /// Classify a blended edge as convex (material on the inside of the dihedral)
 /// or concave, by testing a point just inside the inward normal bisector.
 ///
@@ -812,17 +856,9 @@ pub fn fillet_v2(
             reason: "no edges specified".into(),
         });
     }
-    if edges.len() > 256 {
-        return Err(OperationsError::InvalidInput {
-            reason: "fillet accepts at most 256 seed edges".into(),
-        });
-    }
-    let unique: std::collections::HashSet<_> = edges.iter().copied().collect();
-    if unique.len() != edges.len() {
-        return Err(OperationsError::InvalidInput {
-            reason: "fillet seed edges must be unique".into(),
-        });
-    }
+    let deduped = dedup_seed_edges(edges);
+    let edges = deduped.as_slice();
+    reject_seed_selection_larger_than_solid(topo, solid, "fillet", edges)?;
     reject_blend_into_hole(topo, solid, edges, radius)?;
 
     // The whole selection on one engine, first and unchanged: everything that
@@ -892,6 +928,11 @@ pub fn chamfer_v2(
             reason: "no edges specified".into(),
         });
     }
+    // A repeated seed chamfers the same edge twice and lands a non-manifold
+    // shell, so collapse repeats here for the same reason fillet does.
+    let deduped = dedup_seed_edges(edges);
+    let edges = deduped.as_slice();
+    reject_seed_selection_larger_than_solid(topo, solid, "chamfer", edges)?;
     if is_planar_line_blend(topo, solid, edges)? {
         return transactional(topo, |t| planar_chamfer_result(t, solid, edges, d1, d2));
     }
@@ -932,6 +973,10 @@ pub fn chamfer_distance_angle(
             reason: "no edges specified".into(),
         });
     }
+    // See `chamfer_v2`: repeated seeds chamfer the same edge twice.
+    let deduped = dedup_seed_edges(edges);
+    let edges = deduped.as_slice();
+    reject_seed_selection_larger_than_solid(topo, solid, "chamfer", edges)?;
     let d2 = distance * angle.tan();
     if is_planar_line_blend(topo, solid, edges)? {
         return transactional(topo, |t| {
@@ -1140,14 +1185,29 @@ mod tests {
     }
 
     #[test]
-    fn fillet_v2_rejects_duplicate_seed_edges() {
+    fn dedup_seed_edges_keeps_first_occurrence_order() {
+        let mut topo = Topology::new();
+        let v0 = topo.add_vertex(Vertex::new(Point3::new(0.0, 0.0, 0.0), 1e-7));
+        let v1 = topo.add_vertex(Vertex::new(Point3::new(1.0, 0.0, 0.0), 1e-7));
+        let v2 = topo.add_vertex(Vertex::new(Point3::new(2.0, 0.0, 0.0), 1e-7));
+        let a = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+        let b = topo.add_edge(Edge::new(v1, v2, EdgeCurve::Line));
+        let c = topo.add_edge(Edge::new(v2, v0, EdgeCurve::Line));
+
+        assert_eq!(dedup_seed_edges(&[c, a, b, a, c, b, c]), vec![c, a, b]);
+    }
+
+    #[test]
+    fn fillet_v2_rejects_selection_larger_than_solid() {
         let mut topo = Topology::new();
         let solid = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+        let mut edges = brepkit_topology::explorer::solid_edges(&topo, solid).unwrap();
+        // One more distinct edge than the body owns: cannot name its geometry.
         let v0 = topo.add_vertex(Vertex::new(Point3::new(10.0, 10.0, 10.0), 1e-7));
         let v1 = topo.add_vertex(Vertex::new(Point3::new(11.0, 10.0, 10.0), 1e-7));
-        let edge = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
-        let result = fillet_v2(&mut topo, solid, &[edge, edge], 0.2);
-        assert!(result.is_err());
-        assert!(result.is_err_and(|error| error.to_string().contains("unique")));
+        edges.push(topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line)));
+
+        let result = fillet_v2(&mut topo, solid, &edges, 0.2);
+        assert!(result.is_err_and(|error| error.to_string().contains("distinct edges")));
     }
 }

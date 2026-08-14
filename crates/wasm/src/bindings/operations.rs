@@ -1913,13 +1913,10 @@ impl BrepKernel {
         edge_handles: Vec<u32>,
         radius: f64,
     ) -> Result<u32, JsError> {
-        const MAX_FILLET_SELECTION: usize = 256;
         validate_positive(radius, "radius")?;
-        if edge_handles.len() > MAX_FILLET_SELECTION {
-            return Err(JsError::new(&format!(
-                "filletV2 accepts at most {MAX_FILLET_SELECTION} seed edges"
-            )));
-        }
+        // The bound on a selection is the solid's own edge count, enforced once
+        // in `blend_ops::fillet_v2` rather than duplicated as a constant here:
+        // "fillet every edge" of a real part is ordinary work.
         let solid_id = self.resolve_solid(solid)?;
         let edge_ids: Vec<_> = edge_handles
             .iter()
@@ -2172,6 +2169,31 @@ mod tests {
             assert_eq!(generated.len(), edge_slots.len());
             assert_complete_evolution(&payload);
         }
+    }
+
+    /// The binding must not impose a ceiling of its own on how many edge
+    /// handles a selection carries, and repeated handles — how face-adjacency
+    /// selections come out of JS — must be collapsed, not refused.
+    #[test]
+    fn fillet_v2_binding_takes_a_repeated_selection_past_the_old_handle_cap() {
+        let mut kernel = BrepKernel::new();
+        let solid = kernel.make_box_solid(10.0, 10.0, 10.0).unwrap();
+        let edges = kernel.get_solid_edges(solid).unwrap();
+        let selection: Vec<u32> = std::iter::repeat_n(edges[0], 300).collect();
+
+        let filleted = kernel.fillet_v2(solid, selection, 1.0).unwrap();
+
+        let solid_id = kernel.resolve_solid(filleted).unwrap();
+        let faces = brepkit_topology::explorer::solid_faces(&kernel.topo, solid_id)
+            .unwrap()
+            .len();
+        let volume =
+            brepkit_operations::measure::solid_volume(&kernel.topo, solid_id, 0.01).unwrap();
+        assert!(faces > 6, "fillet must add a face, got {faces}");
+        assert!(
+            volume < 1000.0,
+            "convex fillet must remove material, got {volume}"
+        );
     }
 
     #[test]
