@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786727200242,
+  "lastUpdate": 1786727556742,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10745,6 +10745,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 40740614,
             "range": "± 26495",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "cd660126ccba9b20dc64a8f1230d372c7ab43364",
+          "message": "test(operations): gate offset face-pair determinism in CI (#245)\n\nThe offset path had no in-suite determinism gate. Its coverage is the\ndeterminism_sweep example, which is referenced nowhere in .github/ or\nscripts/ and so only runs when someone runs it by hand.\n\nAdd the approx_census NURBS-loft scenario as a normal test. It repeats the\noffset on a freshly rebuilt solid and asserts a single distinct outcome.\nRandomState re-seeds per HashMap instance rather than once per process, so\nthis catches seed-dependence without spawning: against the unordered\nedge_to_face_map it reports seven distinct face pairs in 24 iterations of one\nprocess.\n\nTest only — no production change.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-14T13:10:14-04:00",
+          "tree_id": "6836165f5195c3d10b4bb6c760a3c67aea23434b",
+          "url": "https://github.com/esaueng/brepkit/commit/cd660126ccba9b20dc64a8f1230d372c7ab43364"
+        },
+        "date": 1786727555504,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1026802,
+            "range": "± 5971",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1100164,
+            "range": "± 1987",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11338,
+            "range": "± 142",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 789830,
+            "range": "± 1002",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 31609147,
+            "range": "± 48692",
             "unit": "ns/iter"
           }
         ]
