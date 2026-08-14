@@ -10,6 +10,41 @@ use crate::tessellate;
 
 use super::helpers::{collect_solid_vertex_points, compute_angular_range};
 
+/// Whether a planar face contains nested inner wires whose parity alternates
+/// material and void. Multiple disjoint holes are safe for the analytic sum;
+/// only containment requires the tessellator's even/odd treatment.
+fn planar_face_has_nested_inner_wires(topo: &Topology, face_id: FaceId) -> Option<bool> {
+    let face = topo.face(face_id).ok()?;
+    if face.inner_wires().len() < 2 {
+        return Some(false);
+    }
+    let FaceSurface::Plane { normal, .. } = face.surface() else {
+        return Some(false);
+    };
+    let polygons: Option<Vec<Vec<Point3>>> = face
+        .inner_wires()
+        .iter()
+        .map(|&wire| brepkit_check::util::wire_polygon_curve_sampled(topo, wire, 64, 16).ok())
+        .collect();
+    let polygons = polygons?;
+    for i in 0..polygons.len() {
+        if polygons[i].len() < 3 {
+            return None;
+        }
+        for j in (i + 1)..polygons.len() {
+            if polygons[j].len() < 3 {
+                return None;
+            }
+            if brepkit_check::util::point_in_polygon_3d(&polygons[i][0], &polygons[j], normal)
+                || brepkit_check::util::point_in_polygon_3d(&polygons[j][0], &polygons[i], normal)
+            {
+                return Some(true);
+            }
+        }
+    }
+    Some(false)
+}
+
 /// Volume of a solid that contains a bored quadric — a sphere (or torus) face
 /// carrying a full-revolution latitude-circle hole (a drilled tunnel rim) — via
 /// exact per-face Gauss quadrature on the analytic surfaces.
@@ -313,6 +348,12 @@ fn all_planar_line_solid_volume(topo: &Topology, solid: SolidId) -> Option<f64> 
         // Bail to the tessellation pipeline on any planarity residual.
         let planar_eps = 1e-6 * (1.0 + d_unit.abs());
         let ring_area2 = |wid| -> Option<f64> {
+            if !brepkit_check::validate::check_wire_self_intersection(topo, wid, 1e-7)
+                .ok()?
+                .is_empty()
+            {
+                return None;
+            }
             let wire = topo.wire(wid).ok()?;
             let edges = wire.edges();
             if edges.len() < 3 {
@@ -380,6 +421,11 @@ fn analytic_faces_solid_volume(topo: &Topology, solid: SolidId) -> Option<f64> {
             has_bored_quadric = true;
         }
         let face = topo.face(fid).ok()?;
+        if matches!(face.surface(), FaceSurface::Plane { .. })
+            && planar_face_has_nested_inner_wires(topo, fid)?
+        {
+            return None;
+        }
         // A notched quadric with a marched NURBS rim that WINDS the period is
         // the wavy-band topology produced by circle-outside cone/box fuses.
         // Its analytic bounding rectangle over-counts the removed lobes; the
@@ -2548,6 +2594,11 @@ fn exact_analytic_face_volume(topo: &Topology, solid: SolidId, deflection: f64) 
     for fid in faces {
         let face = topo.face(fid).ok()?;
         let holed = !face.inner_wires().is_empty();
+        if matches!(face.surface(), FaceSurface::Plane { .. })
+            && planar_face_has_nested_inner_wires(topo, fid)?
+        {
+            return None;
+        }
         total += match face.surface() {
             FaceSurface::Nurbs(_) => return None,
             FaceSurface::Plane { .. } => {

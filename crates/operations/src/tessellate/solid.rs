@@ -456,28 +456,35 @@ fn tessellate_solid_core(
             let existing_gids: DetHashSet<u32> = existing_gids_vec.iter().copied().collect();
 
             let candidates: Vec<u32> = {
-                let steps = ((std::f64::consts::TAU * circle.radius() * grid_inv).ceil() as usize)
-                    .clamp(8, 8192);
-                let mut visited: DetHashSet<(i64, i64, i64)> = DetHashSet::default();
-                let mut cand: Vec<u32> = Vec::new();
-                #[allow(clippy::cast_precision_loss)]
-                for i in 0..steps {
-                    let t = std::f64::consts::TAU * (i as f64) / (steps as f64);
-                    let (cx, cy, cz) = cell_of(&circle.evaluate(t));
-                    for dx in -1..=1_i64 {
-                        for dy in -1..=1_i64 {
-                            for dz in -1..=1_i64 {
-                                let c = (cx + dx, cy + dy, cz + dz);
-                                if visited.insert(c)
-                                    && let Some(gids) = point_grid.get(&c)
-                                {
-                                    cand.extend_from_slice(gids);
+                let required_steps =
+                    (std::f64::consts::TAU * circle.radius() * grid_inv).ceil() as usize;
+                if required_steps > 8192 {
+                    (0..merged.positions.len())
+                        .filter_map(|index| u32::try_from(index).ok())
+                        .collect()
+                } else {
+                    let steps = required_steps.clamp(8, 8192);
+                    let mut visited: DetHashSet<(i64, i64, i64)> = DetHashSet::default();
+                    let mut cand: Vec<u32> = Vec::new();
+                    #[allow(clippy::cast_precision_loss)]
+                    for i in 0..steps {
+                        let t = std::f64::consts::TAU * (i as f64) / (steps as f64);
+                        let (cx, cy, cz) = cell_of(&circle.evaluate(t));
+                        for dx in -1..=1_i64 {
+                            for dy in -1..=1_i64 {
+                                for dz in -1..=1_i64 {
+                                    let c = (cx + dx, cy + dy, cz + dz);
+                                    if visited.insert(c)
+                                        && let Some(gids) = point_grid.get(&c)
+                                    {
+                                        cand.extend_from_slice(gids);
+                                    }
                                 }
                             }
                         }
                     }
+                    cand
                 }
-                cand
             };
 
             let mut insertions: Vec<(f64, u32)> = Vec::new();

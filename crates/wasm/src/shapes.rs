@@ -233,7 +233,7 @@ fn grouped_mesh_f32(value: f64) -> Result<f32, WasmError> {
         Ok(converted)
     } else {
         Err(WasmError::InvalidInput {
-            reason: "tessellated coordinate cannot be represented as a finite f32".to_string(),
+            reason: "tessellated coordinate cannot be represented as a finite f32".into(),
         })
     }
 }

@@ -170,8 +170,12 @@ impl BrepKernel {
                     }
                 };
                 let args = &entry["args"];
-                self.dispatch_op(op, args)
-                    .map_err(|error| error.with_operation_context(operation_index, op))
+                let snapshot = self.topo().clone();
+                let result = self.dispatch_op(op, args);
+                if result.is_err() {
+                    self.topo_mut().restore_preserving_handle_slots(&snapshot);
+                }
+                result.map_err(|error| error.with_operation_context(operation_index, op))
             })
             .collect()
     }
