@@ -12,7 +12,7 @@ repository = "https://github.com/andymai/brepkit"
 rust-version = "1.88"
 # Every crate inherits this via `version.workspace = true`. release-please
 # rewrites it, and the `[workspace.dependencies]` versions below, in lockstep.
-version = "3.2.32"
+version = "4.0.0"
 
 [workspace.dependencies]
 # Math
@@ -59,17 +59,17 @@ zip = {version = "8", default-features = false, features = ["deflate"]}
 # A caret requirement lets that resolve to a newer crates.io release of the same
 # crate name, which drops this workspace's own API and fails the verify build.
 # Keep the `=`; scripts/check-versions.sh enforces it.
-brepkit-algo = {path = "crates/algo", version = "=3.2.32"}
-brepkit-blend = {path = "crates/blend", version = "=3.2.32"}
-brepkit-check = {path = "crates/check", version = "=3.2.32"}
-brepkit-geometry = {path = "crates/geometry", version = "=3.2.32"}
-brepkit-heal = {path = "crates/heal", version = "=3.2.32"}
-brepkit-io = {path = "crates/io", version = "=3.2.32"}
-brepkit-math = {path = "crates/math", version = "=3.2.32"}
-brepkit-offset = {path = "crates/offset", version = "=3.2.32"}
-brepkit-operations = {path = "crates/operations", version = "=3.2.32"}
-brepkit-sketch = {path = "crates/sketch", version = "=3.2.32"}
-brepkit-topology = {path = "crates/topology", version = "=3.2.32"}
+brepkit-algo = {path = "crates/algo", version = "4.0.0"}
+brepkit-blend = {path = "crates/blend", version = "4.0.0"}
+brepkit-check = {path = "crates/check", version = "4.0.0"}
+brepkit-geometry = {path = "crates/geometry", version = "4.0.0"}
+brepkit-heal = {path = "crates/heal", version = "4.0.0"}
+brepkit-io = {path = "crates/io", version = "4.0.0"}
+brepkit-math = {path = "crates/math", version = "4.0.0"}
+brepkit-offset = {path = "crates/offset", version = "4.0.0"}
+brepkit-operations = {path = "crates/operations", version = "4.0.0"}
+brepkit-sketch = {path = "crates/sketch", version = "4.0.0"}
+brepkit-topology = {path = "crates/topology", version = "4.0.0"}
 
 [workspace.lints.rust]
 missing_docs = "warn"
