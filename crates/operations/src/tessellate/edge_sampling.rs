@@ -85,7 +85,7 @@ pub(super) fn plane_axes(normal: Vec3) -> (Vec3, Vec3) {
 /// Display callers pass `false` (the chord count is exact for a constant-
 /// curvature circle); the boolean mesh-fallback passes `true` because its
 /// co-refinement robustness depends on the denser floored sampling.
-pub(super) fn edge_sample_count(
+pub fn edge_sample_count(
     topo: &Topology,
     edge: &brepkit_topology::edge::Edge,
     deflection: f64,
