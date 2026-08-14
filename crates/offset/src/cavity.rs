@@ -134,6 +134,49 @@ pub fn check_cavity_extents(
     Ok(())
 }
 
+/// Reject an outward offset that would collapse a cavity's spatial extent.
+///
+/// A positive offset moves both opposing cavity walls inward by `distance`,
+/// so every axis of the cavity's bounding extent must remain larger than the
+/// scale-aware clearance after losing `2 * distance`.
+///
+/// # Errors
+///
+/// Returns [`OffsetError::InvalidInput`] when a cavity would collapse along
+/// at least one axis.
+pub fn check_cavity_survival(
+    topo: &Topology,
+    solid: SolidId,
+    distance: f64,
+    clearance: f64,
+) -> Result<(), OffsetError> {
+    if distance <= 0.0 {
+        return Ok(());
+    }
+
+    let minimum_span = 2.0 * distance + clearance;
+    for &shell_id in topo.solid(solid)?.inner_shells() {
+        let cavity = shell_extent(topo, shell_id, Stage::Input)?;
+        let spans = [
+            cavity.max.x() - cavity.min.x(),
+            cavity.max.y() - cavity.min.y(),
+            cavity.max.z() - cavity.min.z(),
+        ];
+        if spans.into_iter().any(|span| span <= minimum_span) {
+            return Err(OffsetError::InvalidInput {
+                reason: format!(
+                    "offset of solids with cavity shells requires every cavity to survive: \
+                     cavity shell {} spans {} and an outward offset of {distance:.6e} needs \
+                     more than {minimum_span:.6e} on every axis",
+                    shell_id.index(),
+                    format_extent(cavity),
+                ),
+            });
+        }
+    }
+    Ok(())
+}
+
 /// The clearance a cavity must keep from the outer shell for an offset of
 /// `distance` to be attempted.
 ///
