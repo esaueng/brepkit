@@ -267,30 +267,35 @@ fn patch_package_json(pkg_json: &mut serde_json::Value) -> Result<()> {
         }),
     );
 
-    // Ensure files array includes the node entry
-    let files = obj
-        .entry("files")
-        .or_insert_with(|| serde_json::json!([]))
-        .as_array_mut()
-        .context("package.json files is not an array")?;
+    // Ensure files array includes the node entry.
+    {
+        let files = obj
+            .entry("files")
+            .or_insert_with(|| serde_json::json!([]))
+            .as_array_mut()
+            .context("package.json files is not an array")?;
 
-    files.retain(|entry| {
-        !matches!(
-            entry.as_str(),
-            Some("LICENSE-MIT" | "LICENSE-APACHE")
-        )
-    });
+        files.retain(|entry| !matches!(entry.as_str(), Some("LICENSE-MIT" | "LICENSE-APACHE")));
 
-    for entry in [
-        "brepkit_wasm_node.cjs",
-        "LICENSE",
-        "COMMERCIAL-LICENSE.md",
-    ] {
-        let entry = serde_json::json!(entry);
-        if !files.contains(&entry) {
-            files.push(entry);
+        for entry in ["brepkit_wasm_node.cjs", "LICENSE", "COMMERCIAL-LICENSE.md"] {
+            let entry = serde_json::json!(entry);
+            if !files.contains(&entry) {
+                files.push(entry);
+            }
         }
     }
+
+    // Preserve the package's deterministic top-level layout while retaining
+    // semantic insertion order inside the conditional exports object.
+    let mut keys = obj.keys().cloned().collect::<Vec<_>>();
+    keys.sort_unstable();
+    let mut sorted = serde_json::Map::new();
+    for key in keys {
+        if let Some(value) = obj.remove(&key) {
+            sorted.insert(key, value);
+        }
+    }
+    *obj = sorted;
 
     Ok(())
 }
@@ -430,7 +435,18 @@ fn validate_package_json(pkg_json: &serde_json::Value, errors: &mut Vec<String>)
                     errors.push(format!("exports[\".\"] missing key: {key}"));
                 }
             }
-            println!("  ok exports[\".\"] has node/import/default");
+            if let Some(conditions) = dot.as_object() {
+                let order = conditions.keys().map(String::as_str).collect::<Vec<_>>();
+                if order != ["node", "import", "default"] {
+                    errors.push(format!(
+                        "exports[\".\"] condition order is {order:?}, expected node/import/default"
+                    ));
+                } else {
+                    println!("  ok exports[\".\"] order: node/import/default");
+                }
+            } else {
+                errors.push("exports[\".\"] is not an object".into());
+            }
         } else {
             errors.push("exports missing \".\" entry".into());
         }
@@ -467,6 +483,24 @@ pub fn run_smoke_test() -> Result<()> {
     run_cmd(Command::new("node").arg(&script)).context("smoke test failed")?;
 
     println!("  Smoke test passed");
+    Ok(())
+}
+
+/// Pack, install, and test the npm artifact through normal Node resolution.
+pub fn run_installed_tarball_test() -> Result<()> {
+    println!("\nRunning installed-tarball consumer test...");
+
+    let script = project_root()?.join("scripts/test-wasm-tarball-consumer.mjs");
+    if !script.exists() {
+        bail!(
+            "Tarball consumer test script not found: {}",
+            script.display()
+        );
+    }
+
+    run_cmd(Command::new("node").arg(&script)).context("installed-tarball consumer test failed")?;
+
+    println!("  Installed-tarball consumer test passed");
     Ok(())
 }
 
@@ -554,6 +588,13 @@ mod tests {
         assert_eq!(pkg["exports"]["."]["node"], "./brepkit_wasm_node.cjs");
         assert_eq!(pkg["exports"]["."]["import"], "./brepkit_wasm.js");
         assert_eq!(pkg["exports"]["."]["default"], "./brepkit_wasm.js");
+        let export_order = pkg["exports"]["."]
+            .as_object()
+            .unwrap()
+            .keys()
+            .map(String::as_str)
+            .collect::<Vec<_>>();
+        assert_eq!(export_order, ["node", "import", "default"]);
 
         let files = pkg["files"].as_array().unwrap();
         assert!(files.contains(&json!("brepkit_wasm_node.cjs")));
@@ -614,6 +655,29 @@ mod tests {
         validate_package_json(&pkg, &mut errors);
 
         assert!(errors.iter().any(|e| e.contains("missing exports")));
+    }
+
+    #[test]
+    fn validate_detects_unsafe_export_condition_order() {
+        let pkg = json!({
+            "name": "brepkit-wasm",
+            "main": "brepkit_wasm_node.cjs",
+            "exports": {
+                ".": {
+                    "default": "./brepkit_wasm.js",
+                    "import": "./brepkit_wasm.js",
+                    "node": "./brepkit_wasm_node.cjs"
+                }
+            },
+            "files": ["brepkit_wasm_node.cjs", "LICENSE", "COMMERCIAL-LICENSE.md"]
+        });
+        let mut errors = Vec::new();
+        validate_package_json(&pkg, &mut errors);
+
+        assert!(
+            errors.iter().any(|error| error.contains("condition order")),
+            "unexpected errors: {errors:?}"
+        );
     }
 
     #[test]

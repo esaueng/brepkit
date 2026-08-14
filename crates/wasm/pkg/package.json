@@ -2,9 +2,9 @@
   "description": "WebAssembly bindings for brepkit — browser-native B-Rep solid modeling",
   "exports": {
     ".": {
-      "default": "./brepkit_wasm.js",
+      "node": "./brepkit_wasm_node.cjs",
       "import": "./brepkit_wasm.js",
-      "node": "./brepkit_wasm_node.cjs"
+      "default": "./brepkit_wasm.js"
     },
     "./brepkit_wasm_bg.wasm": "./brepkit_wasm_bg.wasm"
   },
