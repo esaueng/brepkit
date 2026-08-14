@@ -2595,9 +2595,15 @@ export class BrepKernel {
      * itself (and any earlier checkpoints) remain valid for future restores.
      * Checkpoints created after this one are discarded.
      *
+     * Restoring never grows the model: every checkpoint is an ancestor of the
+     * current state, so the restored topology is a subset of it. Undo is
+     * therefore always available, no matter how large the model has grown or
+     * how many operations the kernel instance has run.
+     *
      * # Errors
      *
      * Returns an error if `checkpoint_id` does not refer to a valid checkpoint.
+     * This is the only failure mode.
      */
     restore(checkpoint_id: number): void;
     /**
