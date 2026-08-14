@@ -135,10 +135,13 @@ pub(super) fn tessellate_band_face_local(
             };
             let (u0, _) = project(topo.vertex(from)?.point());
             let (u1, _) = project(topo.vertex(to)?.point());
+            if !u0.is_finite() || !u1.is_finite() {
+                return Ok(None);
+            }
             winding += wrap_pi(u1 - u0);
             at = Some(to);
         }
-        if !whole_turn && (winding.abs() - TAU).abs() > 1e-6 {
+        if !whole_turn && (!winding.is_finite() || (winding.abs() - TAU).abs() > 1e-6) {
             return Ok(None);
         }
     }
@@ -159,6 +162,12 @@ pub(super) fn tessellate_band_face_local(
             }
         }
         if pts.len() < 3 {
+            return Ok(None);
+        }
+        if pts.iter().any(|&point| {
+            let (u, v) = project(point);
+            !u.is_finite() || !v.is_finite()
+        }) {
             return Ok(None);
         }
         pts.sort_by(|a, b| {
@@ -366,6 +375,15 @@ pub(super) fn tessellate_revolution_band_shared(
     }
     // Sort each rim by angle around the axis so the two rings align by index.
     let angle_of = |gid: u32, merged: &TriangleMesh| project(merged.positions[gid as usize]).0;
+    if rims.iter().flatten().any(|&gid| {
+        let Some(&point) = merged.positions.get(gid as usize) else {
+            return true;
+        };
+        let (u, v) = project(point);
+        !u.is_finite() || !v.is_finite()
+    }) {
+        return Ok(false);
+    }
     for rim in &mut rims {
         rim.sort_by(|&a, &b| {
             angle_of(a, merged)
