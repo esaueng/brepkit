@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786687435610,
+  "lastUpdate": 1786707803286,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10043,6 +10043,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 25146416,
             "range": "± 220249",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "10bb627e452ef8fb2794f91fd016cbcb31907f92",
+          "message": "Merge pull request #230 from esaueng/fix/pin-workspace-sibling-versions\n\nfix(build): pin workspace sibling requirements to exact versions",
+          "timestamp": "2026-08-14T07:41:00-04:00",
+          "tree_id": "b8bccb0fbd3bc2428f79653406a070007b679e91",
+          "url": "https://github.com/esaueng/brepkit/commit/10bb627e452ef8fb2794f91fd016cbcb31907f92"
+        },
+        "date": 1786707801941,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 819606,
+            "range": "± 2218",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 892169,
+            "range": "± 769",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10888,
+            "range": "± 54",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 751657,
+            "range": "± 4646",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 21520538,
+            "range": "± 19160",
             "unit": "ns/iter"
           }
         ]
