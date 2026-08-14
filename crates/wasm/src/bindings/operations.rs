@@ -233,7 +233,8 @@ impl BrepKernel {
             .iter()
             .map(|&h| self.resolve_face(h))
             .collect::<Result<_, _>>()?;
-        let solid_id = brepkit_operations::loft::loft(self.topo_mut(), &face_ids)?;
+        let solid_id =
+            self.with_topology_transaction(|topo| brepkit_operations::loft::loft(topo, &face_ids))?;
         Ok(solid_id_to_u32(solid_id))
     }
 
@@ -256,7 +257,9 @@ impl BrepKernel {
             .iter()
             .map(|&h| self.resolve_face(h))
             .collect::<Result<_, _>>()?;
-        let solid_id = brepkit_operations::loft::loft_smooth(self.topo_mut(), &face_ids)?;
+        let solid_id = self.with_topology_transaction(|topo| {
+            brepkit_operations::loft::loft_smooth(topo, &face_ids)
+        })?;
         Ok(solid_id_to_u32(solid_id))
     }
 
@@ -522,7 +525,8 @@ impl BrepKernel {
         validate_finite(distance, "distance")?;
         let solid_id = self.resolve_solid(solid)?;
         let face_id = self.resolve_face(face)?;
-        let result = push_pull_face(self.topo_mut(), solid_id, face_id, distance)?;
+        let result = self
+            .with_topology_transaction(|topo| push_pull_face(topo, solid_id, face_id, distance))?;
         Ok(solid_id_to_u32(result))
     }
 
@@ -545,7 +549,9 @@ impl BrepKernel {
         validate_positive(new_radius, "new_radius")?;
         let solid_id = self.resolve_solid(solid)?;
         let face_id = self.resolve_face(face)?;
-        let result = resize_cylindrical_face(self.topo_mut(), solid_id, face_id, new_radius)?;
+        let result = self.with_topology_transaction(|topo| {
+            resize_cylindrical_face(topo, solid_id, face_id, new_radius)
+        })?;
         Ok(solid_id_to_u32(result))
     }
 
@@ -972,8 +978,9 @@ impl BrepKernel {
             weights,
         )?;
 
-        let solid_id =
-            brepkit_operations::sweep::sweep_smooth(self.topo_mut(), face_id, &path_curve)?;
+        let solid_id = self.with_topology_transaction(|topo| {
+            brepkit_operations::sweep::sweep_smooth(topo, face_id, &path_curve)
+        })?;
         Ok(solid_id_to_u32(solid_id))
     }
 
@@ -1109,6 +1116,16 @@ impl BrepKernel {
         angle_degrees: f64,
     ) -> Result<u32, JsError> {
         validate_finite(angle_degrees, "angle_degrees")?;
+        for (value, name) in [
+            (pull_x, "pull_x"),
+            (pull_y, "pull_y"),
+            (pull_z, "pull_z"),
+            (neutral_x, "neutral_x"),
+            (neutral_y, "neutral_y"),
+            (neutral_z, "neutral_z"),
+        ] {
+            validate_finite(value, name)?;
+        }
         let solid_id = self.resolve_solid(solid)?;
         let face_ids: Vec<brepkit_topology::face::FaceId> = face_handles
             .iter()
@@ -1167,7 +1184,9 @@ impl BrepKernel {
             path_weights,
         )?;
 
-        let solid_id = brepkit_operations::pipe::pipe(self.topo_mut(), face_id, &path_curve, None)?;
+        let solid_id = self.with_topology_transaction(|topo| {
+            brepkit_operations::pipe::pipe(topo, face_id, &path_curve, None)
+        })?;
         Ok(solid_id_to_u32(solid_id))
     }
 
@@ -1297,7 +1316,7 @@ impl BrepKernel {
         let path_curve = brepkit_math::nurbs::fitting::interpolate(&points, degree)?;
 
         let face_id = self.resolve_face(face)?;
-        let solid_id = sweep(self.topo_mut(), face_id, &path_curve)?;
+        let solid_id = self.with_topology_transaction(|topo| sweep(topo, face_id, &path_curve))?;
         Ok(solid_id_to_u32(solid_id))
     }
 
@@ -1435,12 +1454,9 @@ impl BrepKernel {
         let options = parse_sweep_options(contact_mode, scale_values, segments, corner_mode)
             .map_err(|error| JsError::new(&error))?;
 
-        let result = brepkit_operations::sweep::sweep_with_options(
-            self.topo_mut(),
-            face_id,
-            &path_curve,
-            &options,
-        )?;
+        let result = self.with_topology_transaction(|topo| {
+            brepkit_operations::sweep::sweep_with_options(topo, face_id, &path_curve, &options)
+        })?;
         Ok(solid_id_to_u32(result))
     }
 
@@ -1897,7 +1913,13 @@ impl BrepKernel {
         edge_handles: Vec<u32>,
         radius: f64,
     ) -> Result<u32, JsError> {
+        const MAX_FILLET_SELECTION: usize = 256;
         validate_positive(radius, "radius")?;
+        if edge_handles.len() > MAX_FILLET_SELECTION {
+            return Err(JsError::new(&format!(
+                "filletV2 accepts at most {MAX_FILLET_SELECTION} seed edges"
+            )));
+        }
         let solid_id = self.resolve_solid(solid)?;
         let edge_ids: Vec<_> = edge_handles
             .iter()

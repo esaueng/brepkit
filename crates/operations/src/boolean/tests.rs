@@ -7242,8 +7242,6 @@ fn circle_outside_cone_box_fuse_is_watertight() {
 /// so fusing it must add the annulus instead of copying the target unchanged.
 #[test]
 fn fuse_annulus_into_complex_bore_is_not_an_aabb_containment() {
-    use std::f64::consts::PI;
-
     use brepkit_algo::classifier::try_build_analytic_classifier;
     use brepkit_math::mat::Mat4;
 
@@ -7281,14 +7279,18 @@ fn fuse_annulus_into_complex_bore_is_not_an_aabb_containment() {
     );
 
     let before = crate::measure::solid_volume(&topo, target, 0.05).unwrap();
+    let sleeve_volume = crate::measure::solid_volume(&topo, sleeve, 0.05).unwrap();
     let result = boolean(&mut topo, BooleanOp::Fuse, target, sleeve).unwrap();
     crate::heal::unify_faces(&mut topo, result).unwrap();
     check_result(&topo, result);
 
     let actual = crate::measure::solid_volume(&topo, result, 0.05).unwrap();
-    let expected = before + PI * (4.8_f64.powi(2) - 3.8_f64.powi(2)) * 8.0;
+    // Compare like-for-like measurements. Holed planar caps deliberately skip
+    // the unsafe analytic fast path, so both operands and the result use the
+    // same tessellated volume contract at this deflection.
+    let expected = before + sleeve_volume;
     assert!(
-        (actual - expected).abs() <= expected.abs().max(1.0) * 1e-9,
+        (actual - expected).abs() <= sleeve_volume * 5e-4,
         "annulus was not incorporated: before={before}, actual={actual}, expected={expected}"
     );
 
