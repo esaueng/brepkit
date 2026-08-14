@@ -146,15 +146,26 @@ fn face_connectivity_components<V: std::ops::Deref<Target = [brepkit_topology::f
 ) -> Vec<Vec<brepkit_topology::face::FaceId>> {
     use std::collections::{HashMap, HashSet, VecDeque};
 
-    // face index -> neighbor face indices via shared edges
+    // Face index -> neighbor face indices via shared edges. A shared edge only
+    // needs a spanning star to connect all of its incident faces; materializing
+    // the complete clique would make this quadratic for malformed,
+    // high-fanout edges that validation is expected to reject.
     let mut adjacency: HashMap<usize, HashSet<usize>> = HashMap::new();
     for adj_faces in edge_map.values() {
         let adj_faces: &[brepkit_topology::face::FaceId] = adj_faces;
-        for a in adj_faces {
-            for b in adj_faces {
-                if a.index() != b.index() {
-                    adjacency.entry(a.index()).or_default().insert(b.index());
-                }
+        let Some((first, rest)) = adj_faces.split_first() else {
+            continue;
+        };
+        for face in rest {
+            if first.index() != face.index() {
+                adjacency
+                    .entry(first.index())
+                    .or_default()
+                    .insert(face.index());
+                adjacency
+                    .entry(face.index())
+                    .or_default()
+                    .insert(first.index());
             }
         }
     }
@@ -224,6 +235,13 @@ fn outer_components_materially_overlap(
 ) -> Result<bool, crate::OperationsError> {
     use std::collections::HashSet;
 
+    // Keep strict validation safe for untrusted models. A spatial index alone
+    // cannot bound the worst case because arbitrarily many component AABBs can
+    // be mutually nested. Exceeding this budget fails closed, preserving the
+    // historical disconnected-shell verdict instead of spending quadratic
+    // time on a crafted solid.
+    const MAX_COMPONENT_PAIR_CHECKS: usize = 4_096;
+
     let solid_data = topo.solid(solid)?;
     let outer_faces: HashSet<usize> = topo
         .shell(solid_data.outer_shell())?
@@ -262,19 +280,84 @@ fn outer_components_materially_overlap(
             && o.max.y() + eps >= i.max.y()
             && o.max.z() + eps >= i.max.z()
     };
+    let materially_intersects = |a: &brepkit_math::aabb::Aabb3, b: &brepkit_math::aabb::Aabb3| {
+        a.max.x().min(b.max.x()) - a.min.x().max(b.min.x()) > eps
+            && a.max.y().min(b.max.y()) - a.min.y().max(b.min.y()) > eps
+            && a.max.z().min(b.max.z()) - a.min.z().max(b.min.z()) > eps
+    };
 
+    let mut pair_checks = 0usize;
     for (i, (ci_a, a, ga)) in boxes.iter().enumerate() {
         for (ci_b, b, gb) in boxes.iter().skip(i + 1) {
+            pair_checks += 1;
+            if pair_checks > MAX_COMPONENT_PAIR_CHECKS {
+                return Ok(true);
+            }
             if *ga > 0 || *gb > 0 {
                 continue; // higher-genus containment is a cavity wall, not debris
             }
-            // Pre-filter: only a pair where one box encloses the other can be
-            // nested. A diagonal stand-off fails this and is left alone.
+            // Containment is the nesting case. For partial AABB overlap, test
+            // every boundary vertex in both directions: accepting the pair
+            // solely because neither box contains the other would let ordinary
+            // interpenetrating components bypass validation.
             let (outer_ci, outer_box, inner_ci) = if contains(a, b) {
                 (*ci_a, a, *ci_b)
             } else if contains(b, a) {
                 (*ci_b, b, *ci_a)
             } else {
+                if !materially_intersects(a, b) {
+                    continue;
+                }
+                let mut triangles = [Vec::new(), Vec::new()];
+                for (slot, (ci, bbox)) in triangles.iter_mut().zip([(*ci_a, a), (*ci_b, b)]) {
+                    let diag = (bbox.max - bbox.min).length();
+                    let deflection = (diag / 200.0).max(1e-4);
+                    for &fid in &components[ci] {
+                        let mesh = crate::tessellate::tessellate_with_uvs(topo, fid, deflection)?;
+                        for tri in mesh.mesh.indices.chunks_exact(3) {
+                            slot.push([
+                                mesh.mesh.positions[tri[0] as usize],
+                                mesh.mesh.positions[tri[1] as usize],
+                                mesh.mesh.positions[tri[2] as usize],
+                            ]);
+                        }
+                    }
+                }
+                if triangles[0].iter().any(|&ta| {
+                    triangles[1]
+                        .iter()
+                        .any(|&tb| crate::mesh_boolean::triangles_intersect(ta, tb, eps))
+                }) {
+                    return Ok(true);
+                }
+                for (probe_ci, surface_ci, surface_box) in [(*ci_a, *ci_b, b), (*ci_b, *ci_a, a)] {
+                    let diag = (surface_box.max - surface_box.min).length();
+                    let deflection = (diag / 200.0).max(1e-4);
+                    let mut probes = Vec::new();
+                    for &fid in &components[probe_ci] {
+                        let face = topo.face(fid)?;
+                        for wid in std::iter::once(face.outer_wire())
+                            .chain(face.inner_wires().iter().copied())
+                        {
+                            for oe in topo.wire(wid)?.edges() {
+                                probes.push(topo.vertex(topo.edge(oe.edge())?.start())?.point());
+                            }
+                        }
+                    }
+                    if probes.is_empty() {
+                        return Ok(true);
+                    }
+                    match crate::boolean::component_encloses_any_point(
+                        topo,
+                        &components[surface_ci],
+                        &probes,
+                        deflection,
+                    ) {
+                        Some(true) => return Ok(true),
+                        Some(false) => {}
+                        None => return Ok(true),
+                    }
+                }
                 continue;
             };
             // Confirm with ray parity against the enclosing candidate's own
@@ -432,47 +515,68 @@ fn same_oriented_circle(
         && (1.0 - a.normal().dot(b.normal())) <= tol.angular.max(1e-12)
 }
 
+const MAX_AMBIGUOUS_CIRCLE_ARC_COMPARISONS: usize = 4_096;
+
 fn ambiguous_circle_arc_warnings(
     topo: &Topology,
     face_id: brepkit_topology::face::FaceId,
     wire_id: brepkit_topology::wire::WireId,
     tol: Tolerance,
 ) -> Result<Vec<ValidationIssue>, crate::OperationsError> {
+    // One diagnostic identifies the wire-level hazard. Bounding comparisons also
+    // prevents a malformed wire with a huge endpoint bucket from making strict
+    // validation quadratic when none of its circles match.
     let wire = topo.wire(wire_id)?;
-    let mut issues = Vec::new();
-    for (position, first_oe) in wire.edges().iter().enumerate() {
-        let first = topo.edge(first_oe.edge())?;
-        let EdgeCurve::Circle(first_circle) = first.curve() else {
+    let mut by_endpoints = std::collections::HashMap::new();
+    let mut comparisons = 0;
+    for oriented in wire.edges() {
+        let edge = topo.edge(oriented.edge())?;
+        let EdgeCurve::Circle(circle) = edge.curve() else {
             continue;
         };
-        for second_oe in wire.edges().iter().skip(position + 1) {
-            if first_oe.edge() == second_oe.edge() {
+        if edge.start() == edge.end() {
+            continue;
+        }
+        let candidates = by_endpoints
+            .entry((edge.start(), edge.end()))
+            .or_insert_with(Vec::new);
+        for &candidate_id in candidates.iter() {
+            if comparisons == MAX_AMBIGUOUS_CIRCLE_ARC_COMPARISONS {
+                return Ok(vec![ValidationIssue {
+                    severity: Severity::Warning,
+                    description: format!(
+                        "wire {} on face {} has too many same-endpoint circle arcs to check \
+                         individually",
+                        wire_id.index(),
+                        face_id.index()
+                    ),
+                }]);
+            }
+            comparisons += 1;
+            if oriented.edge() == candidate_id {
                 continue;
             }
-            let second = topo.edge(second_oe.edge())?;
-            let EdgeCurve::Circle(second_circle) = second.curve() else {
+            let candidate = topo.edge(candidate_id)?;
+            let EdgeCurve::Circle(candidate_circle) = candidate.curve() else {
                 continue;
             };
-            if first.start() == second.start()
-                && first.end() == second.end()
-                && first.start() != first.end()
-                && same_oriented_circle(first_circle, second_circle, tol)
-            {
-                issues.push(ValidationIssue {
+            if same_oriented_circle(candidate_circle, circle, tol) {
+                return Ok(vec![ValidationIssue {
                     severity: Severity::Warning,
                     description: format!(
                         "wire {} on face {} has ambiguous complementary circle arcs {} and {} \
                          with the same stored vertex order",
                         wire_id.index(),
                         face_id.index(),
-                        first_oe.edge().index(),
-                        second_oe.edge().index()
+                        candidate_id.index(),
+                        oriented.edge().index()
                     ),
-                });
+                }]);
             }
         }
+        candidates.push(oriented.edge());
     }
-    Ok(issues)
+    Ok(Vec::new())
 }
 
 fn periodic_outer_rims_are_full_turns(
@@ -520,16 +624,10 @@ fn periodic_outer_rims_are_full_turns(
     }
 
     let accepts = |project: &dyn Fn(brepkit_math::vec::Point3) -> f64| {
-        for expected in 1..=curved.len() {
-            if crate::tessellate::rim_chain::collect_full_turn_rim_cycles(
-                topo, &curved, project, expected,
-            )?
-            .is_some()
-            {
-                return Ok(true);
-            }
-        }
-        Ok::<bool, crate::OperationsError>(false)
+        Ok::<bool, crate::OperationsError>(
+            crate::tessellate::rim_chain::collect_full_turn_rim_cycles_any(topo, &curved, project)?
+                .is_some(),
+        )
     };
     let project_u = |point| face.surface().project_point(point).map_or(0.0, |uv| uv.0);
     if accepts(&project_u)? {
