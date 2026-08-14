@@ -16,6 +16,10 @@ const COINCIDENT_BOUNDARY_FLOOR_MM: f64 = 1e-6;
 /// Strict margin used by the disjoint-component shortcut's AABB containment
 /// pre-filter, in mm.
 pub(crate) const COMPONENT_OVERLAP_MARGIN_MM: f64 = 1e-7;
+/// Deterministic work limits for the disjoint-component narrow phase.
+const MAX_COMPONENT_NARROW_PHASE_PAIRS: usize = 32;
+const MAX_COMPONENT_TRIANGLES: usize = 100_000;
+const MAX_COMPONENT_TRIANGLE_TESTS: usize = 200_000;
 /// Endpoint distance below which a sampled curve is treated as closed, in mm.
 const CLOSED_CURVE_ENDPOINT_TOL_MM: f64 = 1e-6;
 
@@ -2900,6 +2904,10 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
             && o_max.y() + eps >= i_max.y()
             && o_max.z() + eps >= i_max.z()
     };
+    let mut cached_meshes: Vec<Option<Vec<[Point3; 3]>>> =
+        (0..components.len()).map(|_| None).collect();
+    let mut narrow_phase_pairs = 0usize;
+    let mut triangle_tests = 0usize;
     // AABB containment is only the PRE-FILTER. It is necessary for nesting but
     // far from sufficient: a ring's box contains the box of a separate piece
     // sitting in its HOLE, and a lattice is full of rings. So a suspect pair
@@ -2920,35 +2928,57 @@ fn components_are_disjoint_pieces(topo: &Topology, components: &[Vec<FaceId>]) -
                 continue;
             }
 
-            let span = Point3::new(
-                a_max.x().max(b_max.x()) - a_min.x().min(b_min.x()),
-                a_max.y().max(b_max.y()) - a_min.y().min(b_min.y()),
-                a_max.z().max(b_max.z()) - a_min.z().min(b_min.z()),
-            );
-            let diagonal = (span.x().powi(2) + span.y().powi(2) + span.z().powi(2)).sqrt();
-            let deflection = (diagonal / 200.0).max(1e-4);
-            let mut meshes = [Vec::new(), Vec::new()];
-            for (slot, component) in [&components[i], &components[j]].into_iter().enumerate() {
-                for &fid in component {
+            narrow_phase_pairs += 1;
+            if narrow_phase_pairs > MAX_COMPONENT_NARROW_PHASE_PAIRS {
+                return false;
+            }
+
+            for component_index in [i, j] {
+                if cached_meshes[component_index].is_some() {
+                    continue;
+                }
+                let (min, max) = aabbs[component_index];
+                let diagonal = ((max.x() - min.x()).powi(2)
+                    + (max.y() - min.y()).powi(2)
+                    + (max.z() - min.z()).powi(2))
+                .sqrt();
+                let deflection = (diagonal / 200.0).max(1e-4);
+                let mut triangles = Vec::new();
+                for &fid in &components[component_index] {
                     let Ok(mesh) = crate::tessellate::tessellate_with_uvs(topo, fid, deflection)
                     else {
                         return false;
                     };
                     for tri in mesh.mesh.indices.chunks_exact(3) {
-                        meshes[slot].push([
+                        if triangles.len() >= MAX_COMPONENT_TRIANGLES {
+                            return false;
+                        }
+                        triangles.push([
                             mesh.mesh.positions[tri[0] as usize],
                             mesh.mesh.positions[tri[1] as usize],
                             mesh.mesh.positions[tri[2] as usize],
                         ]);
                     }
                 }
+                cached_meshes[component_index] = Some(triangles);
             }
-            if meshes[0].iter().any(|&a| {
-                meshes[1]
-                    .iter()
-                    .any(|&b| crate::mesh_boolean::triangle_surfaces_intersect(a, b, eps))
-            }) {
+
+            let Some(a_triangles) = cached_meshes[i].as_ref() else {
                 return false;
+            };
+            let Some(b_triangles) = cached_meshes[j].as_ref() else {
+                return false;
+            };
+            for &a in a_triangles {
+                for &b in b_triangles {
+                    if triangle_tests >= MAX_COMPONENT_TRIANGLE_TESTS {
+                        return false;
+                    }
+                    triangle_tests += 1;
+                    if crate::mesh_boolean::triangle_surfaces_intersect(a, b, eps) {
+                        return false;
+                    }
+                }
             }
 
             let (outer, inner) = if contains(aabbs[i], aabbs[j]) {
