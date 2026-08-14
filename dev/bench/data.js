@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786686215274,
+  "lastUpdate": 1786687435610,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9989,6 +9989,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 27678971,
             "range": "± 54656",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "539dfc95b450a1b0215800b488f6d7ca0446d055",
+          "message": "Merge pull request #225 from esaueng/codex/fix-vulnerability-in-tessellation-binary-api\n\nwasm: validate f32 conversion for grouped tessellation to avoid non-finite coords",
+          "timestamp": "2026-08-14T02:01:03-04:00",
+          "tree_id": "28a6aea4d6934fe0717bdeb399e476d3f11ef532",
+          "url": "https://github.com/esaueng/brepkit/commit/539dfc95b450a1b0215800b488f6d7ca0446d055"
+        },
+        "date": 1786687434834,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 967078,
+            "range": "± 1874",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1066318,
+            "range": "± 5044",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12367,
+            "range": "± 194",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 881581,
+            "range": "± 3625",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 25146416,
+            "range": "± 220249",
             "unit": "ns/iter"
           }
         ]
