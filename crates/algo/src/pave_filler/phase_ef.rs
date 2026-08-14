@@ -443,14 +443,16 @@ fn check_edge_face_pairs(
                 .iter()
                 .zip(&endpoint_windows)
                 .map(|(&(t, pt), &(_, _, snap_window))| {
-                    if snap_window <= tol.linear
+                    // Only lines can use the exact parameter recomputation
+                    // below. Reject other curves before the spatial lookup.
+                    if !matches!(curve, brepkit_topology::edge::EdgeCurve::Line)
+                        || snap_window <= tol.linear
                         || find_nearby_vertex(topo, arena, pt, tol).is_some()
                     {
                         return None;
                     }
                     let _ = t;
                     super::helpers::find_nearby_pave_vertex_widened(
-                        topo,
                         arena,
                         pt,
                         snap_window,
@@ -466,9 +468,6 @@ fn check_edge_face_pairs(
                     )
                     .and_then(|vid| {
                         let vp = topo.vertex(vid).ok()?.point();
-                        let brepkit_topology::edge::EdgeCurve::Line = &curve else {
-                            return None;
-                        };
                         let d = end_pos - start_pos;
                         let len_sq = d.length_squared();
                         if len_sq < tol.linear * tol.linear {

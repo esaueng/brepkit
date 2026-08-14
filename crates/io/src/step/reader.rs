@@ -28,7 +28,7 @@
 //! length-valued in it (some are `PRODUCT`/`COLOUR_RGB` only) still imports,
 //! as zero solids.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use brepkit_math::aabb::Aabb2;
 use brepkit_math::frame::Frame3;
@@ -81,14 +81,24 @@ pub fn read_step_with_limits(
     let Some(units) = resolve_unit_scale(&entities, has_solids)? else {
         return Ok(Vec::new());
     };
-    let solids = {
-        let mut builder = StepBuilder::new(topo, &entities, units);
-        builder.build_all_solids()?
-    };
-    for &solid_id in &solids {
-        merge_split_rim_arcs(topo, solid_id, Tolerance::new())?;
+    // Building a STEP model allocates topology incrementally. Keep the import
+    // transactional so an error in a later solid cannot expose geometry from
+    // an otherwise rejected file to the caller.
+    let snapshot = topo.clone();
+    let result = (|| {
+        let solids = {
+            let mut builder = StepBuilder::new(topo, &entities, units);
+            builder.build_all_solids()?
+        };
+        for &solid_id in &solids {
+            merge_split_rim_arcs(topo, solid_id, Tolerance::new())?;
+        }
+        Ok(solids)
+    })();
+    if result.is_err() {
+        topo.restore_preserving_handle_slots(&snapshot);
     }
-    Ok(solids)
+    result
 }
 
 // ── Parsing ─────────────────────────────────────────────────────────
@@ -109,20 +119,22 @@ fn parse_step_entities(
     let mut in_data = false;
     let mut found_data = false;
 
-    for statement in step_statements(input)? {
+    let mut found_endsec = false;
+    visit_step_statements(input, |statement| {
         let stmt = statement.trim();
         if !in_data {
             if stmt.eq_ignore_ascii_case("DATA") {
                 in_data = true;
                 found_data = true;
             }
-            continue;
+            return Ok(true);
         }
         if stmt.eq_ignore_ascii_case("ENDSEC") {
-            return Ok(entities);
+            found_endsec = true;
+            return Ok(false);
         }
         if stmt.is_empty() {
-            continue;
+            return Ok(true);
         }
 
         if let Some(eq_pos) = stmt.find('=') {
@@ -152,9 +164,12 @@ fn parse_step_entities(
                 ensure_limit("STEP entities", entities.len(), limits.max_model_entities)?;
             }
         }
-    }
+        Ok(true)
+    })?;
 
-    if found_data {
+    if found_endsec {
+        Ok(entities)
+    } else if found_data {
         Err(IoError::ParseError {
             reason: "no ENDSEC after DATA".to_string(),
         })
@@ -165,11 +180,17 @@ fn parse_step_entities(
     }
 }
 
-/// Tokenize Part 21 statements without treating semicolons inside strings or
-/// block comments as terminators. STEP escapes a quote inside a string as two
-/// consecutive single quotes.
-fn step_statements(input: &str) -> Result<Vec<String>, IoError> {
-    let mut statements = Vec::new();
+/// Visit Part 21 statements without treating semicolons inside strings or
+/// block comments as terminators. Statements are delivered one at a time so
+/// hostile input cannot create a collection proportional to its statement
+/// count. Returning `false` stops scanning, allowing the DATA parser to avoid
+/// processing arbitrary content after its `ENDSEC`.
+///
+/// STEP escapes a quote inside a string as two consecutive single quotes.
+fn visit_step_statements(
+    input: &str,
+    mut visit: impl FnMut(&str) -> Result<bool, IoError>,
+) -> Result<(), IoError> {
     let mut current = String::new();
     let mut chars = input.chars().peekable();
     let mut in_string = false;
@@ -209,8 +230,8 @@ fn step_statements(input: &str) -> Result<Vec<String>, IoError> {
             }
             ';' => {
                 let statement = current.trim();
-                if !statement.is_empty() {
-                    statements.push(statement.to_string());
+                if !statement.is_empty() && !visit(statement)? {
+                    return Ok(());
                 }
                 current.clear();
             }
@@ -234,7 +255,7 @@ fn step_statements(input: &str) -> Result<Vec<String>, IoError> {
             reason: "unterminated STEP statement".to_string(),
         });
     }
-    Ok(statements)
+    Ok(())
 }
 
 /// Parse `#123` into `123`.
@@ -616,6 +637,14 @@ const FACE_BOUND_SURFACE_RESIDUAL: f64 = 2.0 * FACE_BOUND_CLASSIFICATION_DEFLECT
 /// revolution behind coincident endpoints or a zero midpoint deviation.
 const FACE_BOUND_SAMPLE_DEPTH: u32 = 16;
 
+/// Resource ceilings for geometric classification of one attacker-controlled
+/// `ADVANCED_FACE`.  Ordinary B-Reps use only a handful of bounds per face;
+/// these caps keep containment and adaptive curve sampling predictably bounded.
+const MAX_FACE_BOUND_CANDIDATES: usize = 128;
+const MAX_FACE_BOUND_SAMPLES: usize = 32_768;
+const MAX_FACE_BOUND_EDGE_SAMPLES: usize = 8_192;
+const MAX_FACE_BOUND_CONTAINMENT_WORK: usize = 8_000_000;
+
 #[derive(Debug, Clone, Copy)]
 struct FaceBoundCandidate {
     bound_ref: u64,
@@ -749,11 +778,22 @@ impl<'a> StepBuilder<'a> {
     /// shells use.
     fn build_shell(
         &mut self,
-        shell_ref: u64,
-        flip: bool,
+        mut shell_ref: u64,
+        mut flip: bool,
     ) -> Result<brepkit_topology::shell::ShellId, IoError> {
-        let entity = self.get_entity(shell_ref)?;
-        if entity.entity_type == "ORIENTED_CLOSED_SHELL" {
+        let mut oriented_shells = HashSet::new();
+        let entity = loop {
+            let entity = self.get_entity(shell_ref)?;
+            if entity.entity_type != "ORIENTED_CLOSED_SHELL" {
+                break entity;
+            }
+            if !oriented_shells.insert(shell_ref) {
+                return Err(IoError::ParseError {
+                    reason: format!(
+                        "cyclic ORIENTED_CLOSED_SHELL reference involving #{shell_ref}"
+                    ),
+                });
+            }
             let attrs = entity.attrs.clone();
             let reversed = orientation_is_reversed(&attrs);
             let base = parse_refs(&attrs)
@@ -764,8 +804,9 @@ impl<'a> StepBuilder<'a> {
                         "ORIENTED_CLOSED_SHELL #{shell_ref} missing its closed shell reference"
                     ),
                 })?;
-            return self.build_shell(base, flip != reversed);
-        }
+            shell_ref = base;
+            flip = flip != reversed;
+        };
 
         let attrs = entity.attrs.clone();
         let face_refs = parse_list_refs(&attrs);
@@ -797,6 +838,12 @@ impl<'a> StepBuilder<'a> {
         let face_reversed = surface_reversed != flip;
         let all_refs = parse_refs(&attrs);
         let list_refs = parse_list_refs(&attrs);
+
+        ensure_limit(
+            "STEP bounds per ADVANCED_FACE",
+            list_refs.len(),
+            MAX_FACE_BOUND_CANDIDATES,
+        )?;
 
         // Surface ref is the last #ref that's not in the bounds list.
         let list_set: std::collections::HashSet<u64> = list_refs.iter().copied().collect();
@@ -956,8 +1003,10 @@ impl<'a> StepBuilder<'a> {
         })?;
 
         let mut loops = Vec::with_capacity(candidates.len());
+        let mut sampled_points = 0;
         for (candidate_index, candidate) in candidates.iter().enumerate() {
-            let polygon = self.sample_planar_bound(face_ref, *candidate, &frame)?;
+            let polygon =
+                self.sample_planar_bound(face_ref, *candidate, &frame, &mut sampled_points)?;
             let bounds = Aabb2::try_from_points(polygon.iter().copied()).ok_or_else(|| {
                 IoError::ParseError {
                     reason: format!(
@@ -1004,6 +1053,7 @@ impl<'a> StepBuilder<'a> {
 
         let margin = FACE_BOUND_CLASSIFICATION_DEFLECTION + tol.linear;
         let mut parents = vec![None; loops.len()];
+        let mut containment_work = 0usize;
         for child_index in 0..loops.len() {
             let child = &loops[child_index];
             let mut possible = Vec::new();
@@ -1015,6 +1065,13 @@ impl<'a> StepBuilder<'a> {
                 if area_gap <= child.perimeter * tol.linear {
                     continue;
                 }
+                containment_work = containment_work
+                    .saturating_add(parent.polygon.len().saturating_mul(child.polygon.len() + 1));
+                ensure_limit(
+                    "STEP face-bound containment work",
+                    containment_work,
+                    MAX_FACE_BOUND_CONTAINMENT_WORK,
+                )?;
                 if planar_loop_contains(parent, child, margin) {
                     possible.push(parent_index);
                 }
@@ -1080,10 +1137,16 @@ impl<'a> StepBuilder<'a> {
         let margin = FACE_BOUND_CLASSIFICATION_DEFLECTION + tol.linear;
         let (u_period, v_period) = domain.scaled_periods();
         let mut loops = Vec::with_capacity(candidates.len());
+        let mut sampled_points = 0;
 
         for (candidate_index, candidate) in candidates.iter().enumerate() {
-            let (polygon, seam_flexible_u, seam_flexible_v) =
-                self.sample_periodic_bound(face_ref, *candidate, surface, domain)?;
+            let (polygon, seam_flexible_u, seam_flexible_v) = self.sample_periodic_bound(
+                face_ref,
+                *candidate,
+                surface,
+                domain,
+                &mut sampled_points,
+            )?;
             let bounds = Aabb2::try_from_points(polygon.iter().copied()).ok_or_else(|| {
                 IoError::ParseError {
                     reason: format!(
@@ -1152,6 +1215,7 @@ impl<'a> StepBuilder<'a> {
         }
 
         let mut parents = vec![None; loops.len()];
+        let mut containment_work = 0usize;
         for child_index in 0..loops.len() {
             let child = &loops[child_index];
             let mut possible = Vec::new();
@@ -1163,6 +1227,13 @@ impl<'a> StepBuilder<'a> {
                 if area_gap <= child.perimeter * tol.linear {
                     continue;
                 }
+                containment_work = containment_work
+                    .saturating_add(parent.polygon.len().saturating_mul(child.polygon.len() + 1));
+                ensure_limit(
+                    "STEP face-bound containment work",
+                    containment_work,
+                    MAX_FACE_BOUND_CONTAINMENT_WORK,
+                )?;
                 if periodic_loop_contains(parent, child, margin, u_period, v_period) {
                     possible.push(parent_index);
                 }
@@ -1219,6 +1290,7 @@ impl<'a> StepBuilder<'a> {
         candidate: FaceBoundCandidate,
         surface: &FaceSurface,
         domain: PeriodicUvDomain,
+        sampled_points: &mut usize,
     ) -> Result<(Vec<Point2>, bool, bool), IoError> {
         let wire = self
             .topo
@@ -1246,6 +1318,12 @@ impl<'a> StepBuilder<'a> {
                     ),
                 })?;
             let mut edge_points = self.sample_bound_edge(edge)?;
+            *sampled_points = sampled_points.saturating_add(edge_points.len());
+            ensure_limit(
+                "sampled points per STEP ADVANCED_FACE",
+                *sampled_points,
+                MAX_FACE_BOUND_SAMPLES,
+            )?;
             if !oriented.is_forward() {
                 edge_points.reverse();
             }
@@ -1387,6 +1465,7 @@ impl<'a> StepBuilder<'a> {
         face_ref: u64,
         candidate: FaceBoundCandidate,
         frame: &Frame3,
+        sampled_points: &mut usize,
     ) -> Result<Vec<Point2>, IoError> {
         let wire = self
             .topo
@@ -1409,6 +1488,12 @@ impl<'a> StepBuilder<'a> {
                     ),
                 })?;
             let mut edge_points = self.sample_bound_edge(edge)?;
+            *sampled_points = sampled_points.saturating_add(edge_points.len());
+            ensure_limit(
+                "sampled points per STEP ADVANCED_FACE",
+                *sampled_points,
+                MAX_FACE_BOUND_SAMPLES,
+            )?;
             if !oriented.is_forward() {
                 edge_points.reverse();
             }
@@ -2775,6 +2860,9 @@ fn sample_bound_curve_interval<F>(
 where
     F: Fn(f64) -> Point3,
 {
+    if out.len() >= MAX_FACE_BOUND_EDGE_SAMPLES {
+        return false;
+    }
     let span = parameter_b - parameter_a;
     let parameter_q1 = span.mul_add(0.25, parameter_a);
     let parameter_mid = span.mul_add(0.5, parameter_a);
@@ -2827,8 +2915,10 @@ fn point_segment_distance_3d(point: Point3, start: Point3, end: Point3) -> f64 {
 
 /// Return a periodic parameter domain together with stable coordinate scales.
 ///
-/// Scaling turns a cylinder's angular coordinate into developed arc length and
-/// keeps the containment tolerance in millimetres.  For the other analytic
+/// Scaling turns angular coordinates into developed arc length and keeps the
+/// containment tolerance in millimetres. Cones are deliberately excluded:
+/// their angular metric varies with height, so no single scale can safely
+/// classify bounds using a fixed linear tolerance. For the other analytic
 /// surfaces the scale is a characteristic metric only; positive independent
 /// scaling of u and v does not change loop containment.  Periodic NURBS retain
 /// their native knot-domain coordinates and are accepted only when projection
@@ -2845,12 +2935,7 @@ fn periodic_uv_domain(surface: &FaceSurface) -> Option<PeriodicUvDomain> {
             u_scale: cylinder.radius().abs().max(tol),
             v_scale: 1.0,
         }),
-        FaceSurface::Cone(cone) => Some(PeriodicUvDomain {
-            u_period: Some(TAU),
-            v_period: None,
-            u_scale: cone.radius_at(1.0).abs().max(tol),
-            v_scale: 1.0,
-        }),
+        FaceSurface::Cone(_) => None,
         FaceSurface::Sphere(sphere) => Some(PeriodicUvDomain {
             u_period: Some(TAU),
             v_period: None,
@@ -4578,6 +4663,15 @@ mod tests {
     }
 
     #[test]
+    fn statement_scanner_streams_pre_data_statements_and_stops_after_data() {
+        let mut step = "A;".repeat(100_000);
+        step.push_str("DATA;ENDSEC;'unclosed content after the DATA section");
+
+        let entities = parse_step_entities(&step, ImportLimits::default()).unwrap();
+        assert!(entities.is_empty());
+    }
+
+    #[test]
     fn statement_scanner_rejects_unterminated_string_comment_and_statement() {
         for step in [
             "ISO-10303-21;DATA;#1=NAME('unterminated;ENDSEC;",
@@ -4641,6 +4735,41 @@ mod tests {
         let solids = read_step(&step_str, &mut read_topo).unwrap();
 
         assert_eq!(solids.len(), 2);
+    }
+
+    #[test]
+    fn failed_multi_solid_import_is_transactional() {
+        let mut write_topo = Topology::new();
+        let first =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let second =
+            brepkit_operations::primitives::make_box(&mut write_topo, 2.0, 2.0, 2.0).unwrap();
+        let mut step = writer::write_step(&write_topo, &[first, second]).unwrap();
+
+        let second_solid_line = step
+            .lines()
+            .filter(|line| line.contains("MANIFOLD_SOLID_BREP"))
+            .nth(1)
+            .unwrap()
+            .to_owned();
+        let shell_reference = second_solid_line.rfind('#').unwrap();
+        let reference_end =
+            shell_reference + second_solid_line[shell_reference..].find(')').unwrap();
+        let mut malformed_line = second_solid_line.clone();
+        malformed_line.replace_range(shell_reference..reference_end, "#999999");
+        step = step.replacen(&second_solid_line, &malformed_line, 1);
+
+        let mut read_topo = Topology::new();
+        let result = read_step(&step, &mut read_topo);
+
+        assert!(result.is_err());
+        assert_eq!(read_topo.num_solids(), 0);
+        let fresh =
+            brepkit_operations::primitives::make_box(&mut read_topo, 3.0, 3.0, 3.0).unwrap();
+        assert!(
+            fresh.index() > 0,
+            "a handle allocated during the rejected import must not be reused"
+        );
     }
 
     #[test]
@@ -7500,6 +7629,13 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         cone
     }
 
+    #[test]
+    fn generic_cone_bound_classification_fails_closed() {
+        let cone = cone_geometry(&z_axis_cone("1000000.", "0.5404195002705842"));
+
+        assert!(periodic_uv_domain(&FaceSurface::Cone(cone)).is_none());
+    }
+
     /// The radius the cone carries at axial distance `h` from its apex.
     ///
     /// `radius_at` takes a distance along the generator; `h/sin(half_angle)`
@@ -8091,6 +8227,37 @@ REPRESENTATION_CONTEXT('Context3D','3D Context with UNIT and UNCERTAINTY') );\n"
         for (f, r) in forward.iter().zip(flipped.iter()) {
             assert_ne!(f, r, "ORIENTED_CLOSED_SHELL .F. must invert each face");
         }
+    }
+
+    #[test]
+    fn cyclic_oriented_closed_shell_is_refused_not_overflowed() {
+        let mut write_topo = Topology::new();
+        let solid =
+            brepkit_operations::primitives::make_box(&mut write_topo, 1.0, 1.0, 1.0).unwrap();
+        let step_str = writer::write_step(&write_topo, &[solid]).unwrap();
+        let idx = step_str.rfind("ENDSEC;").unwrap();
+        let cyclic = format!(
+            "{}#90001 = ORIENTED_CLOSED_SHELL('',*,#90002,.T.);\n\
+             #90002 = ORIENTED_CLOSED_SHELL('',*,#90001,.F.);\n\
+             #90003 = MANIFOLD_SOLID_BREP('',#90001);\n{}",
+            &step_str[..idx],
+            &step_str[idx..]
+        );
+        let mut kept = String::new();
+        for line in cyclic
+            .lines()
+            .filter(|line| !line.contains("= MANIFOLD_SOLID_BREP(") || line.contains("#90001"))
+        {
+            let _ = writeln!(kept, "{line}");
+        }
+
+        let mut read_topo = Topology::new();
+        let err = read_step(&kept, &mut read_topo).unwrap_err();
+        assert!(
+            err.to_string()
+                .contains("cyclic ORIENTED_CLOSED_SHELL reference"),
+            "unexpected error: {err}"
+        );
     }
 
     #[test]

@@ -874,26 +874,33 @@ fn fit_circular_pattern(group: &[HolePatternInfo]) -> Option<(Vec<usize>, f64)> 
         return None;
     }
     let tolerance = Tolerance::new();
-    let mut fitted = None;
-    'triples: for i in 0..group.len() {
-        for j in (i + 1)..group.len() {
-            for k in (j + 1)..group.len() {
-                let a = group[j].position - group[i].position;
-                let b = group[k].position - group[i].position;
-                let normal = a.cross(b);
-                let denominator = 2.0 * normal.length_squared();
-                if denominator <= tolerance.linear_sq() {
-                    continue;
-                }
-                let offset = (a.length_squared() * b.cross(normal)
-                    + b.length_squared() * normal.cross(a))
-                    * (1.0 / denominator);
-                fitted = Some((group[i].position + offset, offset.length()));
-                break 'triples;
-            }
-        }
+    // Use a well-separated pair and the point farthest from their line. This
+    // finds a non-collinear triple in linear time instead of exhaustively
+    // examining every triple for collinear, unevenly-spaced inputs.
+    let origin = group[0].position;
+    let (_, a) = group[1..]
+        .iter()
+        .map(|hole| {
+            let offset = hole.position - origin;
+            (offset.length_squared(), offset)
+        })
+        .max_by(|left, right| left.0.total_cmp(&right.0))?;
+    let (_, b, normal) = group[1..]
+        .iter()
+        .map(|hole| {
+            let offset = hole.position - origin;
+            let cross = a.cross(offset);
+            (cross.length_squared(), offset, cross)
+        })
+        .max_by(|left, right| left.0.total_cmp(&right.0))?;
+    let denominator = 2.0 * normal.length_squared();
+    if denominator <= tolerance.linear_sq() {
+        return None;
     }
-    let (center, radius) = fitted?;
+    let offset = (a.length_squared() * b.cross(normal) + b.length_squared() * normal.cross(a))
+        * (1.0 / denominator);
+    let center = origin + offset;
+    let radius = offset.length();
     let radial_tolerance = tolerance.linear.max(radius * 1e-6);
     if radius <= tolerance.linear
         || group
@@ -1236,6 +1243,40 @@ mod tests {
         // Three arbitrary non-collinear points always define a circle, so
         // circular recognition deliberately requires at least four holes.
         assert!(group.len() < 4);
+    }
+
+    #[test]
+    fn circular_fitting_rejects_large_collinear_group() {
+        let group = (0..1_000)
+            .map(|feature_index| HolePatternInfo {
+                feature_index,
+                diameter: 5.0,
+                position: Point3::new((feature_index * feature_index) as f64, 0.0, 0.0),
+                axis: Vec3::new(0.0, 0.0, 1.0),
+            })
+            .collect::<Vec<_>>();
+
+        assert!(fit_circular_pattern(&group).is_none());
+    }
+
+    #[test]
+    fn circular_fitting_preserves_evenly_spaced_patterns() -> Result<(), &'static str> {
+        let group = (0..8)
+            .map(|feature_index| {
+                let angle = std::f64::consts::TAU * feature_index as f64 / 8.0;
+                HolePatternInfo {
+                    feature_index,
+                    diameter: 5.0,
+                    position: Point3::new(10.0 * angle.cos(), 10.0 * angle.sin(), 0.0),
+                    axis: Vec3::new(0.0, 0.0, 1.0),
+                }
+            })
+            .collect::<Vec<_>>();
+
+        let (indices, spacing) = fit_circular_pattern(&group).ok_or("pattern should fit")?;
+        assert_eq!(indices.len(), group.len());
+        assert!((spacing - 10.0 * std::f64::consts::TAU / 8.0).abs() < 1e-10);
+        Ok(())
     }
 
     #[test]
