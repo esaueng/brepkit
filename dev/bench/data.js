@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786587364101,
+  "lastUpdate": 1786683661980,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9881,6 +9881,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13705389,
             "range": "± 43363",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "590ab70573dca8a656f8f908b15778ca0f731b75",
+          "message": "test(wasm): exercise installed tarball consumer (#221)\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-08-14T00:58:56-04:00",
+          "tree_id": "3cc7160f6e4e429f0c3d8bed62765bb5206ae887",
+          "url": "https://github.com/esaueng/brepkit/commit/590ab70573dca8a656f8f908b15778ca0f731b75"
+        },
+        "date": 1786683660621,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 469301,
+            "range": "± 1711",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 521064,
+            "range": "± 2257",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6558,
+            "range": "± 5",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 430274,
+            "range": "± 1093",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 14172583,
+            "range": "± 37110",
             "unit": "ns/iter"
           }
         ]
