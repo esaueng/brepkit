@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786707803286,
+  "lastUpdate": 1786710239090,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10097,6 +10097,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 21520538,
             "range": "± 19160",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "770b002ae7b4d0850490dcaa0d440a871ce6e689",
+          "message": "Merge pull request #226 from esaueng/codex/fix-unbounded-deflection-in-projectedges\n\nfix(operations): bound hidden-line projection sampling",
+          "timestamp": "2026-08-14T08:21:22-04:00",
+          "tree_id": "388f8c2659e06946d5be5d3293c34d3c5b78d7ca",
+          "url": "https://github.com/esaueng/brepkit/commit/770b002ae7b4d0850490dcaa0d440a871ce6e689"
+        },
+        "date": 1786710238306,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1060057,
+            "range": "± 12122",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1149381,
+            "range": "± 9434",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14302,
+            "range": "± 92",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 964098,
+            "range": "± 2222",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 27707975,
+            "range": "± 97528",
             "unit": "ns/iter"
           }
         ]
