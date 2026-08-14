@@ -23,13 +23,31 @@ pub fn sample_nurbs_endpoints(curve: &NurbsCurve) -> Vec<Point3> {
     vec![curve.evaluate(t0), curve.evaluate(t1)]
 }
 
-fn contact_midpoint_matches(
+fn contact_geometry_matches(
     edge_curve: &EdgeCurve,
     edge_start: Point3,
     edge_end: Point3,
     want_curve: &NurbsCurve,
     tolerance: f64,
 ) -> bool {
+    if matches!(edge_curve, EdgeCurve::Line) {
+        let chord = edge_end - edge_start;
+        let chord_len_sq = chord.dot(chord);
+        if chord_len_sq <= f64::EPSILON {
+            return want_curve
+                .control_points()
+                .iter()
+                .all(|point| (*point - edge_start).length() <= tolerance);
+        }
+
+        return want_curve.control_points().iter().all(|point| {
+            let offset = *point - edge_start;
+            let parameter = offset.dot(chord) / chord_len_sq;
+            let distance = (offset - chord * parameter).length();
+            distance <= tolerance && parameter >= -tolerance && parameter <= 1.0 + tolerance
+        });
+    }
+
     let (t0, t1) = want_curve.domain();
     let want_mid = want_curve.evaluate((t0 + t1) * 0.5);
     let edge_mid = edge_curve.evaluate_with_endpoints(0.5, edge_start, edge_end);
@@ -48,7 +66,7 @@ fn contact_midpoint_matches(
 /// span the same contacts. Minting fresh edges for curves the trimmed
 /// neighbours already carry leaves two edge entities per contact — each used
 /// by one face — opening the shell along every blend flank. A trimmer edge
-/// is adopted (with its vertices) when its endpoints and midpoint match the
+/// is adopted (with its vertices) when its endpoints and geometry match the
 /// stripe's contact curve within the weld band, in either orientation;
 /// otherwise that side falls back to a fresh edge.
 pub fn create_blend_face_with_contacts(
@@ -80,7 +98,7 @@ pub fn create_blend_face_with_contacts(
         let (sv, ev) = (e.start(), e.end());
         let sp = topo.vertex(sv).ok()?.point();
         let ep = topo.vertex(ev).ok()?.point();
-        if !contact_midpoint_matches(e.curve(), sp, ep, want_curve, WELD) {
+        if !contact_geometry_matches(e.curve(), sp, ep, want_curve, WELD) {
             return None;
         }
         if (sp - want_s).length() <= WELD && (ep - want_e).length() <= WELD {
@@ -617,11 +635,33 @@ mod tests {
         )
         .expect("valid quadratic NURBS");
 
-        assert!(!contact_midpoint_matches(
+        assert!(!contact_geometry_matches(
             &EdgeCurve::Line,
             start,
             end,
             &curved,
+            1e-5,
+        ));
+    }
+
+    #[test]
+    #[allow(clippy::expect_used)]
+    fn straight_contact_matches_nonuniform_linear_nurbs() {
+        let start = Point3::new(0.0, 0.0, 0.0);
+        let end = Point3::new(1.0, 0.0, 0.0);
+        let nonuniform = NurbsCurve::new(
+            1,
+            vec![0.0, 0.0, 0.5, 1.0, 1.0],
+            vec![start, Point3::new(0.9, 0.0, 0.0), end],
+            vec![1.0, 1.0, 1.0],
+        )
+        .expect("valid linear NURBS");
+
+        assert!(contact_geometry_matches(
+            &EdgeCurve::Line,
+            start,
+            end,
+            &nonuniform,
             1e-5,
         ));
     }
