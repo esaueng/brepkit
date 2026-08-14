@@ -915,6 +915,9 @@ pub fn boolean_with_options(
     Ok(result)
 }
 
+/// Maximum number of tools accepted by [`compound_cut`].
+pub const MAX_COMPOUND_CUT_TOOLS: usize = 256;
+
 /// Sequential compound cut via GFA.
 ///
 /// Cuts the `target` solid by each tool in order using sequential
@@ -922,13 +925,22 @@ pub fn boolean_with_options(
 ///
 /// # Errors
 ///
-/// Returns an error if any individual cut fails.
+/// Returns an error if the tool count exceeds [`MAX_COMPOUND_CUT_TOOLS`] or
+/// any individual cut fails.
 pub fn compound_cut(
     topo: &mut Topology,
     target: SolidId,
     tools: &[SolidId],
     opts: BooleanOptions,
 ) -> Result<SolidId, crate::OperationsError> {
+    if tools.len() > MAX_COMPOUND_CUT_TOOLS {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: format!(
+                "compound_cut accepts at most {MAX_COMPOUND_CUT_TOOLS} tools, got {}",
+                tools.len()
+            ),
+        });
+    }
     // Batched fast path: merge the tools into one multi-piece solid and cut
     // ONCE. Sequential cutting re-runs the full boolean pipeline against the
     // whole target per tool — O(target × tools); the lite magnet-drill pass
@@ -954,14 +966,15 @@ pub fn compound_cut(
         && let Some(clusters) = cluster_tools_by_aabb(topo, tools)
         && !clusters.is_empty()
     {
-        let merged = clusters.iter().try_fold(None::<SolidId>, |acc, cluster| {
-            let fused = fuse_cluster(topo, cluster)?;
-            match acc {
-                None => Ok(Some(fused)),
-                Some(prev) => boolean(topo, BooleanOp::Fuse, prev, fused).map(Some),
-            }
-        });
-        if let Ok(Some(tool)) = merged
+        let merged = clusters
+            .iter()
+            .map(|cluster| {
+                let fused = fuse_cluster(topo, cluster)?;
+                crate::copy::copy_solid(topo, fused)
+            })
+            .collect::<Result<Vec<_>, _>>()
+            .and_then(|solids| crate::compound_ops::merge_disjoint_solids(topo, &solids));
+        if let Ok(tool) = merged
             && let Ok(cut) = boolean(topo, BooleanOp::Cut, target, tool)
         {
             result = cut;
