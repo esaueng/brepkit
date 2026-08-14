@@ -315,15 +315,30 @@ fn polygon_area_3d(polygon: &[Point3], normal: Vec3) -> f64 {
     (sum * 0.5).abs()
 }
 
-type EdgeKey = ((i64, i64, i64), (i64, i64, i64));
+type Quantized = (bool, u64);
+type QuantizedPoint = (Quantized, Quantized, Quantized);
+type EdgeKey = (QuantizedPoint, QuantizedPoint);
+
+fn quantize_component(value: f64, scale: f64) -> Quantized {
+    let scaled = value * scale;
+    if scaled.is_finite() {
+        let rounded = scaled.round();
+        (false, if rounded == 0.0 { 0 } else { rounded.to_bits() })
+    } else {
+        // At magnitudes where tolerance scaling overflows, f64 spacing already
+        // exceeds the modeling tolerance. Preserve the exact coordinate bits
+        // instead of saturating unrelated coordinates into one integer key.
+        (true, value.to_bits())
+    }
+}
 
 /// Quantize a point onto an integer lattice for tolerant endpoint matching.
-fn quantize_point(p: Point3, tol: Tolerance) -> (i64, i64, i64) {
+fn quantize_point(p: Point3, tol: Tolerance) -> QuantizedPoint {
     let scale = 1.0 / (tol.linear * 10.0);
     (
-        (p.x() * scale).round() as i64,
-        (p.y() * scale).round() as i64,
-        (p.z() * scale).round() as i64,
+        quantize_component(p.x(), scale),
+        quantize_component(p.y(), scale),
+        quantize_component(p.z(), scale),
     )
 }
 

@@ -1133,7 +1133,7 @@ fn tessellate_planar_with_holes(
         })
         .collect();
 
-    for seed in hole_removal_seeds(&pts2d, &inner_wire_ranges) {
+    for seed in hole_removal_seeds(&pts2d, &inner_wire_ranges)? {
         let _removed = cdt.flood_remove_from_point(seed, &constraint_set);
     }
 
@@ -1281,7 +1281,7 @@ fn find_interior_seed(polygon: &[brepkit_math::vec::Point2]) -> brepkit_math::ve
 pub(super) fn hole_removal_seeds(
     pts2d: &[brepkit_math::vec::Point2],
     inner_wire_ranges: &[(usize, usize)],
-) -> Vec<brepkit_math::vec::Point2> {
+) -> Result<Vec<brepkit_math::vec::Point2>, crate::OperationsError> {
     use brepkit_math::predicates::point_in_polygon;
     use brepkit_math::vec::Point2;
 
@@ -1299,7 +1299,7 @@ pub(super) fn hole_removal_seeds(
     // One wire cannot nest, so skip the containment scan entirely — the common
     // case, and it keeps this off the hot path for ordinary single-hole faces.
     if polys.len() < 2 {
-        return seeds.into_iter().flatten().collect();
+        return Ok(seeds.into_iter().flatten().collect());
     }
 
     // Bounds gate the winding-number tests: honeycomb faces carry dozens of
@@ -1356,10 +1356,9 @@ pub(super) fn hole_removal_seeds(
                 continue;
             }
             if search_budget == 0 {
-                // Preserve the old safe fallback: an unclassified wire is
-                // treated as a hole rather than allowing attacker-controlled
-                // topology to consume unbounded CPU.
-                break;
+                return Err(crate::OperationsError::InvalidInput {
+                    reason: "hole nesting exceeds the bounded containment budget".into(),
+                });
             }
             search_budget -= 1;
             if point_in_polygon(seed, &polys[j]) {
@@ -1383,7 +1382,7 @@ pub(super) fn hole_removal_seeds(
             out.push(seed);
         }
     }
-    out
+    Ok(out)
 }
 
 /// Reconstruct a 3D point from a 2D projection, using the face plane.
@@ -1693,7 +1692,7 @@ pub(super) fn tessellate_planar_shared_with_holes(
         })
         .collect();
 
-    for seed in hole_removal_seeds(&pts2d, &inner_wire_ranges) {
+    for seed in hole_removal_seeds(&pts2d, &inner_wire_ranges)? {
         let _removed = cdt.flood_remove_from_point(seed, &constraint_set);
     }
 
@@ -1813,7 +1812,7 @@ pub(super) fn run_planar_cdt(
         })
         .collect();
 
-    for seed in hole_removal_seeds(pts2d, inner_wire_ranges) {
+    for seed in hole_removal_seeds(pts2d, inner_wire_ranges)? {
         let _removed = cdt.flood_remove_from_point(seed, &constraint_set);
     }
 
@@ -1891,7 +1890,7 @@ mod hole_seed_tests {
             ranges.push((start, points.len()));
         }
 
-        let seeds = hole_removal_seeds(&points, &ranges);
+        let seeds = hole_removal_seeds(&points, &ranges).unwrap_or_default();
 
         assert_eq!(seeds.len(), wire_count / 2);
     }

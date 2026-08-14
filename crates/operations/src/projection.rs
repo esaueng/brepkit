@@ -12,6 +12,8 @@ use brepkit_topology::solid::SolidId;
 
 use crate::classify::{PointClassification, classify_point};
 
+const MAX_PROJECT_EDGE_SAMPLE_POINTS: usize = 100_000;
+
 /// Projected edges, split into visible and hidden 2D polylines (in the view
 /// plane's `(x, y)` coordinates).
 #[derive(Debug, Clone, Default)]
@@ -45,6 +47,32 @@ pub fn project_edges(
     hidden_lines: bool,
     deflection: f64,
 ) -> Result<ProjectedEdges, crate::OperationsError> {
+    if !deflection.is_finite() || deflection <= 0.0 {
+        return Err(crate::OperationsError::InvalidInput {
+            reason: "projection deflection must be finite and positive".into(),
+        });
+    }
+    let edges = brepkit_topology::explorer::solid_edges(topo, solid)?;
+    let mut sample_points = 0usize;
+    for edge_id in edges {
+        let edge = topo.edge(edge_id)?;
+        let count = crate::tessellate::edge_sampling::edge_sample_count(
+            topo,
+            edge,
+            deflection,
+            brepkit_math::chord::DEFAULT_ANGULAR_TOL,
+            false,
+        );
+        sample_points = sample_points.saturating_add(count);
+        if sample_points > MAX_PROJECT_EDGE_SAMPLE_POINTS {
+            return Err(crate::OperationsError::InvalidInput {
+                reason: format!(
+                    "projection sampling exceeds the {MAX_PROJECT_EDGE_SAMPLE_POINTS}-point limit; increase deflection"
+                ),
+            });
+        }
+    }
+
     let view = direction
         .normalize()
         .map_err(|_| crate::OperationsError::InvalidInput {
