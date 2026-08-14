@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786710239090,
+  "lastUpdate": 1786710393514,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10151,6 +10151,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 27707975,
             "range": "± 97528",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "9100925c5f12dfebf80c5cdf83b02d22c217e8d7",
+          "message": "Merge pull request #227 from esaueng/codex/fix-section-deduplication-issue\n\nfix(section): preserve large-coordinate section outlines",
+          "timestamp": "2026-08-14T08:21:25-04:00",
+          "tree_id": "3dd365f93bb0c9ae91b4d44883279ddde6b8d24e",
+          "url": "https://github.com/esaueng/brepkit/commit/9100925c5f12dfebf80c5cdf83b02d22c217e8d7"
+        },
+        "date": 1786710392461,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1018751,
+            "range": "± 1794",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1105705,
+            "range": "± 1047",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12916,
+            "range": "± 243",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 938118,
+            "range": "± 2905",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26784062,
+            "range": "± 106170",
             "unit": "ns/iter"
           }
         ]
