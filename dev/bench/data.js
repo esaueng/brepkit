@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786725431800,
+  "lastUpdate": 1786725897753,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10583,6 +10583,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 31545343,
             "range": "± 240554",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7cff90e8c1008828daa2b62a8d4293a08123d1b8",
+          "message": "Merge pull request #241 from esaueng/fix/boolean-flatten-recursion-guard\n\nfix(operations): bound the boolean flatten pre-pass recursion",
+          "timestamp": "2026-08-14T12:39:16-04:00",
+          "tree_id": "3d45a6184cee92dee811a60948adde6320824f80",
+          "url": "https://github.com/esaueng/brepkit/commit/7cff90e8c1008828daa2b62a8d4293a08123d1b8"
+        },
+        "date": 1786725896986,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1038607,
+            "range": "± 7503",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1114120,
+            "range": "± 2712",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 10539,
+            "range": "± 49",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 787493,
+            "range": "± 5331",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 31614955,
+            "range": "± 203979",
             "unit": "ns/iter"
           }
         ]
