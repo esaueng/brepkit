@@ -37,12 +37,18 @@ while read -r name version; do
 done < <(cargo metadata --no-deps --format-version 1 \
   | jq -r '.packages[] | "\(.name) \(.version)"')
 
-# Every brepkit-to-brepkit dependency must request the shared version.
+# Every brepkit-to-brepkit dependency must request the shared version EXACTLY.
+# Publish verification resolves siblings from crates.io (`path` is stripped when
+# packaging), so a caret requirement can pull a newer registry release of the
+# same crate name and fail the verify build against this workspace's own API.
+# release-please rewrites these values on each release and may drop the `=`;
+# this check is the backstop. Re-pin with scripts/pin-sibling-versions.sh.
 while read -r line; do
   dep=${line%% *}
   req=${line#* }
-  if [ "$req" != "^$WS_VERSION" ]; then
-    echo "❌ workspace dependency $dep requests '$req', expected '^$WS_VERSION'"
+  if [ "$req" != "=$WS_VERSION" ]; then
+    echo "❌ workspace dependency $dep requests '$req', expected '=$WS_VERSION'"
+    echo "   run scripts/pin-sibling-versions.sh to fix"
     FAIL=1
   fi
 done < <(cargo metadata --no-deps --format-version 1 \

@@ -4721,7 +4721,7 @@ fn split_face_2d_impl(
             if is_plane { Some(frame) } else { None },
             edge_images,
             &section_anchor_pts,
-            is_plane,
+            tol.linear,
         )
     } else {
         boundary_edges_to_pcurve(topo, face.outer_wire(), &surface, &wire_pts, None)
@@ -5272,7 +5272,18 @@ fn split_face_2d_impl(
     let mut split_pts_3d: Vec<Point3> = sections.iter().flat_map(|s| [s.start, s.end]).collect();
     split_pts_3d.append(&mut outer_clip_anchors);
     if !is_plane && let Some(reg) = split_registry.as_deref_mut() {
-        split_pts_3d.extend(reg.values().flatten().copied());
+        // Only consume anchors belonging to section curves on this face.  The
+        // registry spans the whole boolean; flattening it here made every
+        // curved face probe every earlier anchor against every NURBS boundary.
+        let pave_blocks: std::collections::HashSet<_> =
+            sections.iter().filter_map(|s| s.pave_block_id).collect();
+        split_pts_3d.extend(
+            pave_blocks
+                .into_iter()
+                .filter_map(|pb_id| reg.get(&pb_id))
+                .flatten()
+                .copied(),
+        );
     }
 
     // For periodic faces, align closed boundary edge UV with seam edge UV.
@@ -6025,8 +6036,9 @@ fn split_face_2d_impl(
     if is_plane && original_inner_wires.is_empty() {
         use brepkit_math::curves2d::{Curve2D, Line2D};
         use brepkit_math::vec::Vec2;
-        const BRIDGE_BAND: f64 = 3e-3;
         let weld = tol.linear * 100.0;
+        let bridge_band = conversion::reconciliation_band(&wire_pts, weld);
+        let isolation_band = conversion::reconciliation_band(&wire_pts, 0.0);
         let n_all = all_edges.len();
         let mut bridges: Vec<OrientedPCurveEdge> = Vec::new();
         let mut pendants: Vec<(Point3, Point2, Point3)> = Vec::new();
@@ -6100,7 +6112,10 @@ fn split_face_2d_impl(
                     })
                 };
                 let boundary_bridge = best.is_some_and(|(d, b3, _)| {
-                    d > weld && d <= BRIDGE_BAND && second >= 1e-2 && !target_in_sections(b3)
+                    d > weld
+                        && d <= bridge_band
+                        && second >= isolation_band
+                        && !target_in_sections(b3)
                 });
                 if !boundary_bridge {
                     pendants.push((p3, puv, own_other));
@@ -6170,7 +6185,7 @@ fn split_face_2d_impl(
             }
             let Some((d, j)) = best_j else { continue };
             let (pj, uvj, own_j) = pendants[j];
-            if d <= weld || d > BRIDGE_BAND || second < 1e-2 {
+            if d <= weld || d > bridge_band || second < isolation_band {
                 continue;
             }
             let mutual = pendants

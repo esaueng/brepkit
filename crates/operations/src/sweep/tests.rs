@@ -402,12 +402,12 @@ fn sweep_insufficient_control_points_error() {
     let mut topo = Topology::new();
     let face = make_unit_square_face(&mut topo);
 
-    // A path with only 1 control point is invalid.
+    // A zero-length path (both control points coincident) is invalid.
     let path = NurbsCurve::new(
-        0,
-        vec![0.0, 1.0],
-        vec![Point3::new(0.0, 0.0, 0.0)],
-        vec![1.0],
+        1,
+        vec![0.0, 0.0, 1.0, 1.0],
+        vec![Point3::new(0.0, 0.0, 0.0), Point3::new(0.0, 0.0, 0.0)],
+        vec![1.0, 1.0],
     )
     .unwrap();
 
@@ -1631,6 +1631,24 @@ fn densify_leaves_uniform_polyline_unchanged() {
 fn densify_short_input_is_identity() {
     let pts = vec![Point3::new(0.0, 0.0, 0.0), Point3::new(10.0, 0.0, 0.0)];
     assert_eq!(densify_path_points(&pts), pts);
+}
+
+#[test]
+fn densify_caps_total_output_for_uneven_gaps() {
+    // A tiny median gap must not let many long gaps amplify a modest input
+    // into an unbounded global interpolation problem.
+    let mut pts = Vec::new();
+    let mut x = 0.0;
+    pts.push(Point3::new(x, 0.0, 0.0));
+    for i in 0..49 {
+        x += if i < 25 { 1e-6 } else { 1.0 };
+        pts.push(Point3::new(x, 0.0, 0.0));
+    }
+
+    let dense = densify_path_points(&pts);
+    assert_eq!(dense.len(), 256);
+    assert_eq!(dense.first(), pts.first());
+    assert_eq!(dense.last(), pts.last());
 }
 
 #[test]

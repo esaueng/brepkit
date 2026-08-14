@@ -2548,6 +2548,35 @@ export class BrepKernel {
      */
     repairSolid(solid: number): number;
     /**
+     * Resize or remove an exact constant-radius analytic blend band.
+     *
+     * `face` is only a seed: the kernel re-derives the complete band, its
+     * supports, and its current radius. `expected_radius` must match that
+     * exact measurement. `new_radius == 0` restores the sharp support
+     * intersection; positive values rebuild the band. Returns a new solid
+     * handle (`u32`).
+     *
+     * # Errors
+     *
+     * Returns a stable-code-prefixed refusal if the band is ambiguous,
+     * freeform, stale, unsupported, or cannot be rebuilt exactly. Failure is
+     * transactional and leaves all pre-existing handles valid.
+     */
+    resizeBlend(solid: number, face: number, expected_radius: number, new_radius: number): number;
+    /**
+     * [`Self::resize_blend_binding`] with versioned face evolution.
+     *
+     * The payload uses the existing [`FaceEvolutionPayloadV1`] schema. New
+     * band faces are `generated` from both recovered support faces; removed
+     * input band faces are `deleted`.
+     *
+     * # Errors
+     *
+     * Returns the same stable-code-prefixed refusals as `resizeBlend`, or a
+     * payload validation error if the construction record is incomplete.
+     */
+    resizeBlendWithEvolution(solid: number, face: number, expected_radius: number, new_radius: number): FaceEvolutionPayloadV1;
+    /**
      * Change the radius of a cylindrical face of a solid.
      *
      * Handles both bores and bosses. Returns a new solid handle (`u32`).
