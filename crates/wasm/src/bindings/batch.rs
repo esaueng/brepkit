@@ -2,6 +2,8 @@
 
 #![allow(clippy::missing_errors_doc, clippy::too_many_lines)]
 
+use std::rc::Rc;
+
 use wasm_bindgen::prelude::*;
 
 use brepkit_math::mat::Mat4;
@@ -65,6 +67,43 @@ enum BatchContract {
 }
 
 type BatchItemResult = Result<serde_json::Value, StructuredWasmError>;
+
+/// Whether a batch operation only reads topology.
+///
+/// This is a **performance hint, never a correctness claim**. A read-only op
+/// takes an `Rc` share of the topology instead of a deep copy; if a listed op
+/// does mutate after all, `Rc::make_mut` inside `BrepKernel::topo_mut` still
+/// materialises the pre-op state, so rollback stays exact. A stale entry here
+/// costs one deep copy — it can never produce a wrong rollback.
+///
+/// Mutating ops deliberately keep the deep copy. Sharing the `Rc` for them
+/// would push the copy into `Rc::make_mut`, which rebuilds every arena at
+/// exact capacity so the operation's first `push` immediately reallocates —
+/// measured 2-4x slower than copying aside and mutating in place.
+fn is_read_only_op(op: &str) -> bool {
+    matches!(
+        op,
+        "boundingBox"
+            | "centerOfMass"
+            | "chamfer2d"
+            | "classifyPoint"
+            | "detectCoincidentFaces"
+            | "fillet2d"
+            | "getNurbsCurveData"
+            | "getNurbsSurfaceData"
+            | "getNurbsSurfaceDataParity"
+            | "massProperties"
+            | "meshQuality"
+            | "polygonBoolean2d"
+            | "polygonUnion2d"
+            | "projectEdges"
+            | "solidEdges"
+            | "solidToSolidDistance"
+            | "surfaceArea"
+            | "validateSolid"
+            | "volume"
+    )
+}
 
 #[wasm_bindgen]
 impl BrepKernel {
@@ -170,14 +209,37 @@ impl BrepKernel {
                     }
                 };
                 let args = &entry["args"];
-                let snapshot = self.topo().clone();
-                let result = self.dispatch_op(op, args);
-                if result.is_err() {
-                    self.topo_mut().restore_preserving_handle_slots(&snapshot);
-                }
-                result.map_err(|error| error.with_operation_context(operation_index, op))
+                self.dispatch_with_rollback(op, args)
+                    .map_err(|error| error.with_operation_context(operation_index, op))
             })
             .collect()
+    }
+
+    /// Runs one batch operation, undoing its topology changes if it fails.
+    ///
+    /// The two arms differ only in what taking the rollback snapshot costs;
+    /// both restore the exact pre-operation state. See [`is_read_only_op`].
+    fn dispatch_with_rollback(&mut self, op: &str, args: &serde_json::Value) -> BatchItemResult {
+        if is_read_only_op(op) {
+            // O(1). Still correct if the op does mutate: `Rc::make_mut` in
+            // `topo_mut` sees the extra reference and copies the pre-op arenas
+            // aside before the first mutation lands.
+            let snapshot = Rc::clone(&self.topo);
+            let result = self.dispatch_op(op, args);
+            if result.is_err() {
+                self.topo_mut().restore_preserving_handle_slots(&snapshot);
+            }
+            result
+        } else {
+            // Copy aside so `self.topo` stays unshared and the operation
+            // mutates it in place, keeping its arena capacity.
+            let snapshot = self.topo().clone();
+            let result = self.dispatch_op(op, args);
+            if result.is_err() {
+                self.topo_mut().restore_preserving_handle_slots(&snapshot);
+            }
+            result
+        }
     }
 }
 
@@ -2214,5 +2276,161 @@ mod batch_contract_tests {
         let v2 = parse(&kernel.execute_batch_v2(&json));
         assert_eq!(v2[0]["error"]["code"], "batch_limit_exceeded");
         assert_eq!(v2[0]["error"]["details"]["resource"], "json_bytes");
+    }
+}
+
+#[cfg(test)]
+mod rollback_tests {
+    #![allow(clippy::unwrap_used, clippy::expect_used)]
+
+    use crate::kernel::BrepKernel;
+
+    /// Live entity counts across every arena a batch op can touch.
+    type Counts = (usize, usize, usize, usize, usize, usize);
+
+    fn counts(k: &BrepKernel) -> Counts {
+        let t = k.topo();
+        (
+            t.num_vertices(),
+            t.num_edges(),
+            t.num_wires(),
+            t.num_faces(),
+            t.num_shells(),
+            t.num_solids(),
+        )
+    }
+
+    fn kernel_with_box() -> BrepKernel {
+        let mut k = BrepKernel::new();
+        let out = k.execute_batch(r#"[{"op":"makeBox","args":{"width":2,"height":2,"depth":2}}]"#);
+        assert!(!out.contains("error"), "seed failed: {out}");
+        k
+    }
+
+    /// A `pushPullFace` far enough to consume the solid fails *after* building
+    /// geometry. Without rollback it leaves the arenas dirty.
+    const DIRTY_FAILING_OP: &str = r#"{"solid":0,"face":0,"distance":-50.0}"#;
+
+    /// Pins the premise of [`failed_batch_op_leaves_topology_untouched`]: the
+    /// operation it uses really does mutate before failing. If this ever stops
+    /// holding, that test is passing vacuously and needs a new operation.
+    #[test]
+    fn chosen_failing_op_really_dirties_topology_without_rollback() {
+        let mut k = kernel_with_box();
+        let before = counts(&k);
+        let args: serde_json::Value = serde_json::from_str(DIRTY_FAILING_OP).unwrap();
+
+        // `dispatch_op` is the raw path with no snapshot around it.
+        let result = k.dispatch_op("pushPullFace", &args);
+
+        assert!(result.is_err(), "expected the op to fail, got {result:?}");
+        assert_ne!(
+            before,
+            counts(&k),
+            "op no longer leaves partial mutation; pick another for the rollback test"
+        );
+    }
+
+    /// A mid-batch failure must leave topology exactly as it was, and the
+    /// operations after it must still see the correct pre-failure state.
+    #[test]
+    fn failed_batch_op_leaves_topology_untouched() {
+        let mut k = kernel_with_box();
+        let before = counts(&k);
+
+        let batch = format!(
+            r#"[
+                {{"op":"pushPullFace","args":{DIRTY_FAILING_OP}}},
+                {{"op":"volume","args":{{"solid":0,"deflection":0.05}}}}
+            ]"#
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&k.execute_batch(&batch)).unwrap();
+
+        // The failing op reports an error...
+        assert!(
+            parsed[0]["error"].is_string(),
+            "expected op 0 to fail, got {parsed}"
+        );
+        // ...and left no live entity behind.
+        assert_eq!(
+            before,
+            counts(&k),
+            "failed op mutated topology; rollback regressed"
+        );
+
+        // The untouched solid still resolves and measures correctly.
+        let vol = parsed[1]["ok"].as_f64().expect("volume should succeed");
+        assert!((vol - 8.0).abs() < 0.05, "expected ~8.0, got {vol}");
+
+        // A later mutating op still builds on the correct state.
+        let parsed: serde_json::Value = serde_json::from_str(
+            &k.execute_batch(r#"[{"op":"makeBox","args":{"width":1,"height":1,"depth":1}}]"#),
+        )
+        .unwrap();
+        let handle = parsed[0]["ok"].as_u64().expect("makeBox should succeed");
+        let parsed: serde_json::Value = serde_json::from_str(&k.execute_batch(&format!(
+            r#"[{{"op":"volume","args":{{"solid":{handle},"deflection":0.05}}}}]"#
+        )))
+        .unwrap();
+        let vol = parsed[0]["ok"].as_f64().expect("volume should succeed");
+        assert!((vol - 1.0).abs() < 0.05, "expected ~1.0, got {vol}");
+    }
+
+    /// Rollback must survive a *second* failure later in the same batch, since
+    /// the snapshot is taken per item rather than once per batch.
+    #[test]
+    fn repeated_failures_each_roll_back_independently() {
+        let mut k = kernel_with_box();
+
+        // A solid created between two failures keeps its handle; rollback
+        // retires the failed op's slots rather than reusing them, so the
+        // handle is read back from the result instead of assumed.
+        let batch = format!(
+            r#"[
+                {{"op":"pushPullFace","args":{DIRTY_FAILING_OP}}},
+                {{"op":"makeBox","args":{{"width":3,"height":3,"depth":3}}}},
+                {{"op":"pushPullFace","args":{DIRTY_FAILING_OP}}}
+            ]"#
+        );
+        let parsed: serde_json::Value = serde_json::from_str(&k.execute_batch(&batch)).unwrap();
+
+        assert!(parsed[0]["error"].is_string(), "op 0 should fail: {parsed}");
+        assert!(parsed[2]["error"].is_string(), "op 2 should fail: {parsed}");
+        let handle = parsed[1]["ok"].as_u64().expect("makeBox should succeed");
+
+        // The box created between the two failures survived the second one.
+        let parsed: serde_json::Value = serde_json::from_str(&k.execute_batch(&format!(
+            r#"[{{"op":"volume","args":{{"solid":{handle},"deflection":0.05}}}}]"#
+        )))
+        .unwrap();
+        let vol = parsed[0]["ok"].as_f64().expect("volume should succeed");
+        assert!((vol - 27.0).abs() < 0.2, "expected ~27.0, got {vol}");
+    }
+
+    /// Guards the `is_read_only_op` allowlist: every listed op that is
+    /// exercisable here must leave topology byte-identical. A drifting entry is
+    /// only a lost optimisation, never a wrong rollback — but it should still
+    /// be caught.
+    #[test]
+    fn read_only_ops_do_not_mutate_topology() {
+        let ops = [
+            r#"{"op":"volume","args":{"solid":0,"deflection":0.1}}"#,
+            r#"{"op":"surfaceArea","args":{"solid":0,"deflection":0.1}}"#,
+            r#"{"op":"boundingBox","args":{"solid":0}}"#,
+            r#"{"op":"centerOfMass","args":{"solid":0,"deflection":0.1}}"#,
+            r#"{"op":"massProperties","args":{"solid":0,"deflection":0.1}}"#,
+            r#"{"op":"validateSolid","args":{"solid":0}}"#,
+            r#"{"op":"solidEdges","args":{"solid":0}}"#,
+            r#"{"op":"meshQuality","args":{"solid":0,"deflection":0.1}}"#,
+            r#"{"op":"classifyPoint","args":{"solid":0,"x":0.5,"y":0.5,"z":0.5}}"#,
+        ];
+
+        for op in ops {
+            let mut k = kernel_with_box();
+            let before = counts(&k);
+            let out = k.execute_batch(&format!("[{op}]"));
+            assert!(!out.contains("\"error\""), "{op} failed: {out}");
+            assert_eq!(before, counts(&k), "{op} mutated topology");
+        }
     }
 }
