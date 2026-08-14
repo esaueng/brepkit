@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786724881016,
+  "lastUpdate": 1786725431800,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10529,6 +10529,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 40728557,
             "range": "± 148779",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "47e57dabe6c7933bd94e74d8c7f8a98585e14e66",
+          "message": "fix(topology): order edge_to_face_map so offset results stop varying per process (#243)\n\n`edge_to_face_map` returned a std `HashMap`, and several callers let its\niteration order reach their output. The visible symptom was the approx_census\n\"offset nurbs-loft [ERR]\" row: offset walks face pairs in map order and names\nthe first pair it cannot intersect, so the same NURBS loft blamed a different\npair in each process (Id(3)/Id(4), Id(3)/Id(5), Id(6)/Id(8), ... across runs)\nwhile the verdict stayed FALLBACK x5.\n\nThe error text was not the only field affected. With the map unordered, the\ndeterminism sweep's SUCCESSFUL offsets — offset_cyl_out and offset_cyl_in —\nalso came back with two different structural fingerprints, so a completed\noffset's wire/vertex structure was process-dependent too. Volume and face\ncount were stable, which is why nothing downstream had caught it.\n\nReturn a `BTreeMap` keyed by edge index. That fixes every caller at once\nrather than one call site at a time, which matters because three of them\n(shell_op, tessellate, offset::arc_joint) had already grown hand-written\nsorts against this exact hazard, and two more still iterate unordered: heal\nunions faces in map order, and offset::analyse classifies edges in it.\n\n`adjacent_faces`, `validate::face_connectivity_components`, and\n`tessellate::has_trimmed_same_sphere_neighbor` take the map by reference and\nmove to `BTreeMap` with it. shell_op's duplicate re-sort of the same vector\nis dropped; the remaining sort stays as an explicit statement of the\nrequirement.\n\nBREAKING: `brepkit_topology::explorer::edge_to_face_map` returns\n`BTreeMap<usize, SmallVec<[FaceId; 2]>>` and `adjacent_faces` takes\n`&BTreeMap<usize, V>`. No JS/WASM surface changes.\n\nGates: offset scenarios added to the determinism_sweep example, including\nthe NURBS loft that only reports an error. Pre-fix that sweep produced 8\ndistinct outputs over 10 processes; post-fix, 1 over 12. Plus an in-process\nassertion that the map yields ascending keys.\n\ncargo nextest --workspace: 3692 passed, 0 failed. fmt, clippy\n--all-targets --all-features, doc tests, rustdoc, boundaries, scaling, and\nwasm32 clippy all clean. approx_census verdicts unchanged; its nurbs-loft row\nis now identical across runs.\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-14T12:33:44-04:00",
+          "tree_id": "296aad205044843adce69a1533aa802194faf8aa",
+          "url": "https://github.com/esaueng/brepkit/commit/47e57dabe6c7933bd94e74d8c7f8a98585e14e66"
+        },
+        "date": 1786725430403,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1035864,
+            "range": "± 1870",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1106108,
+            "range": "± 1255",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11150,
+            "range": "± 36",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 787150,
+            "range": "± 793",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 31545343,
+            "range": "± 240554",
             "unit": "ns/iter"
           }
         ]
