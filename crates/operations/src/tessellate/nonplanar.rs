@@ -19,6 +19,14 @@ type EvalFn = Box<dyn Fn(f64, f64) -> Point3>;
 /// Maps `(u, v)` surface parameters to the outward surface normal.
 type NormalFn = Box<dyn Fn(f64, f64) -> Vec3>;
 
+fn rim_angles_match(a: &[f64], b: &[f64], tolerance: f64) -> bool {
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(&ua, &ub)| {
+            let delta = (ua - ub + TAU / 2.0).rem_euclid(TAU) - TAU / 2.0;
+            delta.is_finite() && delta.abs() <= tolerance
+        })
+}
+
 /// Per-face variant of the cycle-rim structured band: rims are sampled
 /// LOCALLY at the requested deflection instead of pulled from the solid
 /// tessellation's shared edge pool, so the `tessellate(topo, face, defl)`
@@ -375,6 +383,20 @@ pub(super) fn tessellate_revolution_band_shared(
     }
     let equal_counts = rims[0].len() == rims[1].len();
     let n = rims[0].len();
+
+    // Equal counts alone do not prove correspondence: imported B-Reps can
+    // carry independently refined or differently phased circle rims.  In
+    // that case ordinal pairing would make a twisted, off-surface band while
+    // still appearing watertight.  Decline the fast path unless every pair
+    // represents the same surface longitude; the caller's general path can
+    // then tessellate the face without assuming index correspondence.
+    if equal_counts {
+        let angles_a: Vec<f64> = rims[0].iter().map(|&gid| angle_of(gid, merged)).collect();
+        let angles_b: Vec<f64> = rims[1].iter().map(|&gid| angle_of(gid, merged)).collect();
+        if !rim_angles_match(&angles_a, &angles_b, 1e-6) {
+            return Ok(false);
+        }
+    }
 
     // Emit default-oriented (non-reversed) triangles: the geometric normal
     // matches the surface outward normal, the convention `tessellate_analytic`
@@ -3006,4 +3028,24 @@ pub(super) fn tessellate_nonplanar_snap(
     }
 
     Ok(())
+}
+
+#[cfg(test)]
+mod rim_angle_tests {
+    use super::rim_angles_match;
+    use std::f64::consts::TAU;
+
+    #[test]
+    fn accepts_matching_angles_across_surface_seam() {
+        let a = [0.0, 1.0, TAU - 5e-7];
+        let b = [TAU, 1.0 + 5e-7, 0.0];
+        assert!(rim_angles_match(&a, &b, 1e-6));
+    }
+
+    #[test]
+    fn rejects_equal_count_phase_mismatch() {
+        let a = [0.0, 1.0, 2.0];
+        let b = [0.25, 1.25, 2.25];
+        assert!(!rim_angles_match(&a, &b, 1e-6));
+    }
 }
