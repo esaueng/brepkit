@@ -4644,6 +4644,57 @@ export class BrepKernel {
         return ret[0] >>> 0;
     }
     /**
+     * Resize or remove an exact constant-radius analytic blend band.
+     *
+     * `face` is only a seed: the kernel re-derives the complete band, its
+     * supports, and its current radius. `expected_radius` must match that
+     * exact measurement. `new_radius == 0` restores the sharp support
+     * intersection; positive values rebuild the band. Returns a new solid
+     * handle (`u32`).
+     *
+     * # Errors
+     *
+     * Returns a stable-code-prefixed refusal if the band is ambiguous,
+     * freeform, stale, unsupported, or cannot be rebuilt exactly. Failure is
+     * transactional and leaves all pre-existing handles valid.
+     * @param {number} solid
+     * @param {number} face
+     * @param {number} expected_radius
+     * @param {number} new_radius
+     * @returns {number}
+     */
+    resizeBlend(solid, face, expected_radius, new_radius) {
+        const ret = wasm.brepkernel_resizeBlend(this.__wbg_ptr, solid, face, expected_radius, new_radius);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return ret[0] >>> 0;
+    }
+    /**
+     * [`Self::resize_blend_binding`] with versioned face evolution.
+     *
+     * The payload uses the existing [`FaceEvolutionPayloadV1`] schema. New
+     * band faces are `generated` from both recovered support faces; removed
+     * input band faces are `deleted`.
+     *
+     * # Errors
+     *
+     * Returns the same stable-code-prefixed refusals as `resizeBlend`, or a
+     * payload validation error if the construction record is incomplete.
+     * @param {number} solid
+     * @param {number} face
+     * @param {number} expected_radius
+     * @param {number} new_radius
+     * @returns {FaceEvolutionPayloadV1}
+     */
+    resizeBlendWithEvolution(solid, face, expected_radius, new_radius) {
+        const ret = wasm.brepkernel_resizeBlendWithEvolution(this.__wbg_ptr, solid, face, expected_radius, new_radius);
+        if (ret[2]) {
+            throw takeFromExternrefTable0(ret[1]);
+        }
+        return takeFromExternrefTable0(ret[0]);
+    }
+    /**
      * Change the radius of a cylindrical face of a solid.
      *
      * Handles both bores and bosses. Returns a new solid handle (`u32`).
@@ -6154,10 +6205,10 @@ export function __wbg___wbindgen_string_get_b0ca35b86a603356(arg0, arg1) {
 export function __wbg___wbindgen_throw_344f42d3211c4765(arg0, arg1) {
     throw new Error(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_error_552c9c90990574ef(arg0, arg1) {
+export function __wbg_error_20c9d41530b1ddce(arg0, arg1) {
     console.error(getStringFromWasm0(arg0, arg1));
 }
-export function __wbg_log_036fadb32ae2a495(arg0, arg1) {
+export function __wbg_log_c6f7786dd6b40c9d(arg0, arg1) {
     console.log(getStringFromWasm0(arg0, arg1));
 }
 export function __wbg_new_32b398fb48b6d94a() {
@@ -6174,7 +6225,7 @@ export function __wbg_set_6be42768c690e380(arg0, arg1, arg2) {
 export function __wbg_set_8a16b38e4805b298(arg0, arg1, arg2) {
     arg0[arg1 >>> 0] = arg2;
 }
-export function __wbg_warn_c33b3bbf99bfba20(arg0, arg1) {
+export function __wbg_warn_636c9705a73c2bdc(arg0, arg1) {
     console.warn(getStringFromWasm0(arg0, arg1));
 }
 export function __wbindgen_cast_0000000000000001(arg0) {
