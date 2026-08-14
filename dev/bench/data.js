@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786715166898,
+  "lastUpdate": 1786722104037,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10367,6 +10367,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 38661930,
             "range": "± 199418",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "97b74666cc9cc18bb2f9c72beae0c8b2168c5974",
+          "message": "Merge pull request #233 from esaueng/fix/checkpoint-restore-gate\n\nfix(wasm): do not gate checkpoint restore on lifetime slot count",
+          "timestamp": "2026-08-14T11:33:16-04:00",
+          "tree_id": "3518b87d03def42e8867abfe6e0726ef90c4f525",
+          "url": "https://github.com/esaueng/brepkit/commit/97b74666cc9cc18bb2f9c72beae0c8b2168c5974"
+        },
+        "date": 1786722101559,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1396016,
+            "range": "± 29180",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1435570,
+            "range": "± 3074",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14264,
+            "range": "± 63",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 1021173,
+            "range": "± 1841",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 40580354,
+            "range": "± 53968",
             "unit": "ns/iter"
           }
         ]
