@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786683661980,
+  "lastUpdate": 1786686215274,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -9935,6 +9935,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14172583,
             "range": "± 37110",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "bc6042764bc4a312b77e1db697eca15aa2553d46",
+          "message": "Merge pull request #222 from esaueng/codex/beta-ci-free-runners\n\nci: use free hosted runners during beta",
+          "timestamp": "2026-08-14T01:32:52-04:00",
+          "tree_id": "596bd95b4d477890cfc6d1b338079257118bf1b0",
+          "url": "https://github.com/esaueng/brepkit/commit/bc6042764bc4a312b77e1db697eca15aa2553d46"
+        },
+        "date": 1786686214075,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1059372,
+            "range": "± 1254",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1152775,
+            "range": "± 9552",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13977,
+            "range": "± 213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 968550,
+            "range": "± 4769",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 27678971,
+            "range": "± 54656",
             "unit": "ns/iter"
           }
         ]
