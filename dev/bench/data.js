@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786710746185,
+  "lastUpdate": 1786711834978,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10259,6 +10259,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26518957,
             "range": "± 112829",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "43bbccfd65f6bd3c590707847b07f2af519ab19f",
+          "message": "Merge pull request #223 from esaueng/feat/direct-blend-editing-foundations\n\nfeat(blend): add exact direct blend editing foundations",
+          "timestamp": "2026-08-14T08:47:28-04:00",
+          "tree_id": "33e4c3488209a638ecff13480e0570046af5c567",
+          "url": "https://github.com/esaueng/brepkit/commit/43bbccfd65f6bd3c590707847b07f2af519ab19f"
+        },
+        "date": 1786711833510,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1105145,
+            "range": "± 15954",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1159981,
+            "range": "± 1764",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14154,
+            "range": "± 65",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 965628,
+            "range": "± 8658",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 28048194,
+            "range": "± 63151",
             "unit": "ns/iter"
           }
         ]
