@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786726271676,
+  "lastUpdate": 1786727200242,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10691,6 +10691,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 40705051,
             "range": "± 93211",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "5eb2590ba08cf3e2af04decb6faf3cf436a25cbe",
+          "message": "Merge pull request #239 from esaueng/fix/closed-edge-key-ellipse\n\nfix(algo): canonical same-domain key for closed ellipse edges too",
+          "timestamp": "2026-08-14T13:04:02-04:00",
+          "tree_id": "407cbae72687e045fe5a3c4fb1ca316de3c04bba",
+          "url": "https://github.com/esaueng/brepkit/commit/5eb2590ba08cf3e2af04decb6faf3cf436a25cbe"
+        },
+        "date": 1786727198963,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1326551,
+            "range": "± 1132",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1424418,
+            "range": "± 4153",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14401,
+            "range": "± 110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 1018352,
+            "range": "± 839",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 40740614,
+            "range": "± 26495",
             "unit": "ns/iter"
           }
         ]
