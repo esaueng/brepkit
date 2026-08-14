@@ -5203,7 +5203,18 @@ fn split_face_2d_impl(
     let mut split_pts_3d: Vec<Point3> = sections.iter().flat_map(|s| [s.start, s.end]).collect();
     split_pts_3d.append(&mut outer_clip_anchors);
     if !is_plane && let Some(reg) = split_registry.as_deref_mut() {
-        split_pts_3d.extend(reg.values().flatten().copied());
+        // Only consume anchors belonging to section curves on this face.  The
+        // registry spans the whole boolean; flattening it here made every
+        // curved face probe every earlier anchor against every NURBS boundary.
+        let pave_blocks: std::collections::HashSet<_> =
+            sections.iter().filter_map(|s| s.pave_block_id).collect();
+        split_pts_3d.extend(
+            pave_blocks
+                .into_iter()
+                .filter_map(|pb_id| reg.get(&pb_id))
+                .flatten()
+                .copied(),
+        );
     }
 
     // For periodic faces, align closed boundary edge UV with seam edge UV.
