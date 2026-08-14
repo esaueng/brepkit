@@ -133,6 +133,15 @@ impl Topology {
 
     /// Total arena slots, including retired slots reserved to prevent stale
     /// numeric handles from aliasing later entities.
+    ///
+    /// This is a lifetime high-water mark, **not** a measure of current model
+    /// size: arenas only ever append, retiring an entity just clears its
+    /// liveness bit, and a checkpoint restore re-extends each arena back to its
+    /// previous slot count. The value therefore never decreases for the life of
+    /// a `Topology`, and rises with every operation — including ones that are
+    /// rolled back. Use the per-arena `len()` accessors (`vertex_count`,
+    /// `face_count`, …) for live entity counts, and never use this as a proxy
+    /// for how much geometry a model currently holds.
     #[must_use]
     pub fn allocated_slot_count(&self) -> usize {
         [
