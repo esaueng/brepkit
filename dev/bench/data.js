@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786730539727,
+  "lastUpdate": 1786731984703,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10907,6 +10907,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 14365627,
             "range": "± 101566",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "303441a27f7fe086f1a4c1f63e32a399ccc9a351",
+          "message": "fix: replay Apache-compatible baseline repairs (#250)\n\n* fix(algo): preserve meridian winding samples\n\nReplays the Apache-licensed source and regression changes from 1059267922433be804f4c10566626c5b2ea697b8. The generated WASM artifact is intentionally excluded and will be rebuilt from the final replayed source.\n\n* fix(algo): preserve box-cylinder fuse volume\n\nReplays the Apache-licensed source and regression changes from e33c2b78380e30c4176dcd9fba512678e92aea5d. The generated WASM artifact is intentionally excluded and will be rebuilt from the final replayed source.\n\n* fix: repair Apache-line geometry regressions\n\nReplays the Apache-licensed source, fixtures, and regression changes from 0c0b8893c9129b8ec4faad2462130c5cc8de517c. The generated WASM artifact is intentionally excluded and will be rebuilt from the final replayed source.\n\n* test(operations): preserve chamfer fail-closed contract\n\nReimplements the fork-owned regression contract from f8b0af5f without importing post-license upstream source.\n\n* fix(operations): close reusable baseline regressions\n\nReimplements the fork-owned operation fixes and regressions from 6490ca8e165071ae1bf22cd7aafb47522fa917fb without importing post-license upstream source.\n\n* test(operations): retain Apache concave blend policy\n\nKeeps the two concave-notch pins ignored on the Apache engine, matching the fork-owned policy recorded in 5c37c99a. They are not enabled by importing the post-license upstream fillet implementation.\n\n* fix(operations): preserve reusable concave blend handling\n\nReimplements the fork-owned operation changes from 7e3fdd99 while intentionally retaining the Apache engine's ignored concave-notch pins. No post-license upstream engine source or generated WASM is imported.\n\n* fix(heal): apply reshape actions across cavity shells\n\nReimplements the fork-owned repair series 1934d00c, c7d52fdd, 6671d593, and 4bfc3edc on the Apache baseline, including reversed split traversal and regression coverage.\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-08-14T14:24:18-04:00",
+          "tree_id": "67a7bbdb36db02b5c22642e721ddd3a69bad86b5",
+          "url": "https://github.com/esaueng/brepkit/commit/303441a27f7fe086f1a4c1f63e32a399ccc9a351"
+        },
+        "date": 1786731983336,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 486035,
+            "range": "± 4443",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 534284,
+            "range": "± 1200",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6996,
+            "range": "± 33",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 440535,
+            "range": "± 748",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13898478,
+            "range": "± 36983",
             "unit": "ns/iter"
           }
         ]
