@@ -311,6 +311,7 @@ name = "brepkit-io"
 version = "0.1.0"
 dependencies = [
  "brepkit-algo",
+ "brepkit-check",
  "brepkit-math",
  "brepkit-operations",
  "brepkit-topology",
