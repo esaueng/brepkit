@@ -131,6 +131,10 @@ pub fn check_wire_self_intersection(
 
     let samples_per_edge = 8usize;
     let mut edge_segments: Vec<Vec<Point3>> = Vec::new();
+    let mut edge_use_count: HashMap<_, usize> = HashMap::new();
+    for oriented in edges {
+        *edge_use_count.entry(oriented.edge()).or_default() += 1;
+    }
 
     for oe in edges {
         let edge = topo.edge(oe.edge())?;
@@ -249,6 +253,17 @@ pub fn check_wire_self_intersection(
                 continue;
             }
 
+            let edge_i = topo.edge(edges[i].edge())?;
+            let edge_j = topo.edge(edges[j].edge())?;
+            let shared_periodic_vertex =
+                if edge_use_count[&edges[i].edge()] > 1 || edge_use_count[&edges[j].edge()] > 1 {
+                    [edge_i.start(), edge_i.end()]
+                        .into_iter()
+                        .find(|vertex| *vertex == edge_j.start() || *vertex == edge_j.end())
+                } else {
+                    None
+                };
+
             for si in 0..edge_segments[i].len().saturating_sub(1) {
                 let a0 = edge_segments[i][si];
                 let a1 = edge_segments[i][si + 1];
@@ -256,9 +271,23 @@ pub fn check_wire_self_intersection(
                     let b0 = edge_segments[j][sj];
                     let b1 = edge_segments[j][sj + 1];
 
-                    let (dist, _, _) =
+                    let (dist, closest_i, closest_j) =
                         crate::distance::edge::segment_segment_distance(a0, a1, b0, b1);
                     if dist < tolerance {
+                        // STEP periodic wires may use one seam twice and split a
+                        // circular boundary at the seam vertex. The resulting
+                        // non-adjacent edge pair meets at a declared topological
+                        // endpoint; that is closure in parameter space, not a
+                        // geometric crossing. Only ignore the contact when both
+                        // sampled closest points are at that exact shared vertex.
+                        if let Some(vertex) = shared_periodic_vertex {
+                            let point = topo.vertex(vertex)?.point();
+                            if (closest_i - point).length() < tolerance
+                                && (closest_j - point).length() < tolerance
+                            {
+                                continue;
+                            }
+                        }
                         return Ok(vec![ValidationIssue {
                             check: CheckId::WireSelfIntersection,
                             severity: Severity::Error,
