@@ -1197,8 +1197,6 @@ fn planar_faces_overlap(
             })
         };
 
-    let within_rank = sub_faces[i].rank == sub_faces[j].rank;
-
     // Full containment is representable by the same-domain selection rules;
     // unlike a mere area threshold, every boundary point of the smaller face
     // is proven inside the larger face here.
@@ -1258,33 +1256,44 @@ fn planar_faces_overlap(
 
     face_i.inner_wires().is_empty()
         && face_j.inner_wires().is_empty()
-        && polygons_safely_overlap(&poly_i, &poly_j, tol, within_rank)
+        && polygons_overlap_majority(&poly_i, &poly_j, tol)
 }
 
-/// Whether two projected face polygons overlap in a way whole-face selection
-/// can safely represent. Same-rank residue may be fully contained; cross-rank
-/// pairs must cover one another to modeling tolerance.
-fn polygons_safely_overlap(
+/// Whether two projected face polygons share a genuine 2D region.
+///
+/// Two coplanar (or co-surface) faces can overlap without either being fully
+/// contained in the other — e.g. a faceted scoop ramp's staircase-shaped wall
+/// sub-face lying against a rectangular ramp side facet. The containment tests
+/// above miss these, so the coincident pair survives classification and the
+/// fused result goes non-manifold (#895).
+///
+/// Detect it by the intersection AREA of the projected polygons. Faces that
+/// merely tile side-by-side share only a boundary segment (zero intersection
+/// area), so this does not reintroduce the side-by-side false positive the
+/// containment guards defend against. Requiring the overlap to cover more than
+/// half of the smaller face keeps a sliver of numerical overlap along a shared
+/// edge from pairing disjoint faces.
+fn polygons_overlap_majority(
     a: &[brepkit_math::vec::Point2],
     b: &[brepkit_math::vec::Point2],
     tol: Tolerance,
-    allow_one_way_containment: bool,
 ) -> bool {
     let area_a = super::classify_2d::signed_area_2d(a).abs();
     let area_b = super::classify_2d::signed_area_2d(b).abs();
-    if area_a <= tol.linear_sq() || area_b <= tol.linear_sq() {
+    let smaller = area_a.min(area_b);
+    // `smaller` and the overlap are areas, so the degenerate-face guard
+    // compares against the squared linear tolerance (area), not `linear`.
+    if smaller <= tol.linear_sq() {
         return false;
     }
-    let perimeter = |poly: &[brepkit_math::vec::Point2]| -> f64 {
-        poly.iter()
-            .zip(poly.iter().cycle().skip(1))
-            .take(poly.len())
-            .map(|(p, q)| (*q - *p).length())
-            .sum()
-    };
-    let allowed_a = tol.linear * perimeter(a) * 2.0;
-    let allowed_b = tol.linear * perimeter(b) * 2.0;
-    if !allow_one_way_containment && (area_a - area_b).abs() > allowed_a.max(allowed_b) {
+    // The polygon intersection is contained in the overlap of the two 2D
+    // bounding boxes, so `area(poly∩poly) ≤ area(bbox∩bbox)`. The exact (and
+    // costly) polygon clip can only clear the 50%-of-smaller threshold below
+    // when the box overlap already does — so gate the clip on the cheap box
+    // test. This skips the clip for the common touching / side-by-side
+    // coplanar pairs (e.g. stacked wall-piece bands) without changing the
+    // result.
+    if bbox2d_overlap_area(a, b) <= smaller * 0.5 {
         return false;
     }
     crate::perf::bump_sd_poly_clip();
@@ -1294,17 +1303,31 @@ fn polygons_safely_overlap(
         brepkit_math::polygon_boolean::BooleanOp::Intersection,
         tol.linear,
     );
-    let overlap = intersection.area().abs();
-    if allow_one_way_containment {
-        let (smaller, allowed) = if area_a <= area_b {
-            (area_a, allowed_a)
-        } else {
-            (area_b, allowed_b)
-        };
-        smaller - overlap <= allowed
-    } else {
-        area_a - overlap <= allowed_a && area_b - overlap <= allowed_b
-    }
+    intersection.area().abs() > smaller * 0.5
+}
+
+/// Area of the overlap of two 2D point sets' axis-aligned bounding boxes.
+///
+/// A conservative (over-)estimate of the polygons' intersection area: the
+/// intersection lies inside both boxes, so its area never exceeds this. Used to
+/// skip the exact polygon clip when no meaningful overlap is possible.
+fn bbox2d_overlap_area(a: &[brepkit_math::vec::Point2], b: &[brepkit_math::vec::Point2]) -> f64 {
+    let bounds = |poly: &[brepkit_math::vec::Point2]| {
+        let (mut lo_x, mut lo_y) = (f64::MAX, f64::MAX);
+        let (mut hi_x, mut hi_y) = (f64::MIN, f64::MIN);
+        for p in poly {
+            lo_x = lo_x.min(p.x());
+            lo_y = lo_y.min(p.y());
+            hi_x = hi_x.max(p.x());
+            hi_y = hi_y.max(p.y());
+        }
+        (lo_x, lo_y, hi_x, hi_y)
+    };
+    let (alx, aly, ahx, ahy) = bounds(a);
+    let (blx, bly, bhx, bhy) = bounds(b);
+    let ox = (ahx.min(bhx) - alx.max(blx)).max(0.0);
+    let oy = (ahy.min(bhy) - aly.max(bly)).max(0.0);
+    ox * oy
 }
 
 /// Approximate projected outer-wire area of a planar sub-face, in its own
@@ -1636,10 +1659,7 @@ fn analytic_faces_overlap(
         }
     }
 
-    let within_rank = sub_faces[i].rank == sub_faces[j].rank;
     // i contained in j, or j contained in i — the eighth-in-quarter case.
-    // Every sampled boundary point must be contained; the unsafe area-only
-    // partial-overlap shortcut is handled separately below.
     if ip_i_in_j && all_inside(&poly_i, &poly_j) {
         return true;
     }
@@ -1647,7 +1667,8 @@ fn analytic_faces_overlap(
         return true;
     }
 
-    polygons_safely_overlap(&poly_i, &poly_j, tol, within_rank)
+    // Partial overlap by intersection area (mirrors the planar path).
+    polygons_overlap_majority(&poly_i, &poly_j, tol)
 }
 
 /// Approximate `(arc-length, axial)` parameter-space area of a cylinder/cone
