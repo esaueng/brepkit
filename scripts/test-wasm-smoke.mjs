@@ -78,6 +78,78 @@ const boxId = kernel.makeBox(10, 20, 30);
 assert.equal(typeof boxId, 'number', 'makeBox should return a number handle');
 console.log(`ok - makeBox(10, 20, 30) -> handle ${boxId}`);
 
+// Batch deflection validation must reject every value rejected by the matching
+// direct binding. JSON.stringify serializes NaN and Infinity as null, which the
+// batch API must reject rather than silently replacing with its default.
+{
+  const deflectionOperations = [
+    {
+      name: 'volume',
+      direct: (deflection) => kernel.volume(boxId, deflection),
+      args: { solid: boxId },
+    },
+    {
+      name: 'surfaceArea',
+      direct: (deflection) => kernel.surfaceArea(boxId, deflection),
+      args: { solid: boxId },
+    },
+    {
+      name: 'centerOfMass',
+      direct: (deflection) => kernel.centerOfMass(boxId, deflection),
+      args: { solid: boxId },
+    },
+    {
+      name: 'meshQuality',
+      direct: (deflection) => kernel.meshQuality(boxId, deflection),
+      args: { solid: boxId },
+    },
+    {
+      name: 'projectEdges',
+      direct: (deflection) =>
+        kernel.projectEdges(boxId, 0, 0, 0, 0, 0, 1, 1, 0, 0, true, deflection),
+      args: {
+        solid: boxId,
+        originX: 0,
+        originY: 0,
+        originZ: 0,
+        dirX: 0,
+        dirY: 0,
+        dirZ: 1,
+        xAxisX: 1,
+        xAxisY: 0,
+        xAxisZ: 0,
+        hiddenLines: true,
+      },
+    },
+  ];
+
+  for (const deflection of [NaN, Infinity, 0, -0.1]) {
+    for (const operation of deflectionOperations) {
+      assert.throws(
+        () => operation.direct(deflection),
+        undefined,
+        `${operation.name} direct binding must reject deflection ${deflection}`,
+      );
+      const [batchResult] = JSON.parse(
+        kernel.executeBatch(
+          JSON.stringify([
+            {
+              op: operation.name,
+              args: { ...operation.args, deflection },
+            },
+          ]),
+        ),
+      );
+      assert.equal(
+        typeof batchResult.error,
+        'string',
+        `${operation.name} batch binding must reject deflection ${deflection}`,
+      );
+    }
+  }
+  console.log('ok - direct/batch deflection validation parity');
+}
+
 // 3. Volume check
 const vol = kernel.volume(boxId, DEFLECTION);
 assert.ok(Math.abs(vol - 6000) < 1e-6, `volume=${vol}, expected ~6000`);
