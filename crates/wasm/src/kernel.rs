@@ -87,6 +87,18 @@ impl BrepKernel {
         &self.topo
     }
 
+    pub(crate) fn with_topology_transaction<T, E>(
+        &mut self,
+        operation: impl FnOnce(&mut Topology) -> Result<T, E>,
+    ) -> Result<T, E> {
+        let snapshot = self.topo().clone();
+        let result = operation(self.topo_mut());
+        if result.is_err() {
+            self.topo_mut().restore_preserving_handle_slots(&snapshot);
+        }
+        result
+    }
+
     /// Inner implementation for `make_tangent_arc_3d`.
     #[allow(clippy::too_many_arguments)]
     pub(crate) fn make_tangent_arc_3d_impl(

@@ -1120,6 +1120,24 @@ mod tests {
     }
 
     #[test]
+    fn make_ellipse_arc_rejects_off_ellipse_endpoint() {
+        let mut topo = Topology::new();
+        let result = make_ellipse_arc(
+            &mut topo,
+            Point3::new(0.0, 0.0, 0.0),
+            Vec3::new(0.0, 0.0, 1.0),
+            5.0,
+            2.0,
+            Vec3::new(1.0, 0.0, 0.0),
+            Point3::new(5.0, 0.0, 0.0),
+            Point3::new(0.0, 3.0, 0.0),
+            TOL,
+        );
+        assert!(result.is_err());
+        assert_eq!(topo.edges().len(), 0);
+    }
+
+    #[test]
     fn make_ellipse_arc_rejects_off_ellipse_endpoints() {
         for (start, end) in [
             (Point3::new(100.0, 0.0, 0.0), Point3::new(0.0, 2.0, 0.0)),

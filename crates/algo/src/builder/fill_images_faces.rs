@@ -2556,7 +2556,7 @@ fn section_on_existing_boundary(
 /// Whether `p` lies on the edge's true geometry within `tol` (perpendicular
 /// distance for a Line; in-plane + radial distance with an arc-span containment
 /// test for a Circle/Ellipse). NURBS edges are not boundary candidates here.
-fn point_on_edge(
+pub(super) fn point_on_edge(
     curve: &brepkit_topology::edge::EdgeCurve,
     start: Point3,
     end: Point3,
@@ -3862,11 +3862,10 @@ fn presplit_sections_at_registry(
         };
     let mut out = Vec::with_capacity(sections.len());
     for s in sections {
-        let points: &Vec<brepkit_math::vec::Point3> =
-            match s.pave_block_id.and_then(|pb_id| registry.get(&pb_id)) {
-                Some(points) => points,
-                None => &all_points,
-            };
+        let points: &[brepkit_math::vec::Point3] = match s.pave_block_id {
+            Some(pb_id) => registry.get(&pb_id).map_or(&[], Vec::as_slice),
+            None => &all_points,
+        };
         let chord = s.end - s.start;
         let cl2 = chord.dot(chord);
         if cl2 <= tol * tol {

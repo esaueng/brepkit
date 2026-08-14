@@ -892,6 +892,9 @@ fn integrate_planar_face(
     face_id: FaceId,
     normal: Vec3,
 ) -> Result<FaceContribution, CheckError> {
+    let normal = normal.normalize().map_err(|_| {
+        CheckError::IntegrationFailed("planar face has a zero or non-finite normal".into())
+    })?;
     // Faces whose wires consist only of line and circular-arc edges take an
     // exact Green's-theorem boundary-integral path — a chord polygon
     // undercounts a circular cap by the sagitta area (~0.2% at the default

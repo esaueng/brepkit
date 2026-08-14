@@ -228,20 +228,11 @@ fn reversed_face_flips_same_orientation() {
     );
 }
 
-/// Cross-rank coplanar faces that PARTIALLY overlap — neither fully
-/// contained in the other — must still be paired by the geometric pass.
-/// Two boxes stacked with a lateral offset share a partially-overlapping
-/// coincident planar contact face (a sub-rectangle); the contained-only
-/// test misses this, leaving the coincident pieces un-cancelled and the
-/// fused result non-manifold. Closes the documented same-domain "detects
-/// containment but not overlap" gap.
-///
-/// Discriminating: without the partial-overlap branch in
-/// `planar_faces_overlap`, `pairs` is empty (neither face is contained in
-/// the other, so the two containment checks both fail); with it, the
-/// intersection-area test pairs them.
+/// Cross-rank coplanar faces that only partially overlap must not be paired.
+/// Same-domain selection operates on whole faces and cannot preserve either
+/// exposed remainder, even when the overlap exceeds half of each face.
 #[test]
-fn cross_rank_partial_overlap_marks_overlapping() {
+fn cross_rank_partial_overlap_is_not_paired() {
     let mut topo = Topology::new();
     let arena = GfaArena::new();
     let face_ranks: HashMap<FaceId, Rank> = HashMap::new();
@@ -276,21 +267,13 @@ fn cross_rank_partial_overlap_marks_overlapping() {
         result.within_rank_dups.is_empty(),
         "cross-rank pair should not be reported as within-rank dup"
     );
-    assert_eq!(
-        result.pairs.len(),
-        1,
-        "partially-overlapping coplanar cross-rank faces must be paired"
-    );
     assert!(
-        result.pairs[0].geometric_overlap,
-        "geometric overlap must set geometric_overlap=true (different-extent overlap pair)"
+        result.pairs.is_empty(),
+        "partially-overlapping faces must be split before same-domain selection"
     );
 }
 
-/// The partial-overlap branch is gated at 50% of the smaller face: two
-/// coplanar faces sharing only a thin sliver of area must NOT be paired,
-/// so a numerical overlap along a shared edge does not annihilate disjoint
-/// faces.
+/// Two coplanar faces sharing only a thin sliver of area must not be paired.
 #[test]
 fn cross_rank_small_overlap_not_paired() {
     let mut topo = Topology::new();
@@ -324,7 +307,7 @@ fn cross_rank_small_overlap_not_paired() {
 
     assert!(
         result.pairs.is_empty(),
-        "sub-threshold overlap must not pair coplanar faces, got {} pair(s)",
+        "partial overlap must not pair coplanar faces, got {} pair(s)",
         result.pairs.len()
     );
     assert!(
