@@ -2018,7 +2018,7 @@ export class BrepKernel {
      *
      * Returns an error if any coordinate is NaN/infinite, a semi-axis is
      * non-positive, `semi_minor` exceeds `semi_major`, or `axis`/`ref` is
-     * a zero vector.
+     * a zero vector, or an endpoint does not lie on the ellipse.
      */
     makeEllipseArc3d(start_x: number, start_y: number, start_z: number, end_x: number, end_y: number, end_z: number, center_x: number, center_y: number, center_z: number, axis_x: number, axis_y: number, axis_z: number, ref_x: number, ref_y: number, ref_z: number, semi_major: number, semi_minor: number): number;
     /**
