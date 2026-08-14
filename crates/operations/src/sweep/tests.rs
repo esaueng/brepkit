@@ -2314,8 +2314,15 @@ fn analytic_lip_ring_fuses_onto_hollow_box() {
     );
 }
 
+/// The flush variant of the lip fuse above: the sweep profile sits exactly on
+/// the outer wall (x=42.0, not inset by 0.25), so the outer walls and corner
+/// cylinders are coincident too and the rim contact faces only PARTIALLY
+/// overlap — neither is contained in the other. Pairing those is what the
+/// same-domain partial-overlap arm exists for (#895); without it the fuse
+/// cannot resolve the partition analytically and drops to the faceted
+/// fallback (531 all-planar faces, volume 7.9e-5 low).
 #[test]
-fn ambiguous_partial_sd_overlap_does_not_accept_corrupt_analytic_fuse() {
+fn flush_lip_partial_sd_overlap_fuses_analytically() {
     let mut topo = Topology::new();
     let spine_for_face = make_rounded_rect_spine(&mut topo, 84.0, 84.0, 3.75);
     let base_wire = Wire::new(
@@ -2367,19 +2374,46 @@ fn ambiguous_partial_sd_overlap_does_not_accept_corrupt_analytic_fuse() {
         .iter()
         .filter(|&&fid| !matches!(topo.face(fid).unwrap().surface(), FaceSurface::Plane { .. }))
         .count();
-    // The old partial-overlap SD shortcut deleted a real adjacent corner cap
-    // and happened to produce a closed analytic shell. Refusing that unsafe
-    // whole-face deletion must route this unresolved partition through the
-    // validated fallback rather than accept the corrupt analytic result.
+    // Face count is the mesh-fallback tell: the analytic fuse is tens of
+    // faces with the corner cylinders/cones intact; the fallback is hundreds,
+    // all planar.
     assert!(
-        faces.len() >= 200 && curved == 0,
-        "unsafe partial-overlap result was accepted analytically: {} faces ({curved} curved)",
+        faces.len() < 200 && curved > 0,
+        "flush-lip fuse must stay analytic, got {} faces ({curved} curved) — a hundreds-planar \
+         result is the mesh-fallback tell",
         faces.len()
+    );
+
+    // Nothing may be deleted by the partial-overlap pairing: the two bodies
+    // meet only on the rim, so the fused volume is exactly the sum. The
+    // faceted fallback misses this by ~1.5 (7.9e-5 relative), so the 1e-9
+    // gate discriminates the analytic result from the fallback.
+    let hollow_vol = crate::measure::solid_volume(&topo, hollow, 0.01).unwrap();
+    let lip_vol = crate::measure::solid_volume(&topo, lip, 0.01).unwrap();
+    let expected = hollow_vol + lip_vol;
+    let vol = crate::measure::solid_volume(&topo, fused, 0.01).unwrap();
+    assert!(
+        (vol - expected).abs() / expected < 1e-9,
+        "flush-lip fuse volume must be the sum: expected {expected}, got {vol}"
+    );
+    // A face lost to an over-eager same-domain deletion shows up as a volume
+    // that keeps moving as the deflection tightens.
+    let vol_fine = crate::measure::solid_volume(&topo, fused, 0.002).unwrap();
+    assert!(
+        (vol_fine - vol).abs() / expected < 1e-9,
+        "volume must converge under refinement: {vol} at 0.01 vs {vol_fine} at 0.002"
+    );
+
+    let mesh = crate::tessellate::tessellate_solid(&topo, fused, 0.05).unwrap();
+    assert!(
+        crate::tessellate::is_watertight(&mesh),
+        "flush-lip fuse mesh must be watertight ({} boundary edges)",
+        crate::tessellate::boundary_edge_count(&mesh)
     );
     let report = crate::validate::validate_solid(&topo, fused).unwrap();
     assert!(
         report.is_valid(),
-        "fallback result must remain valid: {report:?}"
+        "flush-lip fuse must be a valid solid: {report:?}"
     );
 }
 
