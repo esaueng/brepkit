@@ -785,9 +785,14 @@ fn frame_matrix(base: Point3, axis: Vec3, x_axis: Vec3) -> Result<Mat4, crate::O
     ]))
 }
 
-/// Invert an orthonormal affine frame while keeping its affine bottom row
-/// exact. The generic 4x4 inverse can leave round-off in that row, which is
-/// correctly rejected by the public transform boundary as projective input.
+/// Invert an orthonormal affine frame by transposing its rotation block.
+///
+/// Exact where the generic adjugate `Mat4::inverse` is not: the rotation
+/// entries come back bit-identical and the bottom row is literally
+/// `[0, 0, 0, 1]`, so the `to_local` → edit → `to_world` round trip does not
+/// accumulate inversion round-off in the frame itself. It is also infallible,
+/// which `Mat4::inverse` is not. Valid only for an orthonormal frame —
+/// `frame_matrix` builds one.
 fn inverse_rigid_frame(frame: &Mat4) -> Mat4 {
     let m = &frame.0;
     let tx = m[0][3];
