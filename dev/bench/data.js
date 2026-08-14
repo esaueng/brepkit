@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786725897753,
+  "lastUpdate": 1786726271676,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10637,6 +10637,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 31614955,
             "range": "± 203979",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "271742b025db2e314f86a8e40ec1d047379b39c8",
+          "message": "Merge pull request #242 from esaueng/perf/lazy-topology-snapshot\n\nperf(wasm): skip the batch rollback snapshot for read-only ops",
+          "timestamp": "2026-08-14T12:48:21-04:00",
+          "tree_id": "5e13948696d1ee6e7c4fffc7956b3b0cdc87cae4",
+          "url": "https://github.com/esaueng/brepkit/commit/271742b025db2e314f86a8e40ec1d047379b39c8"
+        },
+        "date": 1786726270848,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1392400,
+            "range": "± 1837",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1425992,
+            "range": "± 2023",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14282,
+            "range": "± 146",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 1015178,
+            "range": "± 1800",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 40705051,
+            "range": "± 93211",
             "unit": "ns/iter"
           }
         ]
