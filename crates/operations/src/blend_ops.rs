@@ -197,7 +197,13 @@ fn validate_blend_volume(
     // (a mixed set can legitimately net out either way).
     let convexities: Vec<bool> = edges
         .iter()
-        .filter_map(|&e| edge_is_convex(topo, input_solid, e, size * 0.25))
+        .filter_map(|&e| {
+            match crate::query::edge_concavity(topo, input_solid, e, size * 0.25).ok()? {
+                crate::query::EdgeConcavity::Convex => Some(true),
+                crate::query::EdgeConcavity::Concave => Some(false),
+                crate::query::EdgeConcavity::Tangent | crate::query::EdgeConcavity::Unknown => None,
+            }
+        })
         .collect();
     if convexities.len() == edges.len() && !convexities.is_empty() {
         let all_convex = convexities.iter().all(|&c| c);

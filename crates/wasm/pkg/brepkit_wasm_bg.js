@@ -3461,7 +3461,7 @@ export class BrepKernel {
      *
      * Returns an error if any coordinate is NaN/infinite, a semi-axis is
      * non-positive, `semi_minor` exceeds `semi_major`, or `axis`/`ref` is
-     * a zero vector.
+     * a zero vector, or an endpoint does not lie on the ellipse.
      * @param {number} start_x
      * @param {number} start_y
      * @param {number} start_z
