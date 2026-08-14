@@ -342,6 +342,20 @@ fn face_boundary_edge_count(topo: &Topology, face_id: FaceId) -> usize {
         .sum()
 }
 
+/// Choose a boundary sampling density without letting attacker-controlled
+/// topology exceed the fixed trim-recovery budget.
+fn nurbs_trim_samples_per_edge(edge_count: usize) -> Option<usize> {
+    if edge_count > NURBS_TRIM_SAMPLE_BUDGET {
+        return None;
+    }
+    Some(
+        NURBS_TRIM_SAMPLE_BUDGET
+            .checked_div(edge_count)
+            .unwrap_or(NURBS_TRIM_SAMPLES_PER_EDGE)
+            .clamp(1, NURBS_TRIM_SAMPLES_PER_EDGE),
+    )
+}
+
 /// Recover the `(u, v)` rectangle a toroidal face occupies.
 ///
 /// Both torus directions are periodic and free of degeneracies, so a face is
@@ -464,10 +478,16 @@ fn nurbs_patch_domain(
         };
     }
 
-    let per_edge = NURBS_TRIM_SAMPLE_BUDGET
-        .checked_div(face_boundary_edge_count(topo, face_id))
-        .unwrap_or(NURBS_TRIM_SAMPLES_PER_EDGE)
-        .clamp(1, NURBS_TRIM_SAMPLES_PER_EDGE);
+    let Some(per_edge) = nurbs_trim_samples_per_edge(face_boundary_edge_count(topo, face_id))
+    else {
+        // Sampling every edge would make projection and de-duplication costs
+        // depend without bound on imported topology. The complete surface
+        // domain is conservative and keeps bounding-box work bounded.
+        return PatchDomain {
+            u: full_u,
+            v: full_v,
+        };
+    };
     let pts = limit_nurbs_trim_samples(face_boundary_samples(topo, face_id, per_edge));
     if pts.is_empty() {
         return PatchDomain {
@@ -879,6 +899,18 @@ fn expand_cone_at_vertices(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn nurbs_trim_sampling_is_bounded() {
+        for edge_count in 0..=NURBS_TRIM_SAMPLE_BUDGET {
+            let Some(per_edge) = nurbs_trim_samples_per_edge(edge_count) else {
+                unreachable!("edge count within budget must be sampled");
+            };
+            assert!(edge_count.saturating_mul(per_edge + 1) <= 2 * NURBS_TRIM_SAMPLE_BUDGET);
+        }
+        assert!(nurbs_trim_samples_per_edge(NURBS_TRIM_SAMPLE_BUDGET + 1).is_none());
+        assert!(nurbs_trim_samples_per_edge(usize::MAX).is_none());
+    }
 
     #[test]
     fn nurbs_trim_samples_are_strictly_bounded_and_span_input() {
