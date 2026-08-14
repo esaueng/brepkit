@@ -25,14 +25,13 @@ use super::planar::{
 };
 use super::{MERGE_GRID, point_merge_key};
 
-fn has_trimmed_same_sphere_neighbor<V, S>(
+fn has_trimmed_same_sphere_neighbor<V>(
     topo: &Topology,
     face_id: FaceId,
-    edge_face_map: &std::collections::HashMap<usize, V, S>,
+    edge_face_map: &std::collections::BTreeMap<usize, V>,
 ) -> Result<bool, crate::OperationsError>
 where
     V: std::ops::Deref<Target = [FaceId]>,
-    S: std::hash::BuildHasher,
 {
     let face = topo.face(face_id)?;
     let FaceSurface::Sphere(sphere) = face.surface() else {
@@ -224,9 +223,9 @@ fn tessellate_solid_core(
     let mut phase_t = PhaseTimer::start();
     let phase = |label: &str, t: &mut PhaseTimer| t.lap(label);
 
-    // The map is a std `HashMap`, so sort its keys into ID order before use —
-    // keeping all downstream iteration deterministic regardless of
-    // insertion-order hashing.
+    // Keys are already in ID order (`edge_to_face_map` is a `BTreeMap`); the
+    // sort states the requirement that downstream iteration — including the
+    // rayon fan-out below — must not depend on traversal order.
     let mut edge_indices: Vec<usize> = edge_face_map.keys().copied().collect();
     edge_indices.sort_unstable();
     #[cfg(not(target_arch = "wasm32"))]

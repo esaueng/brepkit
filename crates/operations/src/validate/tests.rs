@@ -15,7 +15,7 @@ fn high_fanout_edge_connectivity_uses_all_incident_faces() {
     // the cube faces keeps the fixture small while exercising the high-fanout
     // input that must be handled linearly before validation rejects it.
     let incident_faces: Vec<_> = faces.iter().copied().cycle().take(10_000).collect();
-    let edge_map = std::collections::HashMap::from([(0, incident_faces)]);
+    let edge_map = std::collections::BTreeMap::from([(0_usize, incident_faces)]);
 
     let components = face_connectivity_components(&faces, &edge_map);
     assert_eq!(components.len(), 1);
