@@ -9,7 +9,7 @@ use brepkit_topology::face::{FaceId, FaceSurface};
 use brepkit_topology::solid::SolidId;
 
 use crate::OperationsError;
-use crate::classify::{PointClassification, classify_point_robust};
+use crate::classify::{PointClassification, classify_point, classify_point_robust};
 
 /// Geometric relation between the two faces meeting at a manifold edge.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -219,6 +219,42 @@ pub fn edge_concavity(
         return Ok(EdgeConcavity::Unknown);
     }
     let (face_a, face_b) = (faces[0], faces[1]);
+    edge_concavity_with_faces(topo, solid, edge, face_a, face_b, probe, true)
+}
+
+/// Bulk variant for callers that already built edge-to-face adjacency.
+///
+/// Feature recognition invokes this for every manifold edge, so it uses the
+/// analytic classifier rather than rebuilding a full-solid tessellation for
+/// each probe. The supplied faces must be the two incident faces of `edge`.
+pub(crate) fn edge_concavity_from_faces(
+    topo: &Topology,
+    solid: SolidId,
+    edge: EdgeId,
+    face_a: FaceId,
+    face_b: FaceId,
+    probe: f64,
+) -> Result<EdgeConcavity, OperationsError> {
+    if !probe.is_finite() || probe <= 0.0 {
+        return Err(OperationsError::InvalidInput {
+            reason: "edge concavity probe must be positive and finite".into(),
+        });
+    }
+    if face_a == face_b {
+        return Ok(EdgeConcavity::Unknown);
+    }
+    edge_concavity_with_faces(topo, solid, edge, face_a, face_b, probe, false)
+}
+
+fn edge_concavity_with_faces(
+    topo: &Topology,
+    solid: SolidId,
+    edge: EdgeId,
+    face_a: FaceId,
+    face_b: FaceId,
+    probe: f64,
+    robust: bool,
+) -> Result<EdgeConcavity, OperationsError> {
     if edge_is_g1(topo, edge, face_a, face_b)? {
         return Ok(EdgeConcavity::Tangent);
     }
@@ -237,7 +273,13 @@ pub fn edge_concavity(
     // without depending on face orientation bookkeeping: a convex edge is an
     // intersection of inward halfspaces (exactly one quadrant is material),
     // while a concave edge is their union (exactly three quadrants are).
-    let classify = |offset: Vec3| classify_point_robust(topo, solid, point + offset, 0.01, 1.0e-7);
+    let classify = |offset: Vec3| {
+        if robust {
+            classify_point_robust(topo, solid, point + offset, 0.01, 1.0e-7)
+        } else {
+            classify_point(topo, solid, point + offset, 0.01, 1.0e-7)
+        }
+    };
     let inward_a = -normal_a * probe;
     let inward_b = -normal_b * probe;
     let quadrants = [
