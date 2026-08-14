@@ -828,6 +828,26 @@ fn singular_non_affine_transforms_are_refused_without_mutation() {
 }
 
 #[test]
+fn non_finite_and_projective_bottom_rows_are_rejected() {
+    for matrix in [
+        Mat4([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [f64::NAN, 0.0, 0.0, 1.0],
+        ]),
+        Mat4([
+            [1.0, 0.0, 0.0, 0.0],
+            [0.0, 1.0, 0.0, 0.0],
+            [0.0, 0.0, 1.0, 0.0],
+            [f64::MIN_POSITIVE, 0.0, 0.0, 1.0],
+        ]),
+    ] {
+        assert!(reject_degenerate_transform(&matrix).is_err());
+    }
+}
+
+#[test]
 fn the_degeneracy_verdict_does_not_move_with_the_units() {
     // The guard's whole contract in one assertion: multiplying a matrix by a
     // uniform scale changes |det| by s³ but never changes whether the

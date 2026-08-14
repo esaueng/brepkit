@@ -209,15 +209,25 @@ pub(super) fn boundary_edges_to_pcurve_with_images<S: std::hash::BuildHasher>(
         match edge_images.get(&oe.edge()) {
             Some(imgs)
                 if imgs.len() > 1
-                    && ((is_line && junction_near_anchor(imgs))
+                    && ((frame.is_some() && is_line && junction_near_anchor(imgs))
                         || (is_nurbs
                             && nurbs_is_circular(oe.edge())
                             && junction_in_band_nurbs(imgs))) =>
             {
                 if oe.is_forward() {
-                    pieces.extend(imgs.iter().map(|&i| (i, true)));
+                    pieces.extend(imgs.iter().filter_map(|&i| {
+                        topo.edge(i)
+                            .ok()
+                            .filter(|edge| edge.start() != edge.end())
+                            .map(|_| (i, true))
+                    }));
                 } else {
-                    pieces.extend(imgs.iter().rev().map(|&i| (i, false)));
+                    pieces.extend(imgs.iter().rev().filter_map(|&i| {
+                        topo.edge(i)
+                            .ok()
+                            .filter(|edge| edge.start() != edge.end())
+                            .map(|_| (i, false))
+                    }));
                 }
             }
             _ => pieces.push((oe.edge(), oe.is_forward())),

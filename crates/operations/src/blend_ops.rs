@@ -806,6 +806,17 @@ pub fn fillet_v2(
             reason: "no edges specified".into(),
         });
     }
+    if edges.len() > 256 {
+        return Err(OperationsError::InvalidInput {
+            reason: "fillet accepts at most 256 seed edges".into(),
+        });
+    }
+    let unique: std::collections::HashSet<_> = edges.iter().copied().collect();
+    if unique.len() != edges.len() {
+        return Err(OperationsError::InvalidInput {
+            reason: "fillet seed edges must be unique".into(),
+        });
+    }
     reject_blend_into_hole(topo, solid, edges, radius)?;
 
     // The whole selection on one engine, first and unchanged: everything that
@@ -1120,5 +1131,17 @@ mod tests {
                 failed: 1,
             }
         ));
+    }
+
+    #[test]
+    fn fillet_v2_rejects_duplicate_seed_edges() {
+        let mut topo = Topology::new();
+        let solid = crate::primitives::make_box(&mut topo, 2.0, 2.0, 2.0).unwrap();
+        let v0 = topo.add_vertex(Vertex::new(Point3::new(10.0, 10.0, 10.0), 1e-7));
+        let v1 = topo.add_vertex(Vertex::new(Point3::new(11.0, 10.0, 10.0), 1e-7));
+        let edge = topo.add_edge(Edge::new(v0, v1, EdgeCurve::Line));
+        let result = fillet_v2(&mut topo, solid, &[edge, edge], 0.2);
+        assert!(result.is_err());
+        assert!(result.is_err_and(|error| error.to_string().contains("unique")));
     }
 }

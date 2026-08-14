@@ -19,6 +19,14 @@ type EvalFn = Box<dyn Fn(f64, f64) -> Point3>;
 /// Maps `(u, v)` surface parameters to the outward surface normal.
 type NormalFn = Box<dyn Fn(f64, f64) -> Vec3>;
 
+fn rim_angles_match(a: &[f64], b: &[f64], tolerance: f64) -> bool {
+    a.len() == b.len()
+        && a.iter().zip(b).all(|(&ua, &ub)| {
+            let delta = (ua - ub + TAU / 2.0).rem_euclid(TAU) - TAU / 2.0;
+            delta.is_finite() && delta.abs() <= tolerance
+        })
+}
+
 /// Per-face variant of the cycle-rim structured band: rims are sampled
 /// LOCALLY at the requested deflection instead of pulled from the solid
 /// tessellation's shared edge pool, so the `tessellate(topo, face, defl)`
@@ -394,6 +402,14 @@ pub(super) fn tessellate_revolution_band_shared(
     let equal_counts = rims[0].len() == rims[1].len();
     let n = rims[0].len();
 
+    let angular_samples_align = if equal_counts {
+        let angles_a: Vec<f64> = rims[0].iter().map(|&gid| angle_of(gid, merged)).collect();
+        let angles_b: Vec<f64> = rims[1].iter().map(|&gid| angle_of(gid, merged)).collect();
+        rim_angles_match(&angles_a, &angles_b, 1e-6)
+    } else {
+        false
+    };
+
     // Emit default-oriented (non-reversed) triangles: the geometric normal
     // matches the surface outward normal, the convention `tessellate_analytic`
     // uses. The caller (`tessellate_face_with_shared_edges`) applies the global
@@ -418,7 +434,7 @@ pub(super) fn tessellate_revolution_band_shared(
         merged.indices.extend_from_slice(&tri);
     };
 
-    if equal_counts {
+    if angular_samples_align {
         // Equal counts: the historical index-paired sweep (kept byte-identical
         // for the calibrated closed-rim cases).
         for i in 0..n {
@@ -431,11 +447,10 @@ pub(super) fn tessellate_revolution_band_shared(
         return Ok(true);
     }
 
-    // Rims of different radii get different chord-deviation sample counts, so
-    // they cannot pair index-for-index — a cone band always risks this, and a
-    // chamfer that widens a bore hits it every time (a r3.5 plate contact and
-    // a r3 wall contact sample 30 and 28). Merge them by angle instead, which
-    // still uses only shared-pool vertices, so both neighbours stay crack-free.
+    // Rims with different counts or angular phases cannot pair
+    // index-for-index. Merge them by angle instead, which still uses only
+    // shared-pool vertices, so both neighbours stay crack-free without
+    // twisting equal-length but differently refined imported rims.
     let with_angles = |rim: &[u32], merged: &TriangleMesh| -> LatRing {
         rim.iter()
             .map(|&gid| (angle_of(gid, merged), gid))

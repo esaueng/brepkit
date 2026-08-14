@@ -42,12 +42,18 @@ impl BrepKernel {
     /// Returns an error if `checkpoint_id` does not refer to a valid checkpoint.
     #[wasm_bindgen(js_name = "restore")]
     pub fn restore(&mut self, checkpoint_id: u32) -> Result<(), JsError> {
+        const MAX_CHECKPOINT_TOPOLOGY_SLOTS: usize = 500_000;
         let idx = checkpoint_id as usize;
         let cp = self
             .checkpoints
             .get(idx)
             .ok_or_else(|| JsError::new(&format!("invalid checkpoint id: {checkpoint_id}")))?
             .clone();
+        if self.topo().allocated_slot_count() > MAX_CHECKPOINT_TOPOLOGY_SLOTS {
+            return Err(JsError::new(
+                "checkpoint restore refused: topology slot limit exceeded",
+            ));
+        }
         let snapshot_topo = Rc::clone(&cp.topo);
         self.topo_mut()
             .restore_preserving_handle_slots(&snapshot_topo);
