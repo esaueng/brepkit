@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786731984703,
+  "lastUpdate": 1786735108601,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10961,6 +10961,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 13898478,
             "range": "± 36983",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2b67947af5e7ee6ef58a9f5ea489120709b29ba6",
+          "message": "fix: replay Apache-compatible STEP periodic repairs (#251)\n\n* fix(io): classify generic STEP face bounds\n\nReplays the Apache-compatible contribution from PR #127 onto the Apache lineage.\n\n* fix(io): classify periodic STEP face bounds\n\nReplays the Apache-compatible contribution from PR #132 onto the Apache lineage.\n\n* fix(operations): harden split periodic rims\n\nReplays the Apache-compatible contribution from PR #134 onto the Apache lineage.\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-08-14T15:16:22-04:00",
+          "tree_id": "36ec9873e695b7d415aee3263221ddfc5cfcc616",
+          "url": "https://github.com/esaueng/brepkit/commit/2b67947af5e7ee6ef58a9f5ea489120709b29ba6"
+        },
+        "date": 1786735107129,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 470453,
+            "range": "± 9802",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 541674,
+            "range": "± 7389",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 6534,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 429453,
+            "range": "± 6426",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 13915618,
+            "range": "± 57217",
             "unit": "ns/iter"
           }
         ]
