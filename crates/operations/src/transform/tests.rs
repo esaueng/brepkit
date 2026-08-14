@@ -793,6 +793,41 @@ fn genuinely_degenerate_matrices_are_still_refused() {
 }
 
 #[test]
+fn singular_non_affine_transforms_are_refused_without_mutation() {
+    let matrix = Mat4([
+        [1.0, 0.0, 0.0, 10.0],
+        [0.0, 1.0, 0.0, 0.0],
+        [0.0, 0.0, 1.0, 10.0],
+        [0.0, 0.0, 0.0, 0.0],
+    ]);
+
+    let mut topo = Topology::new();
+    let solid = make_single_face_solid(
+        &mut topo,
+        FaceSurface::Plane {
+            normal: Vec3::new(0.0, 0.0, 1.0),
+            d: 0.0,
+        },
+    );
+    let before: Vec<_> = topo.vertices().iter().map(|(_, v)| v.point()).collect();
+
+    assert!(transform_solid(&mut topo, solid, &matrix).is_err());
+    let after: Vec<_> = topo.vertices().iter().map(|(_, v)| v.point()).collect();
+    assert_eq!(after, before, "a rejected transform must be atomic");
+
+    let face = topo
+        .shell(topo.solid(solid).unwrap().outer_shell())
+        .unwrap()
+        .faces()[0];
+    assert!(transform_face(&mut topo, face, &matrix).is_err());
+    let after_face: Vec<_> = topo.vertices().iter().map(|(_, v)| v.point()).collect();
+    assert_eq!(
+        after_face, before,
+        "a rejected face transform must be atomic"
+    );
+}
+
+#[test]
 fn the_degeneracy_verdict_does_not_move_with_the_units() {
     // The guard's whole contract in one assertion: multiplying a matrix by a
     // uniform scale changes |det| by s³ but never changes whether the
