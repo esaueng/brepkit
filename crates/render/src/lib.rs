@@ -68,12 +68,20 @@ use brepkit_topology::solid::SolidId;
 
 /// Default linear chord tolerance used when [`RenderOpts`] does not override it.
 pub const DEFAULT_DEFLECTION: f64 = 0.05;
-const MAX_OFFSCREEN_PIXELS: u64 = 16_777_216;
+/// Total-pixel budget for offscreen targets (4096 x 4096), guarding the color
+/// and face-id buffer allocations against absurd dimensions.
+pub(crate) const MAX_OFFSCREEN_PIXELS: u64 = 16_777_216;
 
 fn validate_offscreen_size(width: u32, height: u32) -> Result<(), RenderError> {
-    let pixels = u64::from(width) * u64::from(height);
-    if width == 0 || height == 0 || pixels > MAX_OFFSCREEN_PIXELS {
+    if width == 0 || height == 0 {
         return Err(RenderError::InvalidSize { width, height });
+    }
+    let pixels = u64::from(width) * u64::from(height);
+    if pixels > MAX_OFFSCREEN_PIXELS {
+        return Err(RenderError::PixelBudgetExceeded {
+            pixels,
+            max: MAX_OFFSCREEN_PIXELS,
+        });
     }
     Ok(())
 }
@@ -151,6 +159,9 @@ impl RenderOutput {
 /// # Errors
 ///
 /// - [`RenderError::InvalidSize`] if `opts.width` or `opts.height` is zero.
+/// - [`RenderError::PixelBudgetExceeded`] if `width * height` exceeds the
+///   offscreen pixel budget, and [`RenderError::SizeTooLarge`] if a dimension
+///   exceeds the adapter's maximum 2D texture size.
 /// - [`RenderError::NoAdapter`] if no wgpu adapter (GPU or software) exists.
 /// - [`RenderError::DeviceRequest`] / [`RenderError::BufferMap`] /
 ///   [`RenderError::Poll`] on GPU setup or readback failure.

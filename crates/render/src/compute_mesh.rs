@@ -381,6 +381,8 @@ struct GpuDescriptor {
 /// # Errors
 ///
 /// - [`RenderError::InvalidSize`] if `opts.width` or `opts.height` is zero.
+/// - [`RenderError::PixelBudgetExceeded`] if `width * height` exceeds the
+///   offscreen pixel budget.
 /// - [`RenderError::NoAdapter`] / [`RenderError::DeviceRequest`] on GPU setup.
 /// - [`RenderError::BufferMap`] / [`RenderError::Poll`] on readback failure.
 #[allow(clippy::too_many_lines)]
