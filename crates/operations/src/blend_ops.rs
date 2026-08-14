@@ -40,52 +40,6 @@ fn transactional<T>(
     }
 }
 
-/// Classify a blended edge as convex (material on the inside of the dihedral)
-/// or concave, by testing a point just inside the inward normal bisector.
-///
-/// Returns `None` when the edge's neighbourhood cannot be classified
-/// (non-manifold edge, degenerate normals, on-boundary sample).
-fn edge_is_convex(topo: &Topology, solid: SolidId, edge: EdgeId, probe: f64) -> Option<bool> {
-    let adjacency = topo.build_adjacency(solid).ok()?;
-    let faces = adjacency.faces_for_edge(edge);
-    if faces.len() != 2 {
-        return None;
-    }
-    let e = topo.edge(edge).ok()?;
-    let start = topo.vertex(e.start()).ok()?.point();
-    let end = topo.vertex(e.end()).ok()?.point();
-    let mid = e.curve().evaluate_with_endpoints(
-        match e.curve() {
-            EdgeCurve::Line => 0.5,
-            other => {
-                let (t0, t1) = other.domain_with_endpoints(start, end);
-                f64::midpoint(t0, t1)
-            }
-        },
-        start,
-        end,
-    );
-
-    let outward = |fid: brepkit_topology::face::FaceId| {
-        let face = topo.face(fid).ok()?;
-        let (u, v) = face.surface().project_point(mid)?;
-        let n = face.surface().normal(u, v);
-        let n = if face.is_reversed() { -n } else { n };
-        n.normalize().ok()
-    };
-    let n1 = outward(faces[0])?;
-    let n2 = outward(faces[1])?;
-    let bisector = (n1 + n2).normalize().ok()?;
-
-    // Step inward along the bisector. Inside the material ⇒ convex edge.
-    let sample = mid - bisector * probe;
-    match crate::classify::classify_point_robust(topo, solid, sample, 0.01, 1e-7).ok()? {
-        crate::classify::PointClassification::Inside => Some(true),
-        crate::classify::PointClassification::Outside => Some(false),
-        crate::classify::PointClassification::OnBoundary => None,
-    }
-}
-
 /// Reject a blend whose volume change is geometrically impossible.
 ///
 /// A blend only moves material inside a tube of radius `size` around each
@@ -143,7 +97,13 @@ fn validate_blend_volume(
     // (a mixed set can legitimately net out either way).
     let convexities: Vec<bool> = edges
         .iter()
-        .filter_map(|&e| edge_is_convex(topo, input_solid, e, size * 0.25))
+        .filter_map(|&e| {
+            match crate::query::edge_concavity(topo, input_solid, e, size * 0.25).ok()? {
+                crate::query::EdgeConcavity::Convex => Some(true),
+                crate::query::EdgeConcavity::Concave => Some(false),
+                crate::query::EdgeConcavity::Tangent | crate::query::EdgeConcavity::Unknown => None,
+            }
+        })
         .collect();
     if convexities.len() == edges.len() && !convexities.is_empty() {
         let all_convex = convexities.iter().all(|&c| c);

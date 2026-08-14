@@ -31,6 +31,7 @@ rayon.workspace = true
 thiserror.workspace = true
 
 [dev-dependencies]
+brepkit-io.workspace = true
 brepkit-topology = {workspace = true, features = ["test-utils"]}
 criterion.workspace = true
 env_logger.workspace = true
