@@ -142,7 +142,7 @@ pub fn euler_characteristic(
 /// discovery order.
 fn face_connectivity_components<V: std::ops::Deref<Target = [brepkit_topology::face::FaceId]>>(
     faces: &[brepkit_topology::face::FaceId],
-    edge_map: &std::collections::HashMap<usize, V>,
+    edge_map: &std::collections::BTreeMap<usize, V>,
 ) -> Vec<Vec<brepkit_topology::face::FaceId>> {
     use std::collections::{HashMap, HashSet, VecDeque};
 
