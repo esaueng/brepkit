@@ -37,21 +37,33 @@ const DEGENERATE_SHAPE_RATIO: f64 = 1e-12;
 
 /// Reject a transform that collapses the model; accept every one that does not.
 ///
-/// Tests the 3×3 linear part only. Translation cannot make a transform
-/// singular, and `Mat4::mul_point` ignores the bottom row, so the linear part
-/// is exactly what gets applied.
+/// Validates the affine bottom row before testing the 3×3 linear part.
+/// `Mat4::mul_point` ignores the bottom row, so accepting a projective matrix
+/// here would apply a different transform from the one the caller supplied.
 ///
 /// # Errors
 ///
-/// Returns [`crate::OperationsError::InvalidInput`] when a linear column is
-/// zero or non-finite, or when the Hadamard ratio is at or below
-/// [`DEGENERATE_SHAPE_RATIO`].
+/// Returns [`crate::OperationsError::InvalidInput`] when the matrix is not
+/// affine, a linear column is zero or non-finite, or the Hadamard ratio is at
+/// or below [`DEGENERATE_SHAPE_RATIO`].
 pub(crate) fn reject_degenerate_transform(matrix: &Mat4) -> Result<(), crate::OperationsError> {
     let degenerate = |reason: &str| crate::OperationsError::InvalidInput {
         reason: format!("transform matrix is degenerate ({reason})"),
     };
 
     let m = &matrix.0;
+    // Ulp-scale tolerance, not an exact comparison: inverting a rigid frame
+    // matrix through the adjugate legitimately yields entries like -0.0 or
+    // 1.0000000000000002 in this row. A genuinely projective row is far
+    // outside this band.
+    let affine_wobble = 8.0 * f64::EPSILON;
+    if m[3][0].abs() > affine_wobble
+        || m[3][1].abs() > affine_wobble
+        || m[3][2].abs() > affine_wobble
+        || (m[3][3] - 1.0).abs() > affine_wobble
+    {
+        return Err(degenerate("the bottom row is not affine"));
+    }
     // Normalize each column before taking the determinant, rather than
     // dividing the determinant by the product of the norms afterwards: the
     // product of three norms can overflow or underflow to 0/∞ for extreme
@@ -97,6 +109,8 @@ pub fn transform_solid(
     matrix: &Mat4,
 ) -> Result<(), crate::OperationsError> {
     reject_degenerate_transform(matrix)?;
+    // Validate every part of the matrix before changing live topology.
+    let normal_matrix = matrix.inverse()?.transpose();
 
     // Collect all unique vertex IDs, edge IDs, and face IDs in a read phase.
     let (vertex_ids, edge_ids, face_ids) = collect_solid_entities(topo, solid)?;
@@ -113,8 +127,6 @@ pub fn transform_solid(
 
     // Mutate phase 3: transform face surface geometry.
     // For plane normals, use the inverse transpose: n' = (M⁻¹)ᵀ · n
-    let normal_matrix = matrix.inverse()?.transpose();
-
     for fid in face_ids {
         let face = topo.face(fid)?;
         match face.surface() {
@@ -770,6 +782,8 @@ pub fn transform_face(
     matrix: &Mat4,
 ) -> Result<(), crate::OperationsError> {
     reject_degenerate_transform(matrix)?;
+    // Validate every part of the matrix before changing live topology.
+    let normal_matrix = matrix.inverse()?.transpose();
 
     // Collect all vertices and edges from the face's wires.
     let (vertex_ids, edge_ids) = collect_face_entities(topo, face_id)?;
@@ -785,7 +799,6 @@ pub fn transform_face(
     transform_edges(topo, &edge_ids, matrix)?;
 
     // Transform face surface.
-    let normal_matrix = matrix.inverse()?.transpose();
     transform_face_surface(topo, face_id, matrix, &normal_matrix)?;
 
     Ok(())
