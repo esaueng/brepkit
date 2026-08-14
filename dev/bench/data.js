@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786710393514,
+  "lastUpdate": 1786710746185,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10205,6 +10205,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 26784062,
             "range": "± 106170",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "0b34035b8654381627fc1be5601aafa03e72c353",
+          "message": "Merge pull request #228 from esaueng/codex/fix-makeellipsearc3d-endpoint-validation\n\nValidate ellipse-arc endpoints and reject off-ellipse points",
+          "timestamp": "2026-08-14T08:29:51-04:00",
+          "tree_id": "07c79d0287d14d152ad42032829ff18b3c2fe408",
+          "url": "https://github.com/esaueng/brepkit/commit/0b34035b8654381627fc1be5601aafa03e72c353"
+        },
+        "date": 1786710745052,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1006195,
+            "range": "± 33694",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1095253,
+            "range": "± 3076",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12812,
+            "range": "± 57",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 927958,
+            "range": "± 1213",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 26518957,
+            "range": "± 112829",
             "unit": "ns/iter"
           }
         ]
