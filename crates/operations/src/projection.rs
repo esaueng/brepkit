@@ -12,6 +12,8 @@ use brepkit_topology::solid::SolidId;
 
 use crate::classify::{PointClassification, classify_point};
 
+/// Hidden-line removal performs a point-in-solid query for every sampled
+/// segment, so bound both its allocation and classification work.
 const MAX_PROJECT_EDGE_SAMPLE_POINTS: usize = 100_000;
 
 /// Projected edges, split into visible and hidden 2D polylines (in the view
@@ -36,8 +38,9 @@ pub struct ProjectedEdges {
 /// # Errors
 ///
 /// Returns [`crate::OperationsError::InvalidInput`] if `direction` or `x_axis`
-/// is degenerate, and propagates topology, sampling, and point-classification
-/// errors.
+/// is degenerate, `deflection` is invalid, or the requested sampling density
+/// exceeds the projection work limit. Propagates topology, sampling, and
+/// point-classification errors.
 pub fn project_edges(
     topo: &Topology,
     solid: SolidId,
@@ -52,6 +55,10 @@ pub fn project_edges(
             reason: "projection deflection must be finite and positive".into(),
         });
     }
+
+    // Preflight the exact sampler counts before it allocates. This check lives
+    // in the native operation (rather than only in WASM validation) so every
+    // caller, including batch dispatch, receives the same resource bound.
     let edges = brepkit_topology::explorer::solid_edges(topo, solid)?;
     let mut sample_points = 0usize;
     for edge_id in edges {
@@ -206,5 +213,28 @@ mod tests {
             result.hidden.is_empty(),
             "hidden lines disabled → no hidden polylines"
         );
+    }
+
+    #[test]
+    fn project_rejects_sampling_that_exceeds_work_limit() {
+        let mut topo = Topology::new();
+        let solid = crate::primitives::make_cylinder(&mut topo, 10.0, 10.0).unwrap();
+        let (o, d, x) = oblique();
+        let err = project_edges(&topo, solid, o, d, x, true, 1e-12).unwrap_err();
+        assert!(
+            matches!(err, crate::OperationsError::InvalidInput { .. }),
+            "excessive sampling must be rejected before allocation"
+        );
+    }
+
+    #[test]
+    fn project_rejects_non_positive_deflection() {
+        let mut topo = Topology::new();
+        let solid = crate::primitives::make_box(&mut topo, 10.0, 10.0, 10.0).unwrap();
+        let (o, d, x) = oblique();
+        assert!(matches!(
+            project_edges(&topo, solid, o, d, x, true, 0.0),
+            Err(crate::OperationsError::InvalidInput { .. })
+        ));
     }
 }
