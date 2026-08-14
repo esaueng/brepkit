@@ -235,6 +235,13 @@ fn outer_components_materially_overlap(
 ) -> Result<bool, crate::OperationsError> {
     use std::collections::HashSet;
 
+    // Keep strict validation safe for untrusted models. A spatial index alone
+    // cannot bound the worst case because arbitrarily many component AABBs can
+    // be mutually nested. Exceeding this budget fails closed, preserving the
+    // historical disconnected-shell verdict instead of spending quadratic
+    // time on a crafted solid.
+    const MAX_COMPONENT_PAIR_CHECKS: usize = 4_096;
+
     let solid_data = topo.solid(solid)?;
     let outer_faces: HashSet<usize> = topo
         .shell(solid_data.outer_shell())?
@@ -274,8 +281,13 @@ fn outer_components_materially_overlap(
             && o.max.z() + eps >= i.max.z()
     };
 
+    let mut pair_checks = 0usize;
     for (i, (ci_a, a, ga)) in boxes.iter().enumerate() {
         for (ci_b, b, gb) in boxes.iter().skip(i + 1) {
+            pair_checks += 1;
+            if pair_checks > MAX_COMPONENT_PAIR_CHECKS {
+                return Ok(true);
+            }
             if *ga > 0 || *gb > 0 {
                 continue; // higher-genus containment is a cavity wall, not debris
             }
