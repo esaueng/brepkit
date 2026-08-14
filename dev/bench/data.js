@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786724595947,
+  "lastUpdate": 1786724881016,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -10475,6 +10475,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 31492060,
             "range": "± 202077",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "7742abeeb25d8144725b20711401a7ddbb05544b",
+          "message": "Merge pull request #240 from esaueng/fix/restore-partial-overlap-sd\n\nfix(algo): restore partial-overlap same-domain pairing reverted by #229",
+          "timestamp": "2026-08-14T12:20:29-04:00",
+          "tree_id": "de073239d66e8eac93eb1a829c011689831e2496",
+          "url": "https://github.com/esaueng/brepkit/commit/7742abeeb25d8144725b20711401a7ddbb05544b"
+        },
+        "date": 1786724879555,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1329303,
+            "range": "± 1514",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1429899,
+            "range": "± 1788",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14325,
+            "range": "± 398",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 1016828,
+            "range": "± 2147",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 40728557,
+            "range": "± 148779",
             "unit": "ns/iter"
           }
         ]
