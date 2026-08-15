@@ -16,6 +16,8 @@ use brepkit_topology::wire::{OrientedEdge, Wire, WireId};
 
 use brepkit_math::nurbs::intersection::IntersectionPoint;
 
+use std::collections::{HashMap, HashSet};
+
 use crate::boolean::face_polygon;
 use crate::dot_normal_point;
 
@@ -322,6 +324,85 @@ fn coincident_points(a: Point3, b: Point3, endpoint_tol: f64) -> bool {
         && (a.z() - b.z()).abs() <= endpoint_tol
 }
 
+type PointBucket = (u64, u64, u64);
+
+/// Spatial index that assigns tolerance-coincident endpoints a stable ID.
+///
+/// The bucket coordinates deliberately remain floating-point bit patterns
+/// rather than being cast to bounded integers. This keeps the index valid for
+/// coordinates whose quotient by the tolerance is outside the `i64` range.
+struct EndpointIndex {
+    tolerance: f64,
+    buckets: HashMap<PointBucket, Vec<(Point3, usize)>>,
+    next_id: usize,
+}
+
+impl EndpointIndex {
+    fn new(tolerance: f64) -> Self {
+        Self {
+            tolerance,
+            buckets: HashMap::new(),
+            next_id: 0,
+        }
+    }
+
+    fn axis_bucket(value: f64, tolerance: f64) -> u64 {
+        let scaled = (value / tolerance).floor();
+        if scaled.is_finite() {
+            scaled.to_bits()
+        } else {
+            // At this magnitude adjacent finite floats are much farther apart
+            // than the modeling tolerance, so exact bits are sufficient.
+            value.to_bits()
+        }
+    }
+
+    fn bucket(&self, point: Point3) -> PointBucket {
+        (
+            Self::axis_bucket(point.x(), self.tolerance),
+            Self::axis_bucket(point.y(), self.tolerance),
+            Self::axis_bucket(point.z(), self.tolerance),
+        )
+    }
+
+    fn id(&mut self, point: Point3) -> usize {
+        let offsets = [-self.tolerance, 0.0, self.tolerance];
+        for dx in offsets {
+            for dy in offsets {
+                for dz in offsets {
+                    let nearby = Point3::new(point.x() + dx, point.y() + dy, point.z() + dz);
+                    let bucket = self.bucket(nearby);
+                    if let Some(entries) = self.buckets.get(&bucket)
+                        && let Some((_, id)) = entries.iter().find(|(candidate, _)| {
+                            coincident_points(point, *candidate, self.tolerance)
+                        })
+                    {
+                        return *id;
+                    }
+                }
+            }
+        }
+
+        let id = self.next_id;
+        self.next_id += 1;
+        self.buckets
+            .entry(self.bucket(point))
+            .or_default()
+            .push((point, id));
+        id
+    }
+}
+
+fn endpoint_pair(index: &mut EndpointIndex, a: Point3, b: Point3) -> (usize, usize) {
+    let a_id = index.id(a);
+    let b_id = index.id(b);
+    if a_id <= b_id {
+        (a_id, b_id)
+    } else {
+        (b_id, a_id)
+    }
+}
+
 /// Collapse geometrically-coincident segments, ignoring orientation.
 ///
 /// A section curve shared by two oppositely-oriented faces is emitted once in
@@ -332,15 +413,11 @@ fn coincident_points(a: Point3, b: Point3, endpoint_tol: f64) -> bool {
 /// section outline are never merged.
 fn dedup_coincident_segments(segments: &mut Vec<(Point3, Point3)>, tol: Tolerance) {
     let endpoint_tol = tol.linear * 10.0;
+    let mut endpoint_index = EndpointIndex::new(endpoint_tol);
+    let mut seen = HashSet::with_capacity(segments.len());
     let mut unique = Vec::with_capacity(segments.len());
     for &(a, b) in segments.iter() {
-        let duplicate = unique.iter().any(|&(seen_a, seen_b)| {
-            (coincident_points(a, seen_a, endpoint_tol)
-                && coincident_points(b, seen_b, endpoint_tol))
-                || (coincident_points(a, seen_b, endpoint_tol)
-                    && coincident_points(b, seen_a, endpoint_tol))
-        });
-        if !duplicate {
+        if seen.insert(endpoint_pair(&mut endpoint_index, a, b)) {
             unique.push((a, b));
         }
     }
@@ -384,7 +461,8 @@ fn extract_coplanar_boundary(
     // An edge shared by two coplanar faces appears twice and is internal.
     // An edge appearing once is a boundary edge.
     let endpoint_tol = tol.linear * 10.0;
-    let mut edge_counts: Vec<(Point3, Point3, usize)> = Vec::new();
+    let mut endpoint_index = EndpointIndex::new(endpoint_tol);
+    let mut edge_counts: HashMap<(usize, usize), (Point3, Point3, usize)> = HashMap::new();
 
     for &fid in &coplanar_faces {
         let verts = face_polygon(topo, fid)?;
@@ -392,24 +470,19 @@ fn extract_coplanar_boundary(
         for i in 0..n {
             let a = verts[i];
             let b = verts[(i + 1) % n];
-            if let Some((_, _, count)) = edge_counts.iter_mut().find(|(seen_a, seen_b, _)| {
-                (coincident_points(a, *seen_a, endpoint_tol)
-                    && coincident_points(b, *seen_b, endpoint_tol))
-                    || (coincident_points(a, *seen_b, endpoint_tol)
-                        && coincident_points(b, *seen_a, endpoint_tol))
-            }) {
-                *count += 1;
-            } else {
-                edge_counts.push((a, b, 1));
-            }
+            let key = endpoint_pair(&mut endpoint_index, a, b);
+            edge_counts
+                .entry(key)
+                .and_modify(|(_, _, count)| *count += 1)
+                .or_insert((a, b, 1));
         }
     }
 
     // Boundary edges appear exactly once.
     let boundary: Vec<(Point3, Point3)> = edge_counts
         .into_iter()
-        .filter(|(_, _, count)| *count == 1)
-        .map(|(a, b, _)| (a, b))
+        .filter(|(_, (_, _, count))| *count == 1)
+        .map(|(_, (a, b, _))| (a, b))
         .collect();
 
     Ok(boundary)
@@ -645,6 +718,24 @@ mod tests {
         dedup_coincident_segments(&mut segments, Tolerance::new());
 
         assert_eq!(segments.len(), 4, "all distinct outline edges must remain");
+    }
+
+    #[test]
+    fn dedup_scales_across_many_distinct_segments() {
+        let mut segments: Vec<_> = (0..10_000)
+            .map(|i| {
+                let x = f64::from(i);
+                (Point3::new(x, 0.0, 0.0), Point3::new(x, 0.5, 0.0))
+            })
+            .collect();
+        segments.push((
+            Point3::new(9_999.0, 0.5, 0.0),
+            Point3::new(9_999.0, 0.0, 0.0),
+        ));
+
+        dedup_coincident_segments(&mut segments, Tolerance::new());
+
+        assert_eq!(segments.len(), 10_000);
     }
 
     #[test]
