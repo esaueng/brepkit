@@ -46,14 +46,17 @@ Local pre-commit covers only fmt, clippy, taplo, machete, and the last two only 
 - `allow_squash_merge: true`. Merge commits and rebase merges are ALSO enabled (`allow_merge_commit`, `allow_rebase_merge`) — squash-only is a convention here, not a setting.
 - `allow_auto_merge: false` — `gh pr merge --auto` errors out. Merge after you have read CI yourself.
 - `delete_branch_on_merge: false` — remote branches survive a merge. Clean up with `git push origin --delete <branch>`.
-- **`main` has no branch protection at all**: `gh api repos/esaueng/brepkit/branches/main/protection` returns 404 `Branch not protected`. No required checks, no linear-history requirement, no force-push block, no required approvals. A direct push to `main` succeeds. "Never commit to main" is policy with zero technical enforcement.
+- **`main` has no branch protection and no rulesets**: `branches/main/protection` returns 404 `Branch not protected`, AND `rules/branches/main` returns `[]`. Both matter — rulesets are a separate system that the `protection` endpoint does not report, so a lone 404 proves nothing. No required checks, no linear-history requirement, no force-push block, no required approvals. A direct push to `main` succeeds. "Never commit to main" is policy with zero technical enforcement.
 - Squash commit titles on `main` look like `type(scope): subject (#N)`.
+
+One gate does still exist, and it is client-side: `gh pr merge` refuses a PR whose `mergeStateStatus` is `BEHIND` with `the head branch is not up to date with the base branch`, then suggests `--auto` (unavailable here) or `--admin`. Neither is the answer — rebase onto `origin/main`, force-push, wait for the fresh CI, and merge. See SKILL.md, "The CI gate", step 5.
 
 Re-verify rather than trusting this table; settings drift:
 
 ```bash
 gh api repos/esaueng/brepkit --jq '"squash=\(.allow_squash_merge) auto=\(.allow_auto_merge) delete=\(.delete_branch_on_merge)"'
 gh api repos/esaueng/brepkit/branches/main/protection --jq '.required_status_checks.contexts'
+gh api repos/esaueng/brepkit/rules/branches/main
 ```
 
 ## AI reviewers: none on this fork

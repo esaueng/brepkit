@@ -11,8 +11,11 @@ End-to-end change flow for this repo: branch, commit, push, PR, CI gate, squash-
 
 ```bash
 gh api repos/esaueng/brepkit/branches/main/protection   # 404 "Branch not protected"
+gh api repos/esaueng/brepkit/rules/branches/main        # [] — rulesets are SEPARATE
 gh api repos/esaueng/brepkit --jq '.allow_auto_merge'   # false
 ```
+
+Check the second one too. Rulesets are a distinct system from legacy branch protection and do not appear in the `protection` endpoint, so a 404 there alone does not prove a branch is unguarded.
 
 The consequences are the whole reason this file exists: `CI Pass` is not a required check, a direct push to `main` will NOT be rejected, and `--auto` will error. The discipline below is policy, held by you, with no backstop.
 
@@ -68,7 +71,13 @@ Do not wait for a review that will never arrive. `CI Pass` is the entire gate, a
    `CI Pass` does not appear in the rollup at all until every job it aggregates has finished, so its absence early on is not a failure.
 3. Investigate every non-green check. `SemVer Check (advisory)` is deliberately excluded from `CI Pass`; a red one is informational. `[code]smith` reporting `skipping` is a vendor promo, not a check. For supply-chain jobs failing on a diff that never touched dependencies, see reference.md, "CI failures you did not cause".
 4. Only then: `gh pr merge <N> --squash`. Auto-merge is disabled repo-wide, so `--auto` errors out — you merge when you have seen green, which means you must actually look.
-5. This applies to every PR including high-risk core changes (GFA boolean engine, public WASM API). Nothing and nobody else will catch a bad one.
+5. If the merge is refused with `the head branch is not up to date with the base branch`, the PR is `BEHIND`: main moved since you branched. This is a `gh` client-side refusal, not branch protection (there is none) — do not reach for `--admin`. Update and re-merge:
+   ```bash
+   gh pr view <N> --json mergeStateStatus --jq .mergeStateStatus   # BEHIND
+   git rebase origin/main && git push --force-with-lease origin <branch>
+   ```
+   That restarts CI, so you wait and read it again before merging. `gh pr update-branch <N>` does the same server-side with a merge commit.
+6. This applies to every PR including high-risk core changes (GFA boolean engine, public WASM API). Nothing and nobody else will catch a bad one.
 
 Because the safety net is missing, the burden shifts left: run the change-specific gates from CLAUDE.md locally before pushing, rather than discovering it in CI or, worse, after merge.
 
@@ -76,6 +85,24 @@ Anti-patterns:
 - Do NOT trust a filtered check poll before listing the rollup unfiltered once. A poll keyed to a name that does not exist on this fork (`cubic · AI code reviewer` is exactly such a name) stays silent forever and reads identically to "all clear".
 - Do NOT read `mergeStateStatus: CLEAN` as "CI passed". With no required checks, a PR is mergeable while CI is still running or outright red.
 - Do NOT merge on a green `Test` alone; the matrix legs (`Test (macos-latest)`, `Test (windows-latest)`) are separate checks that land later.
+
+## Stacked PRs
+
+Basing PR B on PR A's branch works, but landing them needs two manual steps that a protected repo would handle for you. Both bite because `delete_branch_on_merge` is false here.
+
+After A squash-merges, its branch commit never becomes an ancestor of `main` — main gets one NEW squashed commit instead. So B is left based on an orphaned commit, and because A's branch still exists, GitHub does NOT retarget B:
+
+```bash
+# 1. drop the now-duplicated commit; replay only B's own work onto main
+git checkout main && git pull --ff-only
+git checkout <branch-B> && git rebase --onto main <A-head-sha>
+git push --force-with-lease origin <branch-B>
+
+# 2. retarget B, which GitHub will not do while A's branch survives
+gh pr edit <N-B> --base main
+```
+
+Verify both landed: `gh pr view <N-B> --json baseRefName,headRefOid` should show `main` and your new local HEAD, and `gh pr diff <N-B> --name-only` should list only B's files. If it still lists A's files, the rebase did not take and merging would re-apply them.
 
 ## Banned-name compliance
 
