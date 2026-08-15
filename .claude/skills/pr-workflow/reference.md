@@ -4,68 +4,99 @@ Deep catalog behind SKILL.md. Everything here was verified against the repo; whe
 
 ## CI jobs (`.github/workflows/ci.yml`)
 
-All jobs except `wasm-size` fan into `ci-pass` (display name `CI Pass`), the only check required by branch protection.
+Jobs fan into `ci-pass` (display name `CI Pass`), with `wasm-size` and `semver` deliberately excluded. `CI Pass` is an aggregate signal only — branch protection is off, so no check is *required*; see "Repo merge settings".
 
 | Job | Display name | What it runs |
 |-----|--------------|--------------|
 | `fmt` | Format | `cargo fmt --all -- --check` |
 | `clippy` | Clippy | `cargo clippy --all-targets --all-features -- -D warnings` |
 | `test` | Test | `cargo nextest run --workspace`, doc tests, complexity guards |
-| `coverage` | Coverage | llvm-cov coverage report |
+| `platform-test` | Test (macos-latest), Test (windows-latest) | the same suite on the OS matrix; lands later than `Test` |
+| `coverage` | Coverage | llvm-cov coverage report (60% line floor) |
 | `msrv` | MSRV (1.88) | build on the minimum supported Rust |
 | `wasm` | WASM Build & Validate | `cargo xtask wasm-build --skip-opt` (wasm-pack build + validation for `wasm32-unknown-unknown`) |
-| `wasm-size` | WASM Size Report | PR-only size delta comment (informational, not gated by `ci-pass`) |
+| `wasm-size` | WASM Size Report | PR-only size delta comment (informational, NOT in `ci-pass`) |
+| `fuzz-check` | Fuzz Targets Compile | fuzz targets build |
+| `render` | Software Rendering | software Vulkan render checks |
 | `boundaries` | Layer Boundaries | `./scripts/check-boundaries.sh` |
+| `doc-paths` | Doc Paths | `./scripts/check-doc-paths.sh` |
 | `deny` | Cargo Deny | license/advisory/ban checks |
 | `audit` | Security Audit | `cargo audit` |
-| `docs` | Rustdoc | doc build with warnings denied |
+| `docs` | Documentation | doc build with warnings denied |
+| `publish-dry-run` | Publish Dry Run | `cargo publish --workspace --dry-run` against crates.io |
+| `semver` | SemVer Check (advisory) | advisory only, NOT in `ci-pass` — a red one does not block |
 | `machete` | Unused Dependencies | `cargo machete` |
+| `secrets-scan` | Secrets Scan | secret scanning |
 | `taplo` | TOML Format | `taplo fmt --check` |
+
+Two non-CI entries also appear in the rollup: `cla` (a CLA bot) and `[code]smith`, a Blacksmith autofix advertisement that reports `skipping` and is not a check at all.
+
+Regenerate this table rather than trusting it:
+
+```bash
+awk '/^  [a-z0-9_-]+:$/{j=$1} /^    name:/{print j" "$0}' .github/workflows/ci.yml
+```
 
 Local pre-commit covers only fmt, clippy, taplo, machete, and the last two only when the binaries are installed (the hook skips them silently otherwise). Everything else (tests, boundaries, deny, docs) first runs in CI unless you run it yourself. Before pushing, run at minimum the tests for touched crates and, on any `Cargo.toml` change, `./scripts/check-boundaries.sh`.
 
-## Repo merge settings (verified via `gh api repos/andymai/brepkit`)
+## Repo merge settings (verified via `gh api repos/esaueng/brepkit`, 2026-08-14)
 
-- `allow_squash_merge: true`; merge commits and rebase merges disabled.
-- `allow_auto_merge: true`; `delete_branch_on_merge: true`.
-- Branch protection on `main`: linear history, no force pushes, required check = `CI Pass` only, `required_approving_review_count: 0`.
+`origin` is `https://github.com/esaueng/brepkit` — the production fork. Some older notes name `andymai/brepkit`; that is the upstream project, it is not `origin`, and it is not where your PRs go. It is also not configured as a remote by default (`git remote -v` shows `origin` only), so the fork-maintenance commands in CLAUDE.md need `upstream` added first.
+
+- `allow_squash_merge: true`. Merge commits and rebase merges are ALSO enabled (`allow_merge_commit`, `allow_rebase_merge`) — squash-only is a convention here, not a setting.
+- `allow_auto_merge: false` — `gh pr merge --auto` errors out. Merge after you have read CI yourself.
+- `delete_branch_on_merge: false` — remote branches survive a merge. Clean up with `git push origin --delete <branch>`.
+- **`main` has no branch protection and no rulesets**: `branches/main/protection` returns 404 `Branch not protected`, AND `rules/branches/main` returns `[]`. Both matter — rulesets are a separate system that the `protection` endpoint does not report, so a lone 404 proves nothing. No required checks, no linear-history requirement, no force-push block, no required approvals. A direct push to `main` succeeds. "Never commit to main" is policy with zero technical enforcement.
 - Squash commit titles on `main` look like `type(scope): subject (#N)`.
 
-## AI reviewers
+One gate does still exist, and it is client-side: `gh pr merge` refuses a PR whose `mergeStateStatus` is `BEHIND` with `the head branch is not up to date with the base branch`, then suggests `--auto` (unavailable here) or `--admin`. Neither is the answer — rebase onto `origin/main`, force-push, wait for the fresh CI, and merge. See SKILL.md, "The CI gate", step 5.
 
-| Actor | Surface |
-|-------|---------|
-| `cubic` | Inline findings; posts the `cubic · AI code reviewer` status check (not branch-protection required; concludes `NEUTRAL` when it has no findings) |
-| `copilot-pull-request-reviewer` | Inline review comments |
-| `cubic-dev-ai` | Review plus a `cubic · AI code reviewer` check |
-
-Reading findings:
+Re-verify rather than trusting this table; settings drift:
 
 ```bash
-gh api repos/andymai/brepkit/pulls/<N>/comments   # inline (diff-anchored) comments
-gh pr view <N> --comments                          # issue-level comments
+gh api repos/esaueng/brepkit --jq '"squash=\(.allow_squash_merge) auto=\(.allow_auto_merge) delete=\(.delete_branch_on_merge)"'
+gh api repos/esaueng/brepkit/branches/main/protection --jq '.required_status_checks.contexts'
+gh api repos/esaueng/brepkit/rules/branches/main
 ```
 
-Triage: P0/P1 findings get a fix commit before auto-merge is set. P2 and style findings get a short reply (agree-and-fix, or explain why not). A finding being wrong is fine; ignoring it silently is not.
+## AI reviewers: none on this fork
 
-## Sandbox push details
+There are none. No `cubic`, no `cubic-dev-ai`, no `copilot-pull-request-reviewer`, and no `cubic · AI code reviewer` status check. Checked across PRs #224–#245: every one has zero inline comments and zero reviews, except a single `github-actions[bot]` review; the only recurring PR comment is the automated WASM size report.
 
-- `origin` is `git@github.com:andymai/brepkit.git`; SSH to github.com:22 is blocked, so plain `git push` hangs until timeout.
-- Global rewrite trap: `git config --get-regexp 'url\..*insteadof'` shows `url.git@github.com:.insteadof https://github.com/`. This silently converts even an explicit `git push https://github.com/...` back to SSH. The token-embedded URL avoids the rewrite because it does not match the prefix:
+This is the single most dangerous stale belief about this repo, because the failure is silent. Polling for a check name that does not exist returns nothing forever, which is indistinguishable from a clean review. Guard against it by listing the rollup unfiltered before filtering:
 
 ```bash
-git push "https://x-access-token:$(gh auth token)@github.com/andymai/brepkit.git" <branch> \
+gh pr view <N> --json statusCheckRollup --jq '.statusCheckRollup[] | (.name // .context)'
+```
+
+If a reviewer is ever installed on the fork, both comment surfaces need checking, since inline findings do not appear in `gh pr view --comments`:
+
+```bash
+gh api repos/esaueng/brepkit/pulls/<N>/comments   # inline (diff-anchored) comments
+gh api repos/esaueng/brepkit/issues/<N>/comments  # issue-level comments
+```
+
+## Push details
+
+Plain `git push -u origin <branch>` works. `origin` is an HTTPS URL and `git config --get-regexp 'url\..*insteadof'` returns nothing, so tracking refs update normally and `git rev-parse origin/<branch>` is trustworthy.
+
+Two conditions once made this fail, and the token-embedded fallback below exists for them: an SSH `origin` (port 22 is blocked in this sandbox) and a global `insteadOf` rewrite converting `https://github.com/...` back to SSH. Neither is configured now. If a push ever hangs with no output, re-check both before reaching for the workaround:
+
+```bash
+git remote -v
+git config --get-regexp 'url\..*insteadof'
+
+# fallback only if one of the above is the problem
+git push "https://x-access-token:$(gh auth token)@github.com/esaueng/brepkit.git" <branch> \
   2>&1 | sed 's/x-access-token:[^@]*@/x-access-token:***@/g'
 ```
 
-- Explicit-URL pushes never update local `origin/<branch>` tracking refs. Verify what the remote actually has:
+An explicit-URL push does not update local `origin/<branch>`, so if you use the fallback, verify the remote head directly:
 
 ```bash
 gh pr view <N> --json headRefOid --jq .headRefOid
-gh api repos/andymai/brepkit/commits/<branch> --jq .sha
+gh api repos/esaueng/brepkit/commits/<branch> --jq .sha
 ```
-
-Do not conclude "push failed" or "remote is behind" from `git rev-parse origin/<branch>`; that ref is stale by construction here.
 
 - All `gh` operations (create, view, merge, api) go over HTTPS with the CLI token and work normally.
 
@@ -81,6 +112,20 @@ Do not conclude "push failed" or "remote is behind" from `git rev-parse origin/<
 ## CI failures you did not cause
 
 Supply-chain and toolchain jobs can fail on a PR that never touched dependencies. Root cause: `Cargo.lock` is gitignored (see `.gitignore`), so every CI run resolves dependencies fresh. The `audit` job even runs `cargo generate-lockfile` explicitly. A new advisory or a new dep release changes the verdict with zero diff on your branch.
+
+### The `cla` check (currently red on every PR)
+
+`.github/workflows/cla.yml` runs `contributor-assistant/github-action` in its own workflow run, so it is NOT part of `ci-pass` and does not affect `CI Pass`. On this fork it fails for every contributor:
+
+```
+Error occurred when creating the signed contributors file:
+  Branch cla-signatures not found.
+Committers of pull request <N> have to sign the CLA
+```
+
+It is inherited from upstream and never adapted: `path-to-document` still points at `https://github.com/andymai/brepkit/...`, the allowlist is `andymai,web-flow,...`, and the `cla-signatures` branch the action writes to does not exist on the fork. Confirmed red on #240, #241, #243, #245 concurrently.
+
+Treat it as pre-existing infrastructure breakage, not a signal about your diff. Do not try to satisfy it by rewriting commit authorship. Fixing it properly means either creating the `cla-signatures` branch and repointing the config at the fork, or dropping the workflow — its own change, and the repo owner's call.
 
 ### cargo-deny / audit / OSV advisories
 
@@ -118,13 +163,19 @@ Bumping wasm-bindgen is its own change with its own PR. Never bump it as a drive
 
 | Symptom | Cause | Action |
 |---------|-------|--------|
-| `git push` hangs, no output | SSH origin plus blocked port 22; or the `insteadOf` rewrite converted your HTTPS URL | Use the token-embedded HTTPS URL above |
-| `origin/<branch>` does not match what you pushed | Explicit-URL pushes never update tracking refs | Verify with `gh pr view <N> --json headRefOid` |
+| `git push` hangs, no output | An SSH `origin` plus blocked port 22, or an `insteadOf` rewrite. Neither is configured now | Check `git remote -v` and `git config --get-regexp 'url\..*insteadof'` before using the token-URL fallback |
+| `origin/<branch>` does not match what you pushed | You used the explicit-URL fallback; those pushes never update tracking refs | Verify with `gh pr view <N> --json headRefOid` |
+| Hook fails with `cargo: command not found` | Hooks run a bare shell without the toolchain on PATH | Export the toolchain path in the same command as the commit. Never `--no-verify` |
+| `gh pr merge --auto` errors | `allow_auto_merge` is false on this fork | Read CI yourself, then plain `gh pr merge <N> --squash` |
+| Remote branch still present after merge | `delete_branch_on_merge` is false | `git push origin --delete <branch>` |
+| A commit landed directly on `main` | `main` is NOT protected on this fork; nothing rejects it | Policy-only rule. Branch first; there is no backstop |
 | commitlint prints `✖ found N problems` yet the commit succeeded | The commit-msg hook swallows commitlint failures and exits 0 by design of its fallback | Treat as a rejection: `git commit --amend` to `type(scope): subject` form |
 | pre-commit fails on clippy warnings you did not write | Pre-existing breakage on the branch base | Stop and report; never `--no-verify` |
 | `⚠️ commitlint not available` warning on commit | `node_modules` missing, but only if no `✖` lines print above it; the same warning also follows a real lint failure (see the `✖` row) because the hook's fallback fires on any nonzero commitlint exit | If `✖` lines precede it, fix the message; otherwise `npm install` at repo root. Either way the commit went through unchecked, re-verify the message manually |
-| PR shows mergeable but you have not read reviews | the AI review check is not branch-protection required | Wait for the check to complete, read findings, only then `--auto` |
-| AI review check absent minutes after PR creation | Reviewers take roughly 5 to 7 minutes to post | Keep polling `gh pr checks <N>`; do other work meanwhile |
+| PR shows mergeable while CI is red or still running | `main` has no required checks, so `mergeStateStatus` reflects nothing about CI | Read `gh pr checks <N>` yourself before merging |
+| AI review check never appears | No AI reviewer runs on this fork. It is not late; it does not exist | Stop waiting. `CI Pass` is the gate. See "AI reviewers: none on this fork" |
+| `CI Pass` missing from the rollup | It only appears once every job it aggregates has finished | Not a failure; keep polling |
+| `cla` check red | Inherited upstream workflow; `cla-signatures` branch missing, config points at upstream. Red on every PR | Pre-existing, outside `ci-pass`. See "The `cla` check" |
 | CI `boundaries` job fails | A crate dependency violates the layer rules | Run `./scripts/check-boundaries.sh` locally; see the layer-boundaries skill |
 | CI `taplo` or `machete` fails but pre-commit passed | Tool not installed locally; the hook skips it silently | `cargo install taplo-cli cargo-machete`, fix, re-commit |
 | Compliance grep hits in a file you touched | You introduced a banned reference-kernel name, or you touched a grandfathered file | Remove new occurrences; leave grandfathered ones as-is |
@@ -136,10 +187,11 @@ Bumping wasm-bindgen is its own change with its own PR. Never bump it as a drive
 
 ## Anti-patterns (what NOT to conclude)
 
-- "CI is green so the PR is done": review findings do not block CI. The gate is the review check completing plus findings addressed.
+- "The AI reviewer had no findings": no AI reviewer runs here. Silence from a filtered check poll is the absence of the check, not the absence of findings.
+- "The PR is mergeable, so it passed": nothing is a required check on this fork. Mergeable means only that there are no conflicts.
 - "The pre-push hook printed one line and passed, so the change is validated": the hook intentionally runs nothing. Validation is CI plus the local tests you ran yourself.
 - "CLAUDE.md says pre-push runs tests and cargo-deny": stale. The hook file delegates to CI; do not re-add local suites to it and do not cite the stale description.
-- "High-risk change, better wait for a human": no human gate exists. Address findings, then auto-merge.
-- "gh pr view showed no comments, so there are no findings": inline findings live on `pulls/<N>/comments` (the API), check both surfaces.
+- "High-risk change, better wait for a human": no human gate and no bot gate exist. You are the only reviewer, so read your own diff before merging.
+- "Branch protection will stop me doing something stupid": it will not. `main` is unprotected.
 - "The plan doc helps reviewers, commit it": working plans and specs never get committed.
 - "The commit went through, so the message passed commitlint": the commit-msg hook never blocks. Check the hook output for `✖` lines and amend if any appeared.
