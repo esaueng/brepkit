@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786773664540,
+  "lastUpdate": 1786773792331,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -11231,6 +11231,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 40110228,
             "range": "± 356512",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "2e478587d53da1f66473f6633433cea90e42ad62",
+          "message": "docs(skills): correct pr-workflow for this fork's actual gates (#246)\n\n* docs(skills): correct pr-workflow for this fork's actual gates\n\nThe skill described upstream andymai/brepkit, not the esaueng fork we push\nto. Every claim below was re-verified against the live repo and workflows.\n\nWrong, and dangerous:\n- \"The AI review check is the gate.\" No AI reviewer runs on this fork. No\n  cubic, no Copilot, no review check. PRs #224-#245 have zero reviews. The\n  documented poll waits on a check name that never appears, and silence from\n  it reads exactly like a clean review.\n- \"Main is protected, required check = CI Pass.\" Branch protection returns\n  404 Branch not protected. Nothing is required; a direct push to main is\n  not rejected; a red PR is still mergeable.\n- \"gh pr merge --squash --auto.\" allow_auto_merge is false; --auto errors.\n- \"Plain git push hangs, origin is SSH plus an insteadOf rewrite.\" Origin is\n  HTTPS to esaueng and no rewrite is configured. Plain push works; the\n  token-URL form is kept as a documented fallback.\n- delete_branch_on_merge is false, so branches need deleting by hand.\n\nAlso: complete the CI job table (9 jobs were missing, including the macOS\nand Windows matrix legs and the advisory SemVer check), and document the\ncla check, which is red on every PR because the cla-signatures branch does\nnot exist and its config still points at upstream.\n\nDocs only — no code, no workflow changes.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n* docs(skills): add the BEHIND merge refusal and stacked-PR steps\n\nBoth hit for real while landing #243/#245/#246, neither documented.\n\ngh pr merge refuses a BEHIND PR with \"the head branch is not up to date\nwith the base branch\" and suggests --auto/--admin. Neither is right: it is\na gh client-side refusal, not branch protection. Rebase, force-push, re-read\nthe fresh CI, merge.\n\nStacked PRs need two manual steps here because delete_branch_on_merge is\nfalse. After the base PR squash-merges its commit is not an ancestor of\nmain, and because its branch survives, GitHub does not retarget the child —\nso the child needs a rebase --onto plus an explicit gh pr edit --base main.\n\nAlso: verifying \"no branch protection\" needs rules/branches/main as well as\nbranches/main/protection. Rulesets are a separate system and do not show up\nin the protection endpoint, so a 404 there alone proves nothing. Both are\nempty on this fork; the original claim stands, but the method was too weak.\n\nCo-Authored-By: Claude Opus 5 <noreply@anthropic.com>\n\n---------\n\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Claude Opus 5 <noreply@anthropic.com>",
+          "timestamp": "2026-08-14T23:10:25-04:00",
+          "tree_id": "341234a6ff16420e1eb55d221771038397ae285f",
+          "url": "https://github.com/esaueng/brepkit/commit/2e478587d53da1f66473f6633433cea90e42ad62"
+        },
+        "date": 1786773791377,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1262427,
+            "range": "± 2823",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1346676,
+            "range": "± 1895",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 12947,
+            "range": "± 208",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 975954,
+            "range": "± 4881",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 38660090,
+            "range": "± 109375",
             "unit": "ns/iter"
           }
         ]
