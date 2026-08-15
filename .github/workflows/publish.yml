@@ -23,7 +23,7 @@ jobs:
   # ran a months-old kernel while apache-main looked current.
   sync-committed-package:
     name: Refresh committed WASM package
-    runs-on: blacksmith-4vcpu-ubuntu-2404
+    runs-on: ubuntu-latest
     # Skip the bot's own commit so this cannot loop. `[skip ci]` in the commit
     # message already suppresses the re-run; this is the belt-and-braces half.
     #
