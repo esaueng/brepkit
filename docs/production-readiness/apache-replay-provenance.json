@@ -4,10 +4,10 @@
   "purpose": "Engineering provenance record for every fork pull request after the Apache cutoff through the phase-two replay; not legal advice.",
   "source_repository": "https://github.com/esaueng/brepkit",
   "replay": {
-    "parent_commit": "6b0ff51aae89de89accb576177f33ab701f3583d",
+    "parent_commit": "e142b5727f56188014ebec723b81e8104063fd1d",
     "parent_tree": "4c4650e0aa43cc3443c8d6eddcf53b5031198d13",
-    "first_commit": "ea8099ca7b26ad6987d92e7e368ca0560eda0380",
-    "last_commit": "42dc503dafef990a60727c3835480efd2740d552",
+    "first_commit": "a49092d2fdfe9472794cb77f58ffdbff51d38b43",
+    "last_commit": "7aeb36a802188de0e158326c15049ebaaa634ddc",
     "commit_count": 73,
     "source_pull_request_count": 73,
     "source_author": "petergstfsn",
@@ -32,7 +32,7 @@
       "merged_at": "2026-08-12T16:06:12Z",
       "title": "fix(algo): avoid quadratic pendant pruning in `remove_pendant_sections`",
       "replay_commits": [
-        "712646f4eb57a80695c664cb4a831aed10d7fc31"
+        "6855688423ae2714048695649082f1ed3853db90"
       ]
     },
     {
@@ -44,7 +44,7 @@
       "merged_at": "2026-08-12T20:01:52Z",
       "title": "fix(operations): bound Minkowski sum work",
       "replay_commits": [
-        "f5874460b5532fca72d5de44935e552a796eb594"
+        "a7ac8d04b69c8a49200428c8d15afb408b3f7218"
       ]
     },
     {
@@ -56,7 +56,7 @@
       "merged_at": "2026-08-12T20:24:24Z",
       "title": "fix(algo): scope split registry anchors by pave block",
       "replay_commits": [
-        "d64307b52b6cec557c59ef96dbb1d9bc5ebe70f5"
+        "04c626ee3366790cd2652972c6e8cf6463f2351f"
       ]
     },
     {
@@ -68,7 +68,7 @@
       "merged_at": "2026-08-12T20:51:21Z",
       "title": "fix(math): reject degree-zero NURBS curves",
       "replay_commits": [
-        "ed8aceeabadedbde206a2f195a33c99635c41abc"
+        "3cd0780cec96379c80411ef819eed5a32b3ceae0"
       ]
     },
     {
@@ -80,7 +80,7 @@
       "merged_at": "2026-08-12T16:46:45Z",
       "title": "fix(operations): randomize boolean assembly hashing",
       "replay_commits": [
-        "ea8099ca7b26ad6987d92e7e368ca0560eda0380"
+        "a49092d2fdfe9472794cb77f58ffdbff51d38b43"
       ]
     },
     {
@@ -92,7 +92,7 @@
       "merged_at": "2026-08-12T20:57:20Z",
       "title": "math: reject malformed NURBS knot vectors to avoid evaluation panics",
       "replay_commits": [
-        "deddb1241fe52175caa6d8e2ba46adeed54d55b7"
+        "d75d4d7dee8fc8fc904b7f88c7d0df1b975a84ad"
       ]
     },
     {
@@ -104,7 +104,7 @@
       "merged_at": "2026-08-12T16:48:22Z",
       "title": "io: stream STEP statements to avoid pre-DATA memory DoS",
       "replay_commits": [
-        "fb970f24cb4cd33968500adf06f3403fb3fdaa94"
+        "6631544b0ba71cda637cab361982a0afce3d6490"
       ]
     },
     {
@@ -116,7 +116,7 @@
       "merged_at": "2026-08-12T16:49:41Z",
       "title": "fix(io): reject zero-vertex ASCII PLY faces",
       "replay_commits": [
-        "8eed4b80cbde381615dbf9211a1c455e9c0dff46"
+        "c2a2bfdc704395949462518e6022b52480eba553"
       ]
     },
     {
@@ -128,7 +128,7 @@
       "merged_at": "2026-08-12T16:51:08Z",
       "title": "fix(operations): bound nested-wire classification to avoid quadratic DoS",
       "replay_commits": [
-        "163e7c41ec96f15033eac26160acef0d6ee73222"
+        "535e5ea07c0731760b5fa765868642f4877939d7"
       ]
     },
     {
@@ -140,7 +140,7 @@
       "merged_at": "2026-08-12T16:53:18Z",
       "title": "fix(algo): avoid vertex-only AABB pruning in N-way fuse by processing every source pair",
       "replay_commits": [
-        "43522405fae8e8d4b6d7f98bc70c5bbae8d9aaac"
+        "896c6d9005df5d767c1fc129dff316923437860e"
       ]
     },
     {
@@ -152,7 +152,7 @@
       "merged_at": "2026-08-12T16:54:44Z",
       "title": "fix(operations): bound compound_cut batching to prevent quadratic DoS",
       "replay_commits": [
-        "9290c4c33e1c3db541d47ec1483f56ddebf0a354"
+        "e163bce1fb3bc5c6ce9f7240c2fc730e791c25d5"
       ]
     },
     {
@@ -164,7 +164,7 @@
       "merged_at": "2026-08-12T16:56:07Z",
       "title": "fix(math): reject skew cone/cylinder algebraic intersections",
       "replay_commits": [
-        "0db0bee2cf334e5cd0b88006653abc8de7e0b815"
+        "cc90c063981c5be2a8f5c6e8f4e1f66f8d78fe59"
       ]
     },
     {
@@ -176,7 +176,7 @@
       "merged_at": "2026-08-12T16:57:31Z",
       "title": "fix(ci): scope GitHub App credentials to token-minting step in publish workflow",
       "replay_commits": [
-        "c08bcbfb137a888df8688468d2428680a503d1ce"
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375"
       ]
     },
     {
@@ -188,7 +188,7 @@
       "merged_at": "2026-08-12T17:28:01Z",
       "title": "fix(io): bound PLY polygon triangulation",
       "replay_commits": [
-        "4c306c63f2cb808627f05ba10e936d8619aa7f7c"
+        "846aaf3c2b8811381681f0d2c5b5f6cb6a0c6180"
       ]
     },
     {
@@ -200,7 +200,7 @@
       "merged_at": "2026-08-12T17:16:34Z",
       "title": "fix(ci): restrict manual package sync to main and pin checkout/push",
       "replay_commits": [
-        "c08bcbfb137a888df8688468d2428680a503d1ce"
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375"
       ]
     },
     {
@@ -212,7 +212,7 @@
       "merged_at": "2026-08-12T17:16:41Z",
       "title": "fix(io): make STEP imports transactional",
       "replay_commits": [
-        "6450dbeb6c7111d9051716ad958306e4edb346f0"
+        "de07787c375d758ef316384ad18b895d65fdb633"
       ]
     },
     {
@@ -224,7 +224,7 @@
       "merged_at": "2026-08-12T17:16:47Z",
       "title": "fix(io): reject cyclic ORIENTED_CLOSED_SHELL references",
       "replay_commits": [
-        "4f9790939926c19b9cb4d3f917b06da52aa73c00"
+        "00701f00f06ff8bfb8922cd1a20fe336869b071a"
       ]
     },
     {
@@ -236,7 +236,7 @@
       "merged_at": "2026-08-12T17:18:20Z",
       "title": "fix(check): bound curved face trim integration",
       "replay_commits": [
-        "252d3d06765466a1f00609e78158cb2365e05d5a"
+        "4d71cfba77d3ce7cdb1acf59013652e308b7ac28"
       ]
     },
     {
@@ -248,7 +248,7 @@
       "merged_at": "2026-08-12T17:19:47Z",
       "title": "fix(offset): limit cavity overlap checks to prevent quadratic CPU DoS",
       "replay_commits": [
-        "45596bf4bb1b11aaa06acce02cc289c2618d6702"
+        "2a9c5c6105e176ef8744787fcc1c2101e797d570"
       ]
     },
     {
@@ -260,7 +260,7 @@
       "merged_at": "2026-08-12T17:22:25Z",
       "title": "fix(offset): reject collapsing cavity offsets",
       "replay_commits": [
-        "91c89259b12b4f37e89fff60759db058c2d1e165"
+        "894981dada577e32275418394199f10538e3a8e2"
       ]
     },
     {
@@ -272,7 +272,7 @@
       "merged_at": "2026-08-12T21:21:30Z",
       "title": "fix(operations): reject non-affine transforms atomically",
       "replay_commits": [
-        "b450c8de89e4d715abdfc078d7a5cfde8ef34349"
+        "8d1f59deb88d825269ac6cc78486cf77700864b4"
       ]
     },
     {
@@ -284,7 +284,7 @@
       "merged_at": "2026-08-12T17:25:37Z",
       "title": "fix(boolean): reject sampled NURBS disjoint proofs",
       "replay_commits": [
-        "a45cbd8ffbf2b1dbbbec4a1deac4664c5ae6b58f"
+        "2b9476343ed14bf304fe1f835b4a4d63cb0c5d7a"
       ]
     },
     {
@@ -296,7 +296,7 @@
       "merged_at": "2026-08-12T17:27:31Z",
       "title": "operations: reject intersecting boolean components with narrow-phase triangle test",
       "replay_commits": [
-        "b248def7726dcc6bf80e13eaf8318e061210d69b"
+        "07434b659059bc62673e55be3b711d1652008e5b"
       ]
     },
     {
@@ -308,7 +308,7 @@
       "merged_at": "2026-08-12T17:47:07Z",
       "title": "ci: isolate WASM package push from untrusted build",
       "replay_commits": [
-        "c08bcbfb137a888df8688468d2428680a503d1ce"
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375"
       ]
     },
     {
@@ -320,7 +320,7 @@
       "merged_at": "2026-08-12T17:32:23Z",
       "title": "fix(io): validate arena solid references before replay",
       "replay_commits": [
-        "39ef71042b95eb86d0b24be879f697197f0b66ab"
+        "41632fa2db9cc997ded165ae5d8e56ae6c44b79c"
       ]
     },
     {
@@ -332,7 +332,7 @@
       "merged_at": "2026-08-12T17:33:48Z",
       "title": "fix(topology): deduplicate solid retirement traversal",
       "replay_commits": [
-        "f37fe03ef32dcc9193ca36bd11de2191d597e767"
+        "0ca0ff21998e7537d1fc3b1a086c0e50f0fa6d76"
       ]
     },
     {
@@ -344,7 +344,7 @@
       "merged_at": "2026-08-12T17:35:20Z",
       "title": "fix(operations): bound circular pattern fitting",
       "replay_commits": [
-        "d1549d175bb4108e8ae9e932c7fc057ebd368e3a"
+        "6977cc84e32f20960ff7329ff540baa6961e0bb5"
       ]
     },
     {
@@ -356,7 +356,7 @@
       "merged_at": "2026-08-12T17:36:48Z",
       "title": "fix(operations): bound helical sweep work to prevent unbounded allocations",
       "replay_commits": [
-        "73a725e5befcde292b3d4a7b8093b40e3917ff6d"
+        "132cee01307b29b3a0d8ed9d0f92539d216f460e"
       ]
     },
     {
@@ -368,7 +368,7 @@
       "merged_at": "2026-08-12T17:38:13Z",
       "title": "Keep holed periodic face bounds conservative",
       "replay_commits": [
-        "3c0795c9b61887a9cdbb554a37cef0eb24595c00"
+        "9eb58a2b678f46f485e9087d15f18c4698141d98"
       ]
     },
     {
@@ -380,7 +380,7 @@
       "merged_at": "2026-08-12T17:39:38Z",
       "title": "fix(blend): validate reused contact geometry",
       "replay_commits": [
-        "93a40e48823098e0142bdb5f44454b5a22b66375"
+        "cc43ead885fccb0cc7ae175c25b1a595b1b8e302"
       ]
     },
     {
@@ -392,7 +392,7 @@
       "merged_at": "2026-08-12T17:41:08Z",
       "title": "fix(algo): hoist trimmed NURBS domain projection out of arc bisection loop",
       "replay_commits": [
-        "ad16c1911fd59d585354c749ec2ccd8d902b7806"
+        "9bffcd3029718f0d4cd417835db3a03c07de64b7"
       ]
     },
     {
@@ -404,7 +404,7 @@
       "merged_at": "2026-08-12T17:42:39Z",
       "title": "fix(algo): scale face splitter bridge bands",
       "replay_commits": [
-        "8bbbb0587a6395459e3b6efe6bde154c5e684698"
+        "e7663fdb0d2550266c94449e4643cedae22d9a13"
       ]
     },
     {
@@ -416,7 +416,7 @@
       "merged_at": "2026-08-12T17:45:20Z",
       "title": "fix(operations): reject non-finite band parameters",
       "replay_commits": [
-        "0fd76335b6659482075042d9c2d9d418eb39eb60"
+        "dd920d2ac9a8e050ced5276534085b3919ef75e3"
       ]
     },
     {
@@ -428,7 +428,7 @@
       "merged_at": "2026-08-12T17:46:52Z",
       "title": "fix(fillet): validate net area for holed faces",
       "replay_commits": [
-        "fd898315eeeb6e7fd285eae426940c63ea6fd5b4"
+        "8d635055ea23942560dfd5d6f349ca8a1965f136"
       ]
     },
     {
@@ -440,7 +440,7 @@
       "merged_at": "2026-08-12T17:48:39Z",
       "title": "fix(operations): prevent quadratic blowup in face connectivity construction",
       "replay_commits": [
-        "d706f99b2b775a261cb1de8a2f7ee735cabb82ec"
+        "8233f85f2857ff213c5c120aad377895e7836910"
       ]
     },
     {
@@ -452,7 +452,7 @@
       "merged_at": "2026-08-12T17:51:38Z",
       "title": "fix(operations): bound component overlap validation",
       "replay_commits": [
-        "63c49f655b5b392ffa01d42e903dcf1c43067026"
+        "ec01c1ca1235eb7bce82fabbceb9e35157dcebf2"
       ]
     },
     {
@@ -464,7 +464,7 @@
       "merged_at": "2026-08-12T17:54:18Z",
       "title": "fix(operations): bound NURBS trim recovery work",
       "replay_commits": [
-        "f4c6fea20606f086e73c13714409a3f4491f0346"
+        "406de2ca79bd4774ab7b157321a9d2f03d04f187"
       ]
     },
     {
@@ -476,7 +476,7 @@
       "merged_at": "2026-08-12T18:31:58Z",
       "title": "Bound NURBS trim sampling to prevent quadratic CPU DoS",
       "replay_commits": [
-        "4956156d4acdc8e8152cc2d03acc305fa493af03"
+        "b4efff0c568ae8d668b7f2d6a457605a503a1c56"
       ]
     },
     {
@@ -488,7 +488,7 @@
       "merged_at": "2026-08-12T18:33:58Z",
       "title": "fix(operations): reject intersecting shell components",
       "replay_commits": [
-        "8839f4c2afbbb5985f5135dc3e5cdc5dea28e648"
+        "a8ae288235a58e2524f830d76b2d824bb4280240"
       ]
     },
     {
@@ -500,7 +500,7 @@
       "merged_at": "2026-08-12T18:06:25Z",
       "title": "fix(boolean): reject non-manifold tangent pinches",
       "replay_commits": [
-        "2f07602818e191a290f60299b0dc752ea80903ec"
+        "4a04bc6371d539cd7d015a05cf8f592cc1f85324"
       ]
     },
     {
@@ -512,7 +512,7 @@
       "merged_at": "2026-08-12T18:14:43Z",
       "title": "fix(release): isolate crates.io publish token from build-time verification",
       "replay_commits": [
-        "c08bcbfb137a888df8688468d2428680a503d1ce"
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375"
       ]
     },
     {
@@ -524,7 +524,7 @@
       "merged_at": "2026-08-12T18:39:53Z",
       "title": "security: bound cylinder-with-holes tessellation grid to prevent DoS",
       "replay_commits": [
-        "e33caff5357236ed780ecdc2594c685517a0d48b"
+        "d630923554dfeeb89000cde9dc7952e27c873d07"
       ]
     },
     {
@@ -536,7 +536,7 @@
       "merged_at": "2026-08-12T18:54:10Z",
       "title": "fix(ci): validate committed WASM artifact",
       "replay_commits": [
-        "c08bcbfb137a888df8688468d2428680a503d1ce"
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375"
       ]
     },
     {
@@ -548,7 +548,7 @@
       "merged_at": "2026-08-12T18:57:39Z",
       "title": "fix(blend): reuse nonuniform straight contacts",
       "replay_commits": [
-        "55b4115bd08c1ab44fa33843cb44e90f65588cff"
+        "ffb900bf84a2904370d3ef53ed3b3e290339e33e"
       ]
     },
     {
@@ -560,7 +560,7 @@
       "merged_at": "2026-08-12T18:54:14Z",
       "title": "fix(operations): bound component intersection checks",
       "replay_commits": [
-        "354f0b956ead38e1157ef9192baac79c349f4795"
+        "c0c097b7e451e3f3b6b161c421632fa9e61fc020"
       ]
     },
     {
@@ -572,7 +572,7 @@
       "merged_at": "2026-08-12T19:00:36Z",
       "title": "fix(algo): bound widened EF vertex lookup",
       "replay_commits": [
-        "af618c6e507e8337d491e60c1a2b8974b06a0095"
+        "62b7fa0eea6d135fc519ccb28d9df1ec9fb7008e"
       ]
     },
     {
@@ -584,7 +584,7 @@
       "merged_at": "2026-08-12T21:34:32Z",
       "title": "test(operations): cover bounded periodic rim reconciliation",
       "replay_commits": [
-        "cb2a37166ca1a20396f21a260cd16d61c47b79b2"
+        "537766b99806baa8066d54cc547b48cfa0001a79"
       ]
     },
     {
@@ -596,8 +596,8 @@
       "merged_at": "2026-08-12T22:43:50Z",
       "title": "feat(operations): add exact blend resizing",
       "replay_commits": [
-        "a4d357f86632e7fe5e11f3ca1d6ea172c16ac5a5",
-        "c44c4da58af0db6d050d06096ba14194f66f75fb"
+        "6a1ce9cde3abfed0475e63efa58002ca7ac1e75c",
+        "c6160ac18a1a649670c9f4accea1aaffc1d910ab"
       ]
     },
     {
@@ -609,7 +609,7 @@
       "merged_at": "2026-08-13T02:13:58Z",
       "title": "fix(math): reject reversed NURBS domains",
       "replay_commits": [
-        "901a2a546c55a1644411a006740d89cca65c4d2c"
+        "134aa062516f42822048ed4aceae9d288245c7d0"
       ]
     },
     {
@@ -621,7 +621,7 @@
       "merged_at": "2026-08-14T04:58:56Z",
       "title": "test(wasm): exercise installed tarball consumer",
       "replay_commits": [
-        "87edc4fec7af67c89123831aad85757740c3d350"
+        "6a9bdb32349af431f5d12c7fb28747451a3ec408"
       ]
     },
     {
@@ -633,7 +633,7 @@
       "merged_at": "2026-08-14T05:32:53Z",
       "title": "ci: use free hosted runners during beta",
       "replay_commits": [
-        "ecd613bf76b34981f56211b171133532ea338b68"
+        "c71734753b516e960017d02ad917c3af26a96004"
       ]
     },
     {
@@ -645,7 +645,7 @@
       "merged_at": "2026-08-14T12:47:29Z",
       "title": "feat(blend): add exact direct blend editing foundations",
       "replay_commits": [
-        "fb7693865925ccefcfda0014eab2fb033fd8c235"
+        "37b06de8d5e87558e243e12e8d0388910be39153"
       ]
     },
     {
@@ -657,7 +657,7 @@
       "merged_at": null,
       "title": "fix(tessellate): validate shared rim angle alignment",
       "replay_commits": [
-        "1d2383072853d5508dd937882b6f8bac18f4de9d"
+        "5e00047f25b51711c3efe0201a031ed3d0233ee5"
       ]
     },
     {
@@ -669,7 +669,7 @@
       "merged_at": "2026-08-14T06:01:03Z",
       "title": "wasm: validate f32 conversion for grouped tessellation to avoid non-finite coords",
       "replay_commits": [
-        "de2582fa87d1b65605c24bd720abf546e7f35aa1"
+        "0a53075cbc182c5590b248e9a2c4cfb33a329858"
       ]
     },
     {
@@ -681,7 +681,7 @@
       "merged_at": "2026-08-14T12:21:23Z",
       "title": "fix(operations): bound hidden-line projection sampling",
       "replay_commits": [
-        "af7a636e2c89f83fe96ac5c18c37aa5bcb2ec161"
+        "96b34af75c19bb78b72eb0772025f88c9514c950"
       ]
     },
     {
@@ -693,7 +693,7 @@
       "merged_at": "2026-08-14T12:21:25Z",
       "title": "fix(section): preserve large-coordinate section outlines",
       "replay_commits": [
-        "863c351d90b4a41bbaf95516893fdf86f2307dc2"
+        "d6f24c03e6ddc57755823ffc7a6b6278ab3abde8"
       ]
     },
     {
@@ -705,7 +705,7 @@
       "merged_at": "2026-08-14T12:29:51Z",
       "title": "Validate ellipse-arc endpoints and reject off-ellipse points",
       "replay_commits": [
-        "7f9dab502d9f8f6ec192ac3954e2e698701d4576"
+        "b0bbfec92cc6fff3c642b78dab8f0bd69feb836c"
       ]
     },
     {
@@ -717,8 +717,8 @@
       "merged_at": "2026-08-14T13:43:29Z",
       "title": "fix: resolve imported Codex security findings",
       "replay_commits": [
-        "1442f7ea3608aa8004e994fa439977b7b4e14386",
-        "fd276ce406e235897e4b5fbe31c3c649bd74935e"
+        "6fdfb4d1447611e824ee6bbff47149286d552f23",
+        "58c876bdeef2e2984a9a72da47c6e5061f88a38b"
       ]
     },
     {
@@ -730,7 +730,7 @@
       "merged_at": "2026-08-14T11:41:00Z",
       "title": "fix(build): pin workspace sibling requirements to exact versions",
       "replay_commits": [
-        "1eafc6e7eff8c1f85334d40672792acb4b8e2e38"
+        "8f4c35c47c1d8f9b94aa00d2a9c41d80e204a59f"
       ]
     },
     {
@@ -742,7 +742,7 @@
       "merged_at": "2026-08-14T15:33:16Z",
       "title": "fix(wasm): do not gate checkpoint restore on lifetime slot count",
       "replay_commits": [
-        "276376d9ebbf429d276d3ee664853fe859dfb1ce"
+        "703802c2bfbc83dc706632ec01364af2f9ead74e"
       ]
     },
     {
@@ -754,7 +754,7 @@
       "merged_at": "2026-08-14T16:01:28Z",
       "title": "fix(blend): accept whole-part and duplicated fillet selections",
       "replay_commits": [
-        "a001c51505f7329ec04488e54f9bbc61a6649ca7"
+        "63a931d9fd8c038e365256ef01677b8156b00068"
       ]
     },
     {
@@ -766,7 +766,7 @@
       "merged_at": "2026-08-14T16:01:32Z",
       "title": "fix(operations): restore the tolerant affine bottom-row check",
       "replay_commits": [
-        "2ef0915e1298f1a96b02272cd1943cdead8cd01f"
+        "a022ad3a7d4599eae7cc25bbfde3cb9070bbe84f"
       ]
     },
     {
@@ -778,7 +778,7 @@
       "merged_at": null,
       "title": "fix(section): prevent quadratic edge matching",
       "replay_commits": [
-        "7b06b8be6f8f436d703f72ff1dab09eff2a251f3"
+        "e2bf905a6dae4cf5705b75b45201119e67427d80"
       ]
     },
     {
@@ -790,7 +790,7 @@
       "merged_at": null,
       "title": "fix(operations): avoid per-edge full-solid tessellation in feature recognition",
       "replay_commits": [
-        "b71026e61de9dcf3f71874f2b9835c88a513ad30"
+        "13da9a3b1c728bf97f15d9153edebf286533c58a"
       ]
     },
     {
@@ -802,7 +802,7 @@
       "merged_at": null,
       "title": "fix(wasm): avoid batch snapshots for read-only ops",
       "replay_commits": [
-        "6bf789a596e7877013048901168066e263e16e61"
+        "adcb6a66a4372342c9e05fa6148aa41200a34395"
       ]
     },
     {
@@ -814,7 +814,7 @@
       "merged_at": "2026-08-14T17:04:02Z",
       "title": "fix(algo): canonical same-domain key for closed ellipse edges too",
       "replay_commits": [
-        "eb9caf47a0a4ca7a5355d1068883bdba4077f9b3"
+        "af05ed90dafbfac01174732936f7031f2ac161cc"
       ]
     },
     {
@@ -826,7 +826,7 @@
       "merged_at": "2026-08-14T16:20:30Z",
       "title": "fix(algo): restore partial-overlap same-domain pairing reverted by #229",
       "replay_commits": [
-        "018a93b3dccde3906a99d6f952cd2957d2f8465a"
+        "cfff12f5440def307e1b7e57c0cab3d2ccbb9f0d"
       ]
     },
     {
@@ -838,7 +838,7 @@
       "merged_at": "2026-08-14T16:39:17Z",
       "title": "fix(operations): bound the boolean flatten pre-pass recursion",
       "replay_commits": [
-        "181e52cad5b5e4d1c14eb93f48cc85109ff4e49e"
+        "cb0c89bd68e4fbb97ae834d54bd61382eddd996f"
       ]
     },
     {
@@ -850,7 +850,7 @@
       "merged_at": "2026-08-14T16:48:22Z",
       "title": "perf(wasm): skip the batch rollback snapshot for read-only ops",
       "replay_commits": [
-        "c3a7c5f4f01a141abe1dd267b78987be2a8a9c96"
+        "2a3a8b9963de5253ea7c86614ba1ea38178ef263"
       ]
     },
     {
@@ -862,8 +862,8 @@
       "merged_at": "2026-08-14T16:33:44Z",
       "title": "fix(topology): order edge_to_face_map so offset results stop varying per process",
       "replay_commits": [
-        "dde8dedcddf27176e928450fd3694c3c4507c5d7",
-        "ccc05a9706b76091a4afff37b6ed74be79f2d413"
+        "361dbe6791804016a8c9ca0c534b44a0a916e97d",
+        "0198bccb6eb3e510d945718fb29c7fffb22b7449"
       ]
     },
     {
@@ -875,7 +875,7 @@
       "merged_at": null,
       "title": "fix(math): ignore translation in inverse conditioning",
       "replay_commits": [
-        "a41aaab88906ba59198545bd642b26378158ce0d"
+        "6e65aefda1a20cea3274c92cd4bc6a3bb64ddd5b"
       ]
     },
     {
@@ -887,7 +887,7 @@
       "merged_at": "2026-08-14T17:10:14Z",
       "title": "test(operations): gate offset face-pair determinism in CI",
       "replay_commits": [
-        "36da9a1c9701edcc38ea508663d42682159506fb"
+        "6e6ed4e00f7a0c0078dfba00fa51c327fb0fc6d1"
       ]
     },
     {
@@ -899,13 +899,13 @@
       "merged_at": null,
       "title": "fix(wasm): validate executeBatch deflection",
       "replay_commits": [
-        "b321737a1e360b897d5ba368454aa4bf79270852"
+        "6c2d99bff19bfd15099ebf89a0432256bc85a620"
       ]
     }
   ],
   "independent_replay_commits": [
     {
-      "sha": "42dc503dafef990a60727c3835480efd2740d552",
+      "sha": "7aeb36a802188de0e158326c15049ebaaa634ddc",
       "author_name": "Peter",
       "author_email": "171875562+petergstfsn@users.noreply.github.com",
       "subject": "fix(ci): keep generated WASM tied to its source commit"
@@ -917,8 +917,8 @@
         243
       ],
       "replay_commits": [
-        "dde8dedcddf27176e928450fd3694c3c4507c5d7",
-        "ccc05a9706b76091a4afff37b6ed74be79f2d413"
+        "361dbe6791804016a8c9ca0c534b44a0a916e97d",
+        "0198bccb6eb3e510d945718fb29c7fffb22b7449"
       ],
       "reason": "The source delta was ported first, then tessellation was adapted to the ordered edge map."
     },
@@ -927,8 +927,8 @@
         229
       ],
       "replay_commits": [
-        "1442f7ea3608aa8004e994fa439977b7b4e14386",
-        "fd276ce406e235897e4b5fbe31c3c649bd74935e"
+        "6fdfb4d1447611e824ee6bbff47149286d552f23",
+        "58c876bdeef2e2984a9a72da47c6e5061f88a38b"
       ],
       "reason": "Only clean source fixes were ported; the remainder was adapted to the Apache staging tree."
     },
@@ -937,8 +937,8 @@
         218
       ],
       "replay_commits": [
-        "a4d357f86632e7fe5e11f3ca1d6ea172c16ac5a5",
-        "c44c4da58af0db6d050d06096ba14194f66f75fb"
+        "6a1ce9cde3abfed0475e63efa58002ca7ac1e75c",
+        "c6160ac18a1a649670c9f4accea1aaffc1d910ab"
       ],
       "reason": "The source replay and its deterministic lockfile refresh are recorded separately."
     },
@@ -951,7 +951,7 @@
         210
       ],
       "replay_commits": [
-        "c08bcbfb137a888df8688468d2428680a503d1ce"
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375"
       ],
       "reason": "The five CI contributions were consolidated into one Apache-safe generated-package workflow with secrets isolated from build work."
     },
@@ -960,7 +960,7 @@
         224
       ],
       "replay_commits": [
-        "1d2383072853d5508dd937882b6f8bac18f4de9d"
+        "5e00047f25b51711c3efe0201a031ed3d0233ee5"
       ],
       "reason": "The tests were retained; the implementation was superseded by the later security replay."
     }
@@ -1206,9 +1206,9 @@
         "base_sha": "2b67947af5e7ee6ef58a9f5ea489120709b29ba6",
         "audited_head_sha": "a7a17f1e0944eb80b91d863a4e5bb1a8b7ad3191",
         "author": "petergstfsn",
-        "state_at_audit": "open",
-        "merged_at": null,
-        "merge_commit_sha": null,
+        "state_at_audit": "closed",
+        "merged_at": "2026-08-15T02:43:21Z",
+        "merge_commit_sha": "e142b5727f56188014ebec723b81e8104063fd1d",
         "title": "fix: replay Apache-compatible security hardening"
       }
     ],
@@ -1597,7 +1597,7 @@
       "title": "fix(operations): verify spline geometry before normalization",
       "staging_pull_request": 252,
       "replay_commits": [
-        "6b0ff51aae89de89accb576177f33ab701f3583d"
+        "e142b5727f56188014ebec723b81e8104063fd1d"
       ]
     }
   ],

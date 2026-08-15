@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER_PATH = ROOT / "docs/production-readiness/apache-replay-provenance.json"
 EXPECTED_LEDGER_SHA256 = (
-    "42c1616642a4ae3af6ef79de021152446a508ab6471fb1acc7df959e9f2c4b72"
+    "5b540c03e5f2222d5dfb896ad51e78909fbd84da06e3fab2c9ba53feb646e199"
 )
 EXPECTED_ALL_PRS = set(range(127, 231)) | set(range(233, 248))
 EXPECTED_PRIOR_PRS = {
@@ -36,10 +36,10 @@ EXPECTED_EXCLUDED_PRS = {
 }
 EXPECTED_AUTHOR = "petergstfsn"
 EXPECTED_REPLAY = {
-    "parent_commit": "6b0ff51aae89de89accb576177f33ab701f3583d",
+    "parent_commit": "e142b5727f56188014ebec723b81e8104063fd1d",
     "parent_tree": "4c4650e0aa43cc3443c8d6eddcf53b5031198d13",
-    "first_commit": "ea8099ca7b26ad6987d92e7e368ca0560eda0380",
-    "last_commit": "42dc503dafef990a60727c3835480efd2740d552",
+    "first_commit": "a49092d2fdfe9472794cb77f58ffdbff51d38b43",
+    "last_commit": "7aeb36a802188de0e158326c15049ebaaa634ddc",
 }
 EXPECTED_ALLOWED_AUTHORS = {
     ("Peter", "171875562+petergstfsn@users.noreply.github.com"),
@@ -262,7 +262,7 @@ def validate_phase_two(ledger: dict[str, Any]) -> tuple[set[str], dict[str, str]
             shared_commits.setdefault(commit, set()).add(record["number"])
 
     expected_shared = {
-        "c08bcbfb137a888df8688468d2428680a503d1ce": {
+        "abc839b2fef0ec8cb9b07b75f2ce73207616b375": {
             174, 176, 185, 208, 210,
         },
     }
@@ -279,7 +279,7 @@ def validate_phase_two(ledger: dict[str, Any]) -> tuple[set[str], dict[str, str]
     independent_record = independent[0]
     independent_sha = independent_record.get("sha")
     require(
-        independent_sha == "42dc503dafef990a60727c3835480efd2740d552",
+        independent_sha == "7aeb36a802188de0e158326c15049ebaaa634ddc",
         "independent replay commit changed",
     )
     mapped_commits.add(independent_sha)
