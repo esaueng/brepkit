@@ -33,6 +33,21 @@ use crate::kernel::BrepKernel;
 const MAX_BATCH_JSON_BYTES: usize = 16 * 1024 * 1024;
 /// Maximum operations executed by one `executeBatch` call.
 const MAX_BATCH_OPERATIONS: usize = 10_000;
+/// Default tessellation deflection for batch operations when omitted.
+const DEFAULT_DEFLECTION: f64 = 0.1;
+
+fn validate_deflection(deflection: f64) -> Result<f64, StructuredWasmError> {
+    crate::error::validate_positive(deflection, "deflection").map_err(StructuredWasmError::from)?;
+    Ok(deflection)
+}
+
+fn get_deflection(args: &serde_json::Value) -> Result<f64, StructuredWasmError> {
+    let deflection = match args.get("deflection") {
+        None => DEFAULT_DEFLECTION,
+        Some(_) => get_f64(args, "deflection")?,
+    };
+    validate_deflection(deflection)
+}
 
 #[wasm_bindgen(typescript_custom_section)]
 const BATCH_V2_TYPES: &str = r#"
@@ -834,7 +849,7 @@ impl BrepKernel {
             }
             "volume" => {
                 let s = get_u32(args, "solid")?;
-                let deflection = get_f64(args, "deflection").unwrap_or(0.1);
+                let deflection = get_deflection(args)?;
                 let solid_id = self.resolve_solid(s).map_err(StructuredWasmError::from)?;
                 let v = measure::solid_volume(&self.topo, solid_id, deflection)
                     .map_err(StructuredWasmError::from)?;
@@ -853,7 +868,7 @@ impl BrepKernel {
             }
             "surfaceArea" => {
                 let s = get_u32(args, "solid")?;
-                let deflection = get_f64(args, "deflection").unwrap_or(0.1);
+                let deflection = get_deflection(args)?;
                 let solid_id = self.resolve_solid(s).map_err(StructuredWasmError::from)?;
                 let a = measure::solid_surface_area(&self.topo, solid_id, deflection)
                     .map_err(StructuredWasmError::from)?;
@@ -875,7 +890,7 @@ impl BrepKernel {
             }
             "centerOfMass" => {
                 let s = get_u32(args, "solid")?;
-                let deflection = get_f64(args, "deflection").unwrap_or(0.1);
+                let deflection = get_deflection(args)?;
                 let solid_id = self.resolve_solid(s).map_err(StructuredWasmError::from)?;
                 let com = measure::solid_center_of_mass(&self.topo, solid_id, deflection)
                     .map_err(StructuredWasmError::from)?;
@@ -897,7 +912,7 @@ impl BrepKernel {
             }
             "meshQuality" => {
                 let s = get_u32(args, "solid")?;
-                let deflection = get_f64(args, "deflection").unwrap_or(0.1);
+                let deflection = get_deflection(args)?;
                 let solid_id = self.resolve_solid(s).map_err(StructuredWasmError::from)?;
                 let mesh = brepkit_operations::tessellate::tessellate_solid(
                     &self.topo, solid_id, deflection,
@@ -1200,7 +1215,7 @@ impl BrepKernel {
                     get_f64(args, "xAxisZ")?,
                 );
                 let hidden_lines = args["hiddenLines"].as_bool().unwrap_or(true);
-                let deflection = get_f64(args, "deflection").unwrap_or(0.1);
+                let deflection = get_deflection(args)?;
                 let result = brepkit_operations::projection::project_edges(
                     &self.topo,
                     solid,
@@ -2137,6 +2152,29 @@ mod batch_contract_tests {
 
     fn parse(response: &str) -> serde_json::Value {
         serde_json::from_str(response).expect("batch response must be valid JSON")
+    }
+
+    #[test]
+    fn batch_deflection_validation_matches_direct_bindings() {
+        for deflection in [f64::NAN, f64::INFINITY, 0.0, -0.1] {
+            let direct_error = crate::error::validate_positive(deflection, "deflection")
+                .expect_err("direct binding validator must reject invalid deflection");
+            let batch_error = validate_deflection(deflection)
+                .expect_err("batch validator must reject invalid deflection");
+            assert_eq!(batch_error.message(), direct_error.to_string());
+        }
+    }
+
+    #[test]
+    fn batch_deflection_defaults_only_when_omitted() {
+        let default = get_deflection(&serde_json::json!({}))
+            .expect("omitted deflection must use the batch default");
+        assert_eq!(
+            default.to_bits(),
+            DEFAULT_DEFLECTION.to_bits(),
+            "omitted deflection must use the exact batch default"
+        );
+        assert!(get_deflection(&serde_json::json!({"deflection": null})).is_err());
     }
 
     fn v2_error(kernel: &mut BrepKernel, input: &str) -> serde_json::Value {
