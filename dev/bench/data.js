@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786763595079,
+  "lastUpdate": 1786765100820,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -11123,6 +11123,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 38945074,
             "range": "± 288629",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d89b189650fd535529814ea216405e97966854df",
+          "message": "feat: replay Apache-compatible fork contributions (#253)\n\n* audit: replay PR #166\n\n* audit: replay PR #168\n\n* audit: replay PR #169\n\n* audit: replay PR #170\n\n* audit: replay PR #171\n\n* audit: replay PR #173\n\n* audit: replay PR #177\n\n* audit: replay PR #178\n\n* audit: replay PR #179\n\n* audit: replay PR #180\n\n* audit: replay PR #181\n\n* audit: replay PR #183\n\n* audit: replay PR #184\n\n* audit: replay PR #175\n\n* audit: replay PR #186\n\n* audit: replay PR #187\n\n* audit: replay PR #188\n\n* audit: replay PR #189\n\n* audit: replay PR #190\n\n* audit: replay PR #192\n\n* audit: replay PR #193\n\n* audit: replay PR #194\n\n* audit: replay PR #195\n\n* audit: replay PR #198\n\n* audit: replay PR #200\n\n* audit: replay PR #201\n\n* audit: replay PR #204\n\n* audit: replay PR #202\n\n* audit: replay PR #203\n\n* audit: replay PR #209\n\n* audit: replay PR #212\n\n* audit: replay PR #215\n\n* audit: replay PR #149\n\n* audit: replay PR #164\n\n* audit: replay PR #165\n\n* audit: replay PR #167\n\n* audit: replay PR #182\n\n* audit: replay PR #216\n\n* audit: replay PR #220\n\n* audit: replay PR #225\n\n* audit: replay PR #226\n\n* audit: replay PR #227\n\n* audit: replay PR #228\n\n* audit: replay PR #245\n\n* audit: port core of PR #243\n\n* audit: adapt tessellation to ordered edge map\n\n* audit: manually port PR #191\n\n* audit: manually port PR #211\n\n* audit: manually port PR #145\n\n* audit: manually port PR #172\n\n* audit: replay PR #218\n\n* audit: port clean PR #229 source subset\n\n* audit: port remaining PR #229 source fixes\n\n* audit: refresh lockfile for PR #218\n\n* audit: adapt PR #230 to Apache versions\n\n* audit: adapt PR #221 Apache package consumer\n\n* audit: adapt PR #223 exact blend editing foundations\n\n* audit: replay PR #233 checkpoint restore lifetime fix\n\n* audit: replay PR #234 fillet selection limits\n\n* audit: replay PR #235 affine tolerance fix\n\n* audit: adapt PR #240 same-domain overlap pairing\n\n* audit: adapt PR #241 boolean flatten recursion guard\n\n* audit: adapt PR #242 lazy batch rollback snapshots\n\n* audit: replay PR #239 closed ellipse same-domain keys\n\n* audit: adapt PR #238 pre-snapshot batch classification\n\n* audit: replay PR #236 bounded section edge matching\n\n* audit: replay PR #237 bounded feature recognition\n\n* audit: replay PR #244 affine inverse conditioning\n\n* audit: replay PR #247 batch deflection validation\n\n* audit: retain PR #224 rim angle regressions\n\n* audit: adapt PR #222 to Apache staging runners\n\n* audit: adapt PRs #185 and #210 to Apache package refresh\n\n* fix(ci): keep generated WASM tied to its source commit\n\n* audit: record Apache replay provenance\n\nSigned-off-by: Peter <171875562+petergstfsn@users.noreply.github.com>\n\n* audit: complete post-cutoff contribution accounting\n\nSigned-off-by: Peter <171875562+petergstfsn@users.noreply.github.com>\n\n* audit: pin real Apache replay provenance\n\n* chore(wasm): refresh Apache replay package\n\n* fix(build): break unpublished dev dependency cycle\n\n---------\n\nSigned-off-by: Peter <171875562+petergstfsn@users.noreply.github.com>\nCo-authored-by: Peter <171875562+petergstfsn@users.noreply.github.com>",
+          "timestamp": "2026-08-14T23:35:05-04:00",
+          "tree_id": "27a5d4edcd8a767e578184eeb20229474dead507",
+          "url": "https://github.com/esaueng/brepkit/commit/d89b189650fd535529814ea216405e97966854df"
+        },
+        "date": 1786765099378,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1381700,
+            "range": "± 2587",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1420532,
+            "range": "± 5110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14392,
+            "range": "± 48",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 1008855,
+            "range": "± 1174",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 40227850,
+            "range": "± 94315",
             "unit": "ns/iter"
           }
         ]
