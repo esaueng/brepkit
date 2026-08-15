@@ -39,11 +39,11 @@ PRs #132 and #134 supplied the replayed trees.
 
 ## Phase-two replay
 
-- Replay parent: `6b0ff51aae89de89accb576177f33ab701f3583d`
+- Replay parent: `e142b5727f56188014ebec723b81e8104063fd1d`
 - Parent tree matching PR #252:
   `4c4650e0aa43cc3443c8d6eddcf53b5031198d13`
-- Replay range: `ea8099ca7b26ad6987d92e7e368ca0560eda0380`
-  through `42dc503dafef990a60727c3835480efd2740d552`
+- Replay range: `a49092d2fdfe9472794cb77f58ffdbff51d38b43`
+  through `7aeb36a802188de0e158326c15049ebaaa634ddc`
 - Local replay commits: 73
 - Credited source pull requests: 73
 - Replay commit author: Peter, using the two recorded GitHub noreply addresses
@@ -60,7 +60,7 @@ ported manually and verified against the staging tree.
 - CI PRs #174, #176, #185, #208, and #210 were consolidated into one
   Apache-safe package-refresh workflow.
 - PR #224 contributes its regressions; its implementation was superseded.
-- `42dc503d` is independent fork-authored CI hardening that binds generated
+- `7aeb36a8` is independent fork-authored CI hardening that binds generated
   WASM to the triggering source commit.
 
 ## Exclusions and deferred repository prose
