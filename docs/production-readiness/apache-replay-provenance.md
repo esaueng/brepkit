@@ -1,26 +1,52 @@
-# Apache replay provenance
+# Apache contribution provenance
 
-This is the engineering provenance record for the second Apache-only
-contribution replay. It is not legal advice. The machine-readable source of
-truth is [`apache-replay-provenance.json`](apache-replay-provenance.json), and
+This is the engineering provenance record for the Apache-only continuation. It
+is not legal advice. The machine-readable source of truth is
+[`apache-replay-provenance.json`](apache-replay-provenance.json), and
 `scripts/check-apache-replay-provenance.py` validates it offline.
 
-## Recorded scope
+## Complete post-cutoff audit
+
+The audit covers every pull request in `esaueng/brepkit` from #127 through
+#247. Numbers #231 and #232 are not pull requests in that repository.
+
+| Disposition | Count |
+| --- | ---: |
+| Replayed in Apache staging before phase two | 29 |
+| Credited to the 73-commit phase-two replay | 73 |
+| Explicitly excluded, superseded, or deferred | 17 |
+| Total audited | 119 |
+
+All 119 source pull requests were authored by `petergstfsn`. Each record pins
+the exact head SHA, title, state, and merge date inspected on 2026-08-14. This
+matters for PRs that were still open when audited.
+
+## Lineage and staging sequence
+
+- Fork cutoff: `1886e873fa4c24bf1880f2d3a868905c9d5e407f`
+- Final permissive upstream: `v2.129.15` at
+  `a878e2b9c42cd36e4f9d2c00504502a6ef2f9687`
+- Forbidden upstream relicensing commit: `bd7d1ba7`
+- Forbidden first fork merge of that line: `8fbaea57`
+
+The checked record pins staging PRs #248 through #252. PR #248 established the
+Apache-only line, #249 disabled BrepKit publication from staging, #250 replayed
+the initial fork source-commit set, #251 replayed the STEP periodic work, and
+#252 is the first security/correctness wave. The eleven fork source commits
+used by #250 are recorded separately with their authors and exact replay
+mappings. PRs #129 and #133 are credited even though their reconciled successor
+PRs #132 and #134 supplied the replayed trees.
+
+## Phase-two replay
 
 - Replay parent: `6b0ff51aae89de89accb576177f33ab701f3583d`
-- Parent tree: `4c4650e0aa43cc3443c8d6eddcf53b5031198d13`
-- Replay range: `ea8099ca7b26ad6987d92e7e368ca0560eda0380` through
-  `42dc503dafef990a60727c3835480efd2740d552`
+- Parent tree matching PR #252:
+  `4c4650e0aa43cc3443c8d6eddcf53b5031198d13`
+- Replay range: `ea8099ca7b26ad6987d92e7e368ca0560eda0380`
+  through `42dc503dafef990a60727c3835480efd2740d552`
 - Local replay commits: 73
-- Source pull requests: 70
-- Source pull-request author: `petergstfsn`
+- Credited source pull requests: 73
 - Replay commit author: Peter, using the two recorded GitHub noreply addresses
-
-Each source pull request is pinned to the exact head SHA inspected on
-2026-08-14. This matters for PRs #236, #237, #238, #244, and #247, which were
-still open at the time of the audit.
-
-## Adaptations
 
 The replay preserves contribution deltas rather than importing post-license
 branch ancestry. Where the Apache staging architecture differed, the delta was
@@ -31,22 +57,33 @@ ported manually and verified against the staging tree.
 - PR #229 was split into a clean source subset and the remaining compatible
   fixes.
 - PR #218 has a separate lockfile refresh.
-- PRs #185 and #210 were combined into one Apache-safe package-refresh
-  workflow.
+- CI PRs #174, #176, #185, #208, and #210 were consolidated into one
+  Apache-safe package-refresh workflow.
 - PR #224 contributes its regressions; its implementation was superseded.
 - `42dc503d` is independent fork-authored CI hardening that binds generated
   WASM to the triggering source commit.
 
-PRs #206 and #207 were not applicable because their target blend architecture
-does not exist on the Apache staging tree. PR #219 is release-only metadata.
-PR #246 hard-codes repository-specific BrepKit workflow settings and is to be
-regenerated after the standalone Remus repository exists.
+## Exclusions and deferred repository prose
+
+Every omitted PR has an exact reason in the JSON ledger. Closed alternatives
+#148, #153, #196, #197, #199, #205, #213, and #214 are superseded by the
+credited implementations. PR #154's delta was already present in the final
+permissive upstream. PRs #206 and #207 target a post-license blend architecture
+that does not exist on the Apache line. PR #219 is release-only metadata.
+
+Repository-specific documentation from PRs #135, #137, #217, and #246 must be
+regenerated after the standalone successor exists; transplanting their
+BrepKit-specific settings would make the new repository inaccurate. PR #136 is
+the closed review branch superseded by #135 and #137. The installed-package
+test from #217 is superseded by the stronger tarball consumer replayed from
+#221.
 
 ## Verification behavior
 
-The checker always validates the ledger schema, exact PR set, pinned source
-heads, authors, counts, mappings, exceptions, and exclusions. When all 73
-individual replay commits are present in the checkout, it additionally verifies
-their recorded authors and subjects from Git. That history check is expected on
-the replay PR; after a squash merge or a fresh shallow clone, the structured
-ledger remains the durable evidence.
+The checker always validates the canonical ledger digest, the exact 119-PR
+partition, pinned source heads and authors, staging lineage, source-commit
+mappings, phase-two counts, adaptations, and exclusions. When all 73 individual
+phase-two replay commits are present, it additionally verifies their Git
+authors, subjects, parent tree, and range count. That history check is expected
+on the replay PR; after a squash merge or a fresh clone, the structured ledger
+remains the durable evidence and is regenerated with the final replay hashes.
