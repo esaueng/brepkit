@@ -2931,6 +2931,26 @@ pub(super) fn tessellate_nonplanar_snap(
 }
 
 #[cfg(test)]
+mod rim_angle_tests {
+    use super::rim_angles_match;
+    use std::f64::consts::TAU;
+
+    #[test]
+    fn accepts_matching_angles_across_surface_seam() {
+        let a = [0.0, 1.0, TAU - 5e-7];
+        let b = [TAU, 1.0 + 5e-7, 0.0];
+        assert!(rim_angles_match(&a, &b, 1e-6));
+    }
+
+    #[test]
+    fn rejects_equal_count_phase_mismatch() {
+        let a = [0.0, 1.0, 2.0];
+        let b = [0.25, 1.25, 2.25];
+        assert!(!rim_angles_match(&a, &b, 1e-6));
+    }
+}
+
+#[cfg(test)]
 mod torus_winding_tests {
     use super::has_single_period_winding;
 
