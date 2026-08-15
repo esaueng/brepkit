@@ -223,7 +223,11 @@ fn build_face_adjacency_graph(
         if faces.len() == 2 {
             let probe = local_concavity_probe(topo, *eid, faces[0], faces[1])?;
             let normal_angle = crate::query::edge_normal_angle(topo, *eid, faces[0], faces[1])?;
-            let concavity = crate::query::edge_concavity(topo, solid, *eid, probe)?;
+            // Reuse the adjacency assembled above and avoid the robust
+            // classifier's full-solid tessellation for every edge probe.
+            let concavity = crate::query::edge_concavity_from_faces(
+                topo, solid, *eid, faces[0], faces[1], probe,
+            )?;
 
             let edge_info = FagEdge {
                 edge: *eid,
