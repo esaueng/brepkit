@@ -13,6 +13,10 @@ on:
 permissions:
   contents: read
 
+concurrency:
+  group: apache-package-refresh-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   # The committed package directory is a real distribution channel, not a
   # build leftover: OpenZCAD installs this repo as
@@ -141,6 +145,8 @@ jobs:
           VERSION=$(jq -r .version crates/wasm/pkg/package.json)
           git commit -m "chore(wasm): refresh committed package to v${VERSION} from ${GITHUB_SHA:0:7} [skip ci]"
           remote="https://x-access-token:${GH_TOKEN}@github.com/${GITHUB_REPOSITORY}.git"
-          git pull --rebase --autostash "$remote" apache-main
+          # Never rebase an artifact generated from an older source commit onto
+          # a newer branch head. A concurrent source push makes this push fail;
+          # that newer push starts its own refresh from the correct source.
           git push "$remote" HEAD:apache-main
           echo "::notice::Committed brepkit-wasm ${VERSION}; consumers on #apache-main pick it up on the next install."
