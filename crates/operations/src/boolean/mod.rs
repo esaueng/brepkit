@@ -2325,11 +2325,10 @@ fn aabbs_clear_gap(
 /// a clear gap: every connected face component of `a` is separated from every
 /// connected face component of `b` by more than `margin` on some axis.
 ///
-/// Soundness: components containing NURBS faces are rejected because their
-/// sampled bounding boxes are not guaranteed to contain every surface
-/// extremum. The remaining component AABBs come from
-/// [`crate::measure::face_set_bounding_box`] and are conservative *outer*
-/// bounds (vertices plus analytic surface-curvature expansion). If two
+/// Soundness: only polyhedral components (planar faces bounded by line edges)
+/// are accepted. Bounding curved surfaces and edges currently relies in part
+/// on sampling, which cannot prove an outer bound for arbitrary imported
+/// geometry. For polyhedra the vertices provide an exact outer AABB. If two
 /// components' true geometry overlapped or touched, their
 /// boxes would touch or overlap and [`aabbs_clear_gap`] would (correctly)
 /// return `false`. So a `true` result guarantees a real positive gap between
@@ -2354,12 +2353,27 @@ fn solids_provably_disjoint(topo: &Topology, a: SolidId, b: SolidId, margin: f64
         comps
             .iter()
             .map(|faces| {
-                let has_nurbs = faces.iter().try_fold(false, |has_nurbs, &face_id| {
-                    topo.face(face_id)
-                        .map(|face| has_nurbs || matches!(face.surface(), FaceSurface::Nurbs(_)))
-                        .ok()
+                let is_polyhedral = faces.iter().try_fold(true, |is_polyhedral, &face_id| {
+                    let face = topo.face(face_id).ok()?;
+                    let wires_are_linear = std::iter::once(face.outer_wire())
+                        .chain(face.inner_wires().iter().copied())
+                        .try_fold(true, |are_linear, wire_id| {
+                            let wire = topo.wire(wire_id).ok()?;
+                            wire.edges().iter().try_fold(are_linear, |are_linear, oe| {
+                                topo.edge(oe.edge())
+                                    .map(|edge| {
+                                        are_linear && matches!(edge.curve(), EdgeCurve::Line)
+                                    })
+                                    .ok()
+                            })
+                        })?;
+                    Some(
+                        is_polyhedral
+                            && matches!(face.surface(), FaceSurface::Plane { .. })
+                            && wires_are_linear,
+                    )
                 })?;
-                if has_nurbs {
+                if !is_polyhedral {
                     return None;
                 }
                 crate::measure::face_set_bounding_box(topo, faces).ok()

@@ -442,6 +442,36 @@ fn nurbs_component_is_not_provably_disjoint_from_sampled_box() {
     );
 }
 
+#[test]
+fn curved_edge_component_is_not_provably_disjoint_from_sampled_box() {
+    use brepkit_math::nurbs::curve::NurbsCurve;
+
+    let mut topo = Topology::new();
+    let blank = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 0.0);
+    let face_id = brepkit_topology::explorer::solid_faces(&topo, blank).unwrap()[0];
+    let wire_id = topo.face(face_id).unwrap().outer_wire();
+    let edge_id = topo.wire(wire_id).unwrap().edges()[0].edge();
+    let edge = topo.edge(edge_id).unwrap();
+    let start = topo.vertex(edge.start()).unwrap().point();
+    let end = topo.vertex(edge.end()).unwrap().point();
+    let nurbs = NurbsCurve::new(
+        2,
+        vec![0.0, 0.0, 0.0, 1.0, 1.0, 1.0],
+        vec![start, Point3::new(-10.0, -10.0, -10.0), end],
+        vec![1.0; 3],
+    )
+    .unwrap();
+    topo.edge_mut(edge_id)
+        .unwrap()
+        .set_curve(EdgeCurve::NurbsCurve(nurbs));
+
+    let tool = make_unit_cube_manifold_at(&mut topo, 0.0, 0.0, 9.5);
+    assert!(
+        !solids_provably_disjoint(&topo, blank, tool, Tolerance::new().linear),
+        "a sampled curved-edge AABB cannot prove that the solids are disjoint"
+    );
+}
+
 /// A two-piece accumulator whose overall box spans the tool: whole-solid
 /// AABBs overlap, so only the per-component witness can prove the tool
 /// touches nothing. The cut must return the target unchanged.
