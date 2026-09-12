@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1786773792331,
+  "lastUpdate": 1789250205180,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -11285,6 +11285,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 38660090,
             "range": "± 109375",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "235fd938b2504f9e592f063b33e848ae66a238a6",
+          "message": "ci: repair Apache lineage provenance checks (#256)\n\nPR #253 pinned the provenance ledger hash and the replay author\nallowlist before the ledger's final edit, and the lineage script\ndepends on rg, which GitHub runners do not provide. Align the pinned\nledger hash with the merged ledger, record both noreply identities\nthat the 73 replay commits actually use (same GitHub account ID), and\nreplace rg with grep so the license-metadata scan really runs.",
+          "timestamp": "2026-09-12T17:49:53-04:00",
+          "tree_id": "57e50d3b1f462e061b54aaf16375e88037f6121d",
+          "url": "https://github.com/esaueng/brepkit/commit/235fd938b2504f9e592f063b33e848ae66a238a6"
+        },
+        "date": 1789250204273,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1262529,
+            "range": "± 2177",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1347343,
+            "range": "± 8575",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 13031,
+            "range": "± 53",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 972367,
+            "range": "± 1820",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 38047857,
+            "range": "± 631368",
             "unit": "ns/iter"
           }
         ]
