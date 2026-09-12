@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789250205180,
+  "lastUpdate": 1789252883915,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -11339,6 +11339,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 38047857,
             "range": "± 631368",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "d10eea3a0070620ec3086f23d77073a5e1c3a867",
+          "message": "docs: clarify agent authorization with redacted working agreements (#255)",
+          "timestamp": "2026-09-12T18:38:40-04:00",
+          "tree_id": "38c2ab43b1cce1b64e10dad361c966f5c993bf09",
+          "url": "https://github.com/esaueng/brepkit/commit/d10eea3a0070620ec3086f23d77073a5e1c3a867"
+        },
+        "date": 1789252882426,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1322832,
+            "range": "± 6689",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1419131,
+            "range": "± 1356",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 14182,
+            "range": "± 110",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 1013064,
+            "range": "± 1836",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 40138494,
+            "range": "± 78421",
             "unit": "ns/iter"
           }
         ]
