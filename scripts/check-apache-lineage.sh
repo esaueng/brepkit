@@ -25,11 +25,11 @@ if ! grep -Eq '^license = "Apache-2.0"$' Cargo.toml; then
   exit 1
 fi
 
-if rg -n 'AGPL-3.0-only|MIT OR Apache-2.0|LICENSE-MIT' \
-  --glob 'Cargo.toml' \
-  --glob 'package.json' \
-  --glob '*.toml' \
-  --glob '*.json'; then
+if grep -rnE 'AGPL-3.0-only|MIT OR Apache-2.0|LICENSE-MIT' \
+  --include='Cargo.toml' \
+  --include='package.json' \
+  --include='*.toml' \
+  --include='*.json' .; then
   echo "Apache lineage violation: incompatible project license metadata found"
   exit 1
 fi

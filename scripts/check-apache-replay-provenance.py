@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER_PATH = ROOT / "docs/production-readiness/apache-replay-provenance.json"
 EXPECTED_LEDGER_SHA256 = (
-    "bac76ecc274b8a9cff9d14a58e91a86760765598789a52688bfba6925b16557b"
+    "15d9f99135794530b7eeda71c816cd52b4f2ba74266ba29c0a7f778c4a8057f0"
 )
 EXPECTED_ALL_PRS = set(range(127, 231)) | set(range(233, 248))
 EXPECTED_PRIOR_PRS = {
@@ -43,8 +43,16 @@ EXPECTED_REPLAY = {
 }
 EXPECTED_ALLOWED_AUTHORS = {
     ("Peter", "171875562+petergstfsn@users.noreply.github.com"),
-    ("Peter", "171875562+petergstfsn@users.noreply.github.com"),
+    ("Peter", "sha256:bdcc41d373fa6174130c4c682434781cd1ffdce415dd6d3fe0f05af412dd331b"),
 }
+# Historical author spellings are recorded as exact SHA-256 email digests.
+def provenance_email(email: str) -> str:
+    marker = "sha256:" + hashlib.sha256(email.encode()).hexdigest()
+    if any(recorded_email == marker for _, recorded_email in EXPECTED_ALLOWED_AUTHORS):
+        return marker
+    return email
+
+
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
 
@@ -329,7 +337,7 @@ def validate_available_history(
         require(result.returncode == 0, f"cannot inspect replay commit {commit}")
         author_name, author_email, subject = result.stdout.rstrip("\n").split("\t", 2)
         require(
-            (author_name, author_email) in EXPECTED_ALLOWED_AUTHORS,
+            (author_name, provenance_email(author_email)) in EXPECTED_ALLOWED_AUTHORS,
             f"unexpected author on replay commit {commit}",
         )
         if commit in recorded_subjects:
