@@ -14,7 +14,7 @@ from typing import Any
 ROOT = Path(__file__).resolve().parent.parent
 LEDGER_PATH = ROOT / "docs/production-readiness/apache-replay-provenance.json"
 EXPECTED_LEDGER_SHA256 = (
-    "5b540c03e5f2222d5dfb896ad51e78909fbd84da06e3fab2c9ba53feb646e199"
+    "e56d45b2f3c44d4caabb58c7ca08c7bebb02104726bb2cb193147244ee6ade8e"
 )
 EXPECTED_ALL_PRS = set(range(127, 231)) | set(range(233, 248))
 EXPECTED_PRIOR_PRS = {
@@ -43,7 +43,7 @@ EXPECTED_REPLAY = {
 }
 EXPECTED_ALLOWED_AUTHORS = {
     ("Peter", "171875562+petergstfsn@users.noreply.github.com"),
-    ("Peter", "171875562+petergstfsn@users.noreply.github.com"),
+    ("Peter", "171875562+petergustafson@users.noreply.github.com"),
 }
 SHA_PATTERN = re.compile(r"^[0-9a-f]{40}$")
 
