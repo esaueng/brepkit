@@ -1,5 +1,5 @@
 window.BENCHMARK_DATA = {
-  "lastUpdate": 1789252883915,
+  "lastUpdate": 1791433941389,
   "repoUrl": "https://github.com/esaueng/brepkit",
   "entries": {
     "Boolean perf": [
@@ -11393,6 +11393,60 @@ window.BENCHMARK_DATA = {
             "name": "boolean/perforated_cut_36",
             "value": 40138494,
             "range": "± 78421",
+            "unit": "ns/iter"
+          }
+        ]
+      },
+      {
+        "commit": {
+          "author": {
+            "email": "171875562+petergstfsn@users.noreply.github.com",
+            "name": "Peter",
+            "username": "petergstfsn"
+          },
+          "committer": {
+            "email": "noreply@github.com",
+            "name": "GitHub",
+            "username": "web-flow"
+          },
+          "distinct": true,
+          "id": "c5d0f0770834483b9b95c5c67dcd465349d3c997",
+          "message": "docs: clarify agent authorization with redacted working agreements (#255)",
+          "timestamp": "2026-09-12T18:38:40-04:00",
+          "tree_id": "6eb3b02703626df972d84588e7f02f364b5fcfa2",
+          "url": "https://github.com/esaueng/brepkit/commit/c5d0f0770834483b9b95c5c67dcd465349d3c997"
+        },
+        "date": 1791433940346,
+        "tool": "cargo",
+        "benches": [
+          {
+            "name": "boolean/cut_box_box",
+            "value": 1055304,
+            "range": "± 13284",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/fuse_box_box",
+            "value": 1143819,
+            "range": "± 14047",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/intersect_box_box",
+            "value": 11330,
+            "range": "± 157",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/cut_cylinder_through_box",
+            "value": 810414,
+            "range": "± 11253",
+            "unit": "ns/iter"
+          },
+          {
+            "name": "boolean/perforated_cut_36",
+            "value": 31996497,
+            "range": "± 341071",
             "unit": "ns/iter"
           }
         ]
